@@ -1,6 +1,6 @@
 # Overview
 
-This is a St. Regis Osaka Valet Management System - a full-stack web application built for managing hotel valet parking services. The system provides a customer-facing interface for ticket submission and status tracking, along with staff and admin dashboards for operations management. It features real-time updates through WebSocket connections, OCR-based ticket scanning, and role-based access control.
+This is a St. Regis Osaka Valet Management System - a full-stack web application built for managing hotel valet parking services. The system provides a customer-facing interface for ticket submission and status tracking with timed progression stages, along with staff and admin dashboards for operations management. It features real-time countdown timers (5 min → 5 min → 3 min), WebSocket connections, OCR-based ticket scanning, and role-based access control.
 
 # User Preferences
 
@@ -50,6 +50,8 @@ Preferred communication style: Simple, everyday language.
 - **WebSocket Server**: Custom WebSocket implementation for live updates
 - **Event Types**: Ticket creation, status updates, system notifications
 - **Client Integration**: React hook for WebSocket connection management
+- **Countdown Timers**: Live MM:SS countdown for each stage (5min → 5min → 3min)
+- **Automatic Progression**: Stages advance automatically when timers expire
 - **Fallback**: Polling mechanism as backup for real-time updates
 
 ## File Structure
