@@ -202,6 +202,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes for user management
+  app.get("/api/admin/users", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/admin/users", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    const { email, firstName, lastName, role } = req.body;
+
+    if (!email || !firstName || !lastName) {
+      return res.status(400).json({ error: "Email, first name, and last name are required" });
+    }
+
+    try {
+      const newUser = await storage.createUser({
+        email,
+        firstName,
+        lastName,
+        role: role || "standard",
+      });
+      res.json(newUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.get("/api/admin/tickets", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const tickets = await storage.getAllTickets();
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching all tickets:", error);
+      res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
+  app.post("/api/admin/tickets", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    const { ticketNumber, licensePlate, parkingSector, parkingLocation, staffNotes, carPhoto } = req.body;
+
+    if (!ticketNumber) {
+      return res.status(400).json({ error: "Ticket number is required" });
+    }
+
+    try {
+      const parkingLocationFormatted = parkingSector && parkingLocation ? 
+        `${parkingSector}${parkingLocation}` : undefined;
+
+      const newTicket = await storage.createValetTicket({
+        ticketNumber,
+        licensePlate,
+        parkingLocation: parkingLocationFormatted,
+        staffNotes,
+        carPhoto,
+      });
+
+      // Broadcast to all connected WebSocket clients
+      broadcastToAll({
+        type: 'ticket_created',
+        data: newTicket
+      });
+
+      res.json(newTicket);
+    } catch (error) {
+      console.error("Error creating admin ticket:", error);
+      res.status(500).json({ error: "Failed to create ticket" });
+    }
+  });
+
   // Car Photo Management Routes
   app.post('/api/car-photos/upload', isAuthenticated, async (req, res) => {
     try {
@@ -249,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parkingSector,
         staffNotes,
         carPhoto: normalizedPhotoPath,
-        assignedStaff: req.user?.claims?.sub,
+        assignedStaff: (req as any).user?.claims?.sub,
       });
 
       // Broadcast update to WebSocket clients
@@ -261,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedTicket);
     } catch (error) {
       console.error("Error updating car details:", error);
-      if (isUnauthorizedError(error)) {
+      if (error && typeof error === 'object' && 'message' in error && (error as any).message?.includes('Unauthorized')) {
         return res.status(401).json({ message: "Unauthorized" });
       }
       res.status(500).json({ message: "Failed to update car details" });

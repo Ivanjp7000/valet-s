@@ -20,6 +20,8 @@ export interface IStorage {
   // User operations (IMPORTANT) these user operations are mandatory for Replit Auth.
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
+  createUser(user: Omit<UpsertUser, 'id'>): Promise<User>;
   
   // Valet ticket operations
   createValetTicket(ticket: InsertValetTicket): Promise<ValetTicket>;
@@ -28,6 +30,7 @@ export interface IStorage {
   updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined>;
   getActiveTickets(): Promise<ValetTicket[]>;
   getCompletedTicketsToday(): Promise<ValetTicket[]>;
+  getAllTickets(): Promise<ValetTicket[]>;
   
   // FAQ operations
   getFaqs(): Promise<Faq[]>;
@@ -167,6 +170,20 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSystemSettings(): Promise<SystemSetting[]> {
     return await db.select().from(systemSettings);
+  }
+
+  // Additional methods for admin functionality
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(asc(users.firstName));
+  }
+
+  async createUser(userData: Omit<UpsertUser, 'id'>): Promise<User> {
+    const [user] = await db.insert(users).values(userData).returning();
+    return user;
+  }
+
+  async getAllTickets(): Promise<ValetTicket[]> {
+    return await db.select().from(valetTickets).orderBy(desc(valetTickets.createdAt));
   }
 }
 
