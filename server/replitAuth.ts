@@ -57,12 +57,16 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
+  // Check if this user should be superadmin based on email or ID
+  const isAdmin = claims["email"] === "ivan@xen-jp.com" || claims["sub"] === "15452703";
+  
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
+    role: isAdmin ? "superadmin" : "standard",
   });
 }
 

@@ -153,7 +153,7 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (lastMessage) {
       try {
-        const data = JSON.parse(lastMessage.data);
+        const data = JSON.parse(lastMessage);
         if (data.type === 'ticket_created' || data.type === 'status_updated') {
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
           queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
@@ -173,6 +173,7 @@ export default function StaffDashboard() {
             <div>
               <h1 className="text-xl font-bold text-regis-navy">Staff Dashboard</h1>
               <p className="text-sm text-gray-600">Hotel St. Regis Osaka</p>
+              <p className="text-xs text-gray-500">Role: {user?.role || 'Loading...'} | User: {user?.email}</p>
             </div>
           </div>
           <Button
@@ -284,7 +285,7 @@ export default function StaffDashboard() {
                             <div>
                               <p className="font-medium">Ticket #{ticket.ticketNumber}</p>
                               <p className="text-sm text-gray-600">
-                                Created {new Date(ticket.createdAt).toLocaleTimeString()}
+                                Created {ticket.createdAt ? new Date(ticket.createdAt).toLocaleTimeString() : 'Unknown'}
                               </p>
                             </div>
                           </div>
@@ -424,7 +425,7 @@ export default function StaffDashboard() {
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-500">
-                              {new Date(ticket.createdAt).toLocaleDateString()}
+                              {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Unknown'}
                             </p>
                           </div>
                           
