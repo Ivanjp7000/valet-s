@@ -1,6 +1,6 @@
 # Overview
 
-This is a St. Regis Osaka Valet Management System - a full-stack web application built for managing hotel valet parking services. The system provides a customer-facing interface for ticket submission and status tracking with timed progression stages, along with staff and admin dashboards for operations management. It features real-time countdown timers (5 min → 5 min → 3 min), WebSocket connections, OCR-based ticket scanning, and role-based access control.
+This is a St. Regis Osaka Valet Management System - a comprehensive car valet management app that digitalizes the traditional paper ticket system. Features include customer ticket scanning/entry, real-time retrieval tracking with animated progress stages, and a full admin system for managing staff users, tickets, car details (photos, plates, models), and parking locations across sectors A, B, C, T, E with numbered spots 1-100. The system provides role-based access control with superadmin capabilities for comprehensive ticket and user management.
 
 # User Preferences
 
