@@ -15,12 +15,18 @@ interface StatusTrackerProps {
 
 export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
   const [currentStage, setCurrentStage] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [stageStartTime, setStageStartTime] = useState<Date | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
   const { lastMessage } = useWebSocket();
 
   const { data: ticket } = useQuery<ValetTicket>({
     queryKey: ["/api/tickets", ticketNumber],
     refetchInterval: 5000, // Poll every 5 seconds as backup
   });
+
+  // Stage durations in minutes: 5 min, 5 min, 3 min
+  const stageDurations = [5, 5, 3];
 
   // Listen for WebSocket updates
   useEffect(() => {
@@ -33,29 +39,54 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
     }
   }, [lastMessage, ticketNumber]);
 
-  // Update current stage based on ticket status
+  // Initialize timing when component mounts
   useEffect(() => {
-    if (ticket) {
-      switch (ticket.status) {
-        case 'retrieving':
-          setCurrentStage(0);
-          break;
-        case 'transit':
-          setCurrentStage(1);
-          break;
-        case 'ready':
-          setCurrentStage(2);
-          break;
-        case 'completed':
-          // Show success message and redirect
+    if (ticket && !stageStartTime && !isCompleted) {
+      const now = new Date();
+      setStageStartTime(now);
+      setTimeRemaining(stageDurations[0] * 60); // Convert to seconds
+    }
+  }, [ticket, stageStartTime, isCompleted]);
+
+  // Handle countdown and stage progression
+  useEffect(() => {
+    if (!stageStartTime || isCompleted || currentStage >= 3) return;
+
+    const timer = setInterval(() => {
+      const now = new Date();
+      const elapsedSeconds = Math.floor((now.getTime() - stageStartTime.getTime()) / 1000);
+      const currentStageDuration = stageDurations[currentStage] * 60;
+      const remaining = Math.max(0, currentStageDuration - elapsedSeconds);
+      
+      setTimeRemaining(remaining);
+
+      // Progress to next stage when time expires
+      if (remaining === 0) {
+        if (currentStage < 2) {
+          const nextStage = currentStage + 1;
+          setCurrentStage(nextStage);
+          setStageStartTime(now);
+          setTimeRemaining(stageDurations[nextStage] * 60);
+        } else {
+          // All stages completed
+          setIsCompleted(true);
           setTimeout(() => {
             alert('Your vehicle is ready for pickup!');
             onBack();
           }, 2000);
-          break;
+        }
       }
-    }
-  }, [ticket, onBack]);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [stageStartTime, currentStage, isCompleted, onBack]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   const stages = [
     {
@@ -142,6 +173,26 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
                   }`}>
                     {stage.description}
                   </p>
+                  
+                  {/* Show countdown timer for current stage */}
+                  {stage.id === currentStage && !isCompleted && (
+                    <div className="mt-2 flex items-center space-x-2">
+                      <Clock className="text-regis-gold" size={16} />
+                      <span className="text-lg font-bold text-regis-navy">
+                        {formatTime(timeRemaining)}
+                      </span>
+                      <span className="text-sm text-gray-500">remaining</span>
+                    </div>
+                  )}
+                  
+                  {/* Show completion checkmark for completed stages */}
+                  {stage.id < currentStage && (
+                    <div className="mt-2 flex items-center space-x-2">
+                      <Check className="text-green-500" size={16} />
+                      <span className="text-sm text-green-600 font-medium">Completed</span>
+                    </div>
+                  )}
+                  
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
                     <motion.div
                       className={`h-2 rounded-full transition-all duration-1000 ${
@@ -157,18 +208,38 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
             ))}
           </AnimatePresence>
 
-          {/* Estimated Time */}
-          <Card className="mt-8 bg-light-gold">
-            <CardContent className="p-4 text-center">
-              <p className="text-regis-navy font-medium flex items-center justify-center">
-                <Clock className="mr-2" size={16} />
-                Estimated Time
-              </p>
-              <p className="text-2xl font-bold text-regis-navy mt-1">
-                {ticket?.estimatedTime || 5} minutes
-              </p>
-            </CardContent>
-          </Card>
+          {/* Current Stage Progress */}
+          {!isCompleted && (
+            <Card className="mt-8 bg-light-gold">
+              <CardContent className="p-4 text-center">
+                <p className="text-regis-navy font-medium flex items-center justify-center">
+                  <Clock className="mr-2" size={16} />
+                  Current Stage: {stages[currentStage]?.name}
+                </p>
+                <p className="text-3xl font-bold text-regis-navy mt-2">
+                  {formatTime(timeRemaining)}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {Math.floor(timeRemaining / 60)} minutes {timeRemaining % 60} seconds remaining
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Completion Message */}
+          {isCompleted && (
+            <Card className="mt-8 bg-green-100 border-green-300">
+              <CardContent className="p-4 text-center">
+                <Check className="mx-auto text-green-600 mb-2" size={48} />
+                <p className="text-green-800 font-bold text-xl">
+                  Vehicle Ready for Pickup!
+                </p>
+                <p className="text-green-600 text-sm mt-1">
+                  Please proceed to the valet area
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Cancel Button */}
           <Button
