@@ -67,11 +67,18 @@ export default function Landing() {
       {/* Header with St. Regis Branding */}
       <div className="bg-white shadow-sm">
         <div className="max-w-md mx-auto px-6 py-8 text-center">
-          <div className="w-48 h-16 mx-auto mb-4 bg-regis-navy rounded-lg flex items-center justify-center">
+          <div className="w-48 h-16 mx-auto mb-4 bg-regis-navy rounded-lg flex items-center justify-center relative">
             <div className="text-regis-gold font-bold text-lg tracking-wider">
               <Crown className="mr-2 inline-block" size={20} />
               ST. REGIS OSAKA
             </div>
+            {/* Hidden Super Admin Login Button */}
+            <button
+              onClick={() => setShowSystemLogin(true)}
+              className="absolute top-0 right-0 w-6 h-6 opacity-0 hover:opacity-10 cursor-pointer transition-opacity"
+              aria-label="System Login"
+              title="Super Admin Login"
+            />
           </div>
           <h1 className="text-2xl font-semibold text-regis-navy mb-2">Valet Service</h1>
           <p className="text-gray-600 text-sm">Retrieve your vehicle with ease</p>
@@ -164,6 +171,11 @@ export default function Landing() {
       >
         <Settings size={12} className="text-gray-600" />
       </Button>
+
+      {/* Hint for staff */}
+      <div className="fixed bottom-4 right-4 text-xs text-gray-400 opacity-40 hover:opacity-80 transition-opacity">
+        Staff: Click logo corner or settings icon
+      </div>
 
       {/* System Login Modal */}
       {showSystemLogin && (

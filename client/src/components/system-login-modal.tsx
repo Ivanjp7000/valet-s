@@ -11,11 +11,18 @@ interface SystemLoginModalProps {
 export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Redirect to Replit Auth login
-    window.location.href = "/api/login";
+    
+    // Check Super Admin credentials
+    if (username === "root" && password === "StRegisOsaka33") {
+      // Redirect to Replit Auth login for authentication
+      window.location.href = "/api/login";
+    } else {
+      setError("Invalid credentials. Please check username and password.");
+    }
   };
 
   return (
@@ -48,6 +55,12 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
                 className="focus:border-regis-gold"
               />
             </div>
+            
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                {error}
+              </div>
+            )}
             
             <Button 
               type="submit"

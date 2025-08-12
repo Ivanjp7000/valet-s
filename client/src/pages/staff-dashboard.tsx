@@ -299,19 +299,13 @@ export default function StaffDashboard() {
                                 </p>
                               </div>
                               
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700">Parking Sector</label>
-                                  <p className="text-gray-900 bg-gray-50 p-2 rounded border">
-                                    {ticket.parkingSector || "Not assigned"}
-                                  </p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium text-gray-700">Parking Location</label>
-                                  <p className="text-gray-900 bg-gray-50 p-2 rounded border">
-                                    {ticket.parkingLocation || "Not assigned"}
-                                  </p>
-                                </div>
+                              <div>
+                                <label className="text-sm font-medium text-gray-700">Parking Location</label>
+                                <p className="text-gray-900 bg-gray-50 p-2 rounded border">
+                                  {ticket.parkingSector && ticket.parkingLocation 
+                                    ? `${ticket.parkingSector}${ticket.parkingLocation}` 
+                                    : "Not assigned"}
+                                </p>
                               </div>
                               
                               <div>
@@ -402,15 +396,27 @@ export default function StaffDashboard() {
                                     </Select>
                                   </div>
                                   <div>
-                                    <label className="text-sm font-medium text-gray-700">Parking Location</label>
+                                    <label className="text-sm font-medium text-gray-700">Spot Number (1-100)</label>
                                     <Input
+                                      type="number"
+                                      min="1"
+                                      max="100"
                                       value={carFormData.parkingLocation}
                                       onChange={(e) => setCarFormData(prev => ({ ...prev, parkingLocation: e.target.value }))}
-                                      placeholder="e.g., A3, C12, T21"
+                                      placeholder="Enter spot number (1-100)"
                                       className="mt-1"
                                     />
                                   </div>
                                 </div>
+                                
+                                {/* Live Preview of Parking Location */}
+                                {carFormData.parkingSector && carFormData.parkingLocation && (
+                                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                                    <p className="text-sm text-blue-700">
+                                      <strong>Parking Location:</strong> {carFormData.parkingSector}{carFormData.parkingLocation}
+                                    </p>
+                                  </div>
+                                )}
 
                                 {/* Staff Notes */}
                                 <div>
