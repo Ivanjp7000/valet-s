@@ -75,10 +75,12 @@ export default function Landing() {
             {/* Hidden Super Admin Login Button */}
             <button
               onClick={() => setShowSystemLogin(true)}
-              className="absolute top-0 right-0 w-6 h-6 opacity-0 hover:opacity-10 cursor-pointer transition-opacity"
+              className="absolute top-1 right-1 w-8 h-8 opacity-20 hover:opacity-60 cursor-pointer transition-opacity bg-regis-gold rounded-full flex items-center justify-center"
               aria-label="System Login"
               title="Super Admin Login"
-            />
+            >
+              <Settings className="text-regis-navy" size={12} />
+            </button>
           </div>
           <h1 className="text-2xl font-semibold text-regis-navy mb-2">Valet Service</h1>
           <p className="text-gray-600 text-sm">Retrieve your vehicle with ease</p>
