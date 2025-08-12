@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -198,6 +199,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating setting:", error);
       res.status(400).json({ message: "Invalid setting data" });
+    }
+  });
+
+  // Car Photo Management Routes
+  app.post('/api/car-photos/upload', isAuthenticated, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getCarPhotoUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error generating car photo upload URL:", error);
+      res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  app.get('/car-photos/:photoPath(*)', async (req, res) => {
+    try {
+      const photoPath = `/${req.params.photoPath}`;
+      const objectStorageService = new ObjectStorageService();
+      const photoFile = await objectStorageService.getCarPhotoFile(photoPath);
+      objectStorageService.downloadCarPhoto(photoFile, res);
+    } catch (error) {
+      console.error("Error serving car photo:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      return res.status(500).json({ message: "Error serving photo" });
+    }
+  });
+
+  // Enhanced Staff Routes for Car Management
+  app.patch('/api/staff/tickets/:ticketNumber/car-details', isAuthenticated, async (req, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { licensePlate, parkingLocation, parkingSector, staffNotes, carPhoto } = req.body;
+      
+      const objectStorageService = new ObjectStorageService();
+      let normalizedPhotoPath = carPhoto;
+      
+      // Normalize car photo URL if it's an object storage URL
+      if (carPhoto && carPhoto.startsWith("https://storage.googleapis.com/")) {
+        normalizedPhotoPath = objectStorageService.normalizeCarPhotoPath(carPhoto);
+      }
+
+      const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
+        licensePlate,
+        parkingLocation,
+        parkingSector,
+        staffNotes,
+        carPhoto: normalizedPhotoPath,
+        assignedStaff: req.user?.claims?.sub,
+      });
+
+      // Broadcast update to WebSocket clients
+      broadcastToAll({
+        type: 'ticket_details_updated',
+        data: updatedTicket,
+      });
+
+      res.json(updatedTicket);
+    } catch (error) {
+      console.error("Error updating car details:", error);
+      if (isUnauthorizedError(error)) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      res.status(500).json({ message: "Failed to update car details" });
     }
   });
 

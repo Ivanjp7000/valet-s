@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CameraScanner } from "@/components/camera-scanner";
 import { StatusTracker } from "@/components/status-tracker";
 import { SystemLoginModal } from "@/components/system-login-modal";
+import { FAQModal } from "@/components/faq-modal";
 import { Camera, Car, Crown, HelpCircle, Settings, Ticket } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,7 @@ export default function Landing() {
   const [showCamera, setShowCamera] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showSystemLogin, setShowSystemLogin] = useState(false);
+  const [showFAQModal, setShowFAQModal] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState("");
   const { toast } = useToast();
 
@@ -143,7 +145,10 @@ export default function Landing() {
                 </>
               )}
             </div>
-            <button className="text-regis-gold text-sm font-medium mt-3 hover:underline">
+            <button 
+              onClick={() => setShowFAQModal(true)}
+              className="text-regis-gold text-sm font-medium mt-3 hover:underline"
+            >
               View all FAQs →
             </button>
           </CardContent>
@@ -164,6 +169,12 @@ export default function Landing() {
       {showSystemLogin && (
         <SystemLoginModal onClose={() => setShowSystemLogin(false)} />
       )}
+
+      {/* FAQ Modal */}
+      <FAQModal 
+        isOpen={showFAQModal} 
+        onClose={() => setShowFAQModal(false)} 
+      />
     </div>
   );
 }

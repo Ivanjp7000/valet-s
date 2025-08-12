@@ -43,6 +43,14 @@ export const valetTickets = pgTable("valet_tickets", {
   ticketNumber: varchar("ticket_number", { length: 6 }).notNull().unique(),
   status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled'
   estimatedTime: integer("estimated_time").default(5), // in minutes
+  // Car details
+  licensePlate: varchar("license_plate"),
+  carPhoto: varchar("car_photo"), // URL to car image
+  parkingLocation: varchar("parking_location"), // e.g., "A3", "C12", "T21"
+  parkingSector: varchar("parking_sector"), // A, B, C, T, E
+  // Staff management
+  staffNotes: text("staff_notes"),
+  assignedStaff: varchar("assigned_staff"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

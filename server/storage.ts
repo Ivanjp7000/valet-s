@@ -25,6 +25,7 @@ export interface IStorage {
   createValetTicket(ticket: InsertValetTicket): Promise<ValetTicket>;
   getValetTicket(ticketNumber: string): Promise<ValetTicket | undefined>;
   updateValetTicketStatus(ticketNumber: string, status: string): Promise<ValetTicket | undefined>;
+  updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined>;
   getActiveTickets(): Promise<ValetTicket[]>;
   getCompletedTicketsToday(): Promise<ValetTicket[]>;
   
@@ -80,6 +81,15 @@ export class DatabaseStorage implements IStorage {
     const [ticket] = await db
       .update(valetTickets)
       .set({ status, updatedAt: new Date() })
+      .where(eq(valetTickets.ticketNumber, ticketNumber))
+      .returning();
+    return ticket;
+  }
+
+  async updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined> {
+    const [ticket] = await db
+      .update(valetTickets)
+      .set({ ...details, updatedAt: new Date() })
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
     return ticket;
