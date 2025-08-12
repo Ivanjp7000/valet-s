@@ -111,7 +111,14 @@ export default function StaffDashboard() {
 
   const addTicketMutation = useMutation({
     mutationFn: async (ticketData: typeof newTicketData) => {
-      await apiRequest("POST", "/api/admin/tickets", ticketData);
+      // Combine sector and spot number for final parking location
+      const finalData = {
+        ...ticketData,
+        parkingLocation: ticketData.parkingSector && ticketData.parkingLocation 
+          ? `${ticketData.parkingSector}${ticketData.parkingLocation.replace(/[A-Z]/g, '')}` 
+          : ticketData.parkingLocation
+      };
+      await apiRequest("POST", "/api/admin/tickets", finalData);
     },
     onSuccess: () => {
       setShowAddTicket(false);
@@ -121,7 +128,11 @@ export default function StaffDashboard() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-      toast({ title: "Success", description: "Ticket added successfully" });
+      toast({ 
+        title: "Success", 
+        description: "New ticket with car details added successfully",
+        duration: 3000
+      });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
