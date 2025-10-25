@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Shield, X } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SystemLoginModalProps {
   onClose: () => void;
@@ -12,16 +13,21 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setIsLoading(true);
     
-    // Check Super Admin credentials
-    if (username === "root" && password === "StRegisOsaka33") {
-      // Redirect to Replit Auth login for authentication
-      window.location.href = "/api/login";
-    } else {
-      setError("Invalid credentials. Please check username and password.");
+    try {
+      await apiRequest("POST", "/api/auth/local", { username, password });
+      // On success, reload the page to update authentication state
+      window.location.href = "/";
+    } catch (err: any) {
+      setError(err.message || "Invalid credentials. Please check username and password.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -65,8 +71,10 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
             <Button 
               type="submit"
               className="w-full bg-regis-navy hover:bg-blue-900 text-white font-medium mb-4"
+              disabled={isLoading}
+              data-testid="button-login"
             >
-              Login
+              {isLoading ? "Logging in..." : "Login"}
             </Button>
           </form>
 
