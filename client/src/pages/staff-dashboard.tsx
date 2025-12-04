@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CarPhotoUploader } from "@/components/car-photo-uploader";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home } from "lucide-react";
+import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -187,14 +188,26 @@ export default function StaffDashboard() {
               <p className="text-xs text-gray-500">Role: {user?.role || 'Loading...'} | User: {user?.email}</p>
             </div>
           </div>
-          <Button
-            onClick={() => window.location.href = '/api/logout'}
-            variant="outline"
-            className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white"
-          >
-            <LogOut size={16} className="mr-2" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <Link href="/">
+              <Button
+                variant="outline"
+                className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white"
+                data-testid="button-back-home"
+              >
+                <Home size={16} className="mr-2" />
+                Home
+              </Button>
+            </Link>
+            <Button
+              onClick={() => window.location.href = '/api/logout'}
+              variant="outline"
+              className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white"
+            >
+              <LogOut size={16} className="mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </div>
 

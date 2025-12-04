@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff } from "lucide-react";
+import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home } from "lucide-react";
+import { Link } from "wouter";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -257,6 +258,16 @@ export default function AdminPanel() {
             {isPrivilegeAdmin && userOUName && (
               <Badge className="bg-blue-600 text-white">{userOUName}</Badge>
             )}
+            <Link href="/">
+              <Button
+                variant="outline"
+                className="border-blue-300 text-blue-200 hover:bg-blue-800 hover:text-white"
+                data-testid="button-back-home"
+              >
+                <Home className="mr-2" size={18} />
+                Home
+              </Button>
+            </Link>
             <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white" data-testid="link-logout">
               <LogOut className="mr-2" size={18} />
               Logout
