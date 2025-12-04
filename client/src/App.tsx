@@ -22,7 +22,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/staff" component={StaffDashboard} />
-          {user?.role === 'superadmin' && (
+          {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
             <Route path="/admin" component={AdminPanel} />
           )}
         </>

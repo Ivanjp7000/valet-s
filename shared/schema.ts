@@ -28,7 +28,10 @@ export const sessions = pgTable(
 export const organizationalUnits = pgTable("organizational_units", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull().unique(),
+  code: varchar("code").notNull().unique(), // Short unique identifier like "SONY", "MARRIOTT"
   description: text("description"),
+  contactEmail: varchar("contact_email"),
+  contactPhone: varchar("contact_phone"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -39,6 +42,7 @@ export const physicalLocations = pgTable("physical_locations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ouId: varchar("ou_id").notNull().references(() => organizationalUnits.id),
   name: varchar("name").notNull(),
+  code: varchar("code").notNull(), // Short identifier like "TKY-HQ"
   address: text("address"),
   parkingSectors: text("parking_sectors"), // comma-separated: "A,B,C,T,E"
   maxSpots: integer("max_spots").default(100),
@@ -130,12 +134,16 @@ export type UserRole = 'superadmin' | 'privilege_admin' | 'standard_admin';
 // Zod schemas
 export const insertOUSchema = createInsertSchema(organizationalUnits).pick({
   name: true,
+  code: true,
   description: true,
+  contactEmail: true,
+  contactPhone: true,
 });
 
 export const insertPhysicalLocationSchema = createInsertSchema(physicalLocations).pick({
   ouId: true,
   name: true,
+  code: true,
   address: true,
   parkingSectors: true,
   maxSpots: true,
