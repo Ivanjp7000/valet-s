@@ -4,9 +4,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Crown, LogOut, Users, Settings, Car, Building, MapPin, Shield } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
 
 export default function Home() {
   const { user } = useAuth();
+
+  const { data: ous } = useQuery<OrganizationalUnit[]>({
+    queryKey: ["/api/ous"],
+    enabled: user?.role === 'superadmin',
+  });
+
+  const { data: locations } = useQuery<PhysicalLocation[]>({
+    queryKey: ["/api/locations"],
+    enabled: user?.role === 'superadmin',
+  });
+
+  const { data: users } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    enabled: user?.role === 'superadmin',
+  });
 
   const getRoleLabel = (role: string) => {
     switch (role) {
@@ -109,15 +126,15 @@ export default function Home() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="text-sm text-gray-600">Organizations</span>
-                    <span className="font-semibold text-regis-navy">—</span>
+                    <span className="font-semibold text-regis-navy">{ous?.length ?? 0}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="text-sm text-gray-600">Locations</span>
-                    <span className="font-semibold text-regis-navy">—</span>
+                    <span className="font-semibold text-regis-navy">{locations?.length ?? 0}</span>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-sm text-gray-600">Total Users</span>
-                    <span className="font-semibold text-regis-navy">—</span>
+                    <span className="font-semibold text-regis-navy">{users?.length ?? 0}</span>
                   </div>
                 </div>
               </CardContent>
