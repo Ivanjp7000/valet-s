@@ -125,7 +125,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     (formData.visitorType !== "restaurant" || formData.visitorSubType) &&
     formData.carMake && formData.carModel && formData.carColor;
 
-  const canProceedStep2 = formData.guestName.trim().length > 0;
+  const canProceedStep2 = formData.guestName.trim().length > 0 && formData.platePhotoUrl.length > 0;
 
   const canProceedStep3 = formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber);
 
@@ -302,7 +302,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
               <p className="text-sm text-gray-500">Take a photo of the license plate</p>
               <div className="flex gap-2 justify-center">
                 <Button
-                  variant="outline"
+                  variant="default"
+                  className="bg-regis-gold hover:bg-yellow-600 text-regis-navy"
                   onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
@@ -323,10 +324,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   data-testid="button-capture-plate"
                 >
                   <Camera className="w-4 h-4 mr-2" />
-                  Capture
+                  Take Photo
                 </Button>
               </div>
-              <p className="text-xs text-gray-400">(Optional - can skip if not available)</p>
+              <p className="text-xs text-red-500 font-medium">* Photo is required to proceed</p>
             </div>
           )}
         </div>
