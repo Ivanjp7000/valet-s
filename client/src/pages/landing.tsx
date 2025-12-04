@@ -182,14 +182,10 @@ export default function Landing() {
         size="icon"
         onClick={() => setShowSystemLogin(true)}
         className="fixed bottom-4 left-4 w-8 h-8 bg-gray-300 hover:bg-gray-400 opacity-30 hover:opacity-60 transition-all duration-300"
+        data-testid="button-system-login"
       >
         <Settings size={12} className="text-gray-600" />
       </Button>
-
-      {/* Hint for staff */}
-      <div className="fixed bottom-4 right-4 text-xs text-gray-400 opacity-40 hover:opacity-80 transition-opacity">
-        Staff: Click logo corner or settings icon
-      </div>
 
       {/* System Login Modal */}
       {showSystemLogin && (
