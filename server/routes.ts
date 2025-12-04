@@ -124,61 +124,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Protected routes (Staff/Admin only)
-  app.get('/api/staff/tickets', isAuthenticated, async (req, res) => {
-    try {
-      const activeTickets = await storage.getActiveTickets();
-      res.json(activeTickets);
-    } catch (error) {
-      console.error("Error fetching active tickets:", error);
-      res.status(500).json({ message: "Failed to fetch active tickets" });
-    }
-  });
-
-  app.patch('/api/staff/tickets/:ticketNumber/status', isAuthenticated, async (req, res) => {
-    try {
-      const { ticketNumber } = req.params;
-      const { status } = updateValetTicketStatusSchema.parse(req.body);
-      
-      const ticket = await storage.updateValetTicketStatus(ticketNumber, status);
-      
-      if (!ticket) {
-        return res.status(404).json({ message: "Ticket not found" });
-      }
-
-      // Broadcast status update to all connected clients
-      broadcastToAll({
-        type: 'ticket_status_updated',
-        data: ticket
-      });
-
-      res.json(ticket);
-    } catch (error) {
-      console.error("Error updating ticket status:", error);
-      res.status(400).json({ message: "Invalid status update" });
-    }
-  });
-
-  app.get('/api/staff/stats', isAuthenticated, async (req, res) => {
-    try {
-      const activeTickets = await storage.getActiveTickets();
-      const completedToday = await storage.getCompletedTicketsToday();
-      
-      const stats = {
-        pending: activeTickets.filter(t => t.status === 'retrieving').length,
-        transit: activeTickets.filter(t => t.status === 'transit').length,
-        ready: activeTickets.filter(t => t.status === 'ready').length,
-        completed: completedToday.length,
-        avgTime: '4.2m' // This could be calculated from actual data
-      };
-
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      res.status(500).json({ message: "Failed to fetch stats" });
-    }
-  });
-
   // Role-based middleware
   const requireSuperAdmin = async (req: any, res: any, next: any) => {
     const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
@@ -215,6 +160,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.currentUser = user;
     next();
   };
+
+  // Protected routes (Staff/Admin only) - requires standard_admin or higher
+  app.get('/api/staff/tickets', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const activeTickets = await storage.getActiveTickets();
+      res.json(activeTickets);
+    } catch (error) {
+      console.error("Error fetching active tickets:", error);
+      res.status(500).json({ message: "Failed to fetch active tickets" });
+    }
+  });
+
+  app.patch('/api/staff/tickets/:ticketNumber/status', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { status } = updateValetTicketStatusSchema.parse(req.body);
+      
+      const ticket = await storage.updateValetTicketStatus(ticketNumber, status);
+      
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Broadcast status update to all connected clients
+      broadcastToAll({
+        type: 'ticket_status_updated',
+        data: ticket
+      });
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error updating ticket status:", error);
+      res.status(400).json({ message: "Invalid status update" });
+    }
+  });
+
+  app.get('/api/staff/stats', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const activeTickets = await storage.getActiveTickets();
+      const completedToday = await storage.getCompletedTicketsToday();
+      
+      const stats = {
+        pending: activeTickets.filter(t => t.status === 'retrieving').length,
+        transit: activeTickets.filter(t => t.status === 'transit').length,
+        ready: activeTickets.filter(t => t.status === 'ready').length,
+        completed: completedToday.length,
+        avgTime: '4.2m'
+      };
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
 
   // ===== ORGANIZATIONAL UNIT ROUTES (Super Admin Only) =====
   app.get('/api/ous', isAuthenticated, requireSuperAdmin, async (req, res) => {
@@ -652,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Car Photo Management Routes
-  app.post('/api/car-photos/upload', isAuthenticated, async (req, res) => {
+  app.post('/api/car-photos/upload', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getCarPhotoUploadURL();
@@ -679,7 +679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced Staff Routes for Car Management
-  app.patch('/api/staff/tickets/:ticketNumber/car-details', isAuthenticated, async (req, res) => {
+  app.patch('/api/staff/tickets/:ticketNumber/car-details', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
       const { licensePlate, parkingLocation, parkingSector, staffNotes, carPhoto } = req.body;
