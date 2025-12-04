@@ -870,12 +870,12 @@ export default function AdminPanel() {
             {(newUser.role !== 'superadmin' || isPrivilegeAdmin) && newUser.ouId && (
               <div>
                 <label className="text-sm font-medium text-gray-700">Location (optional)</label>
-                <Select value={newUser.locationId} onValueChange={(value) => setNewUser({ ...newUser, locationId: value })}>
+                <Select value={newUser.locationId || "none"} onValueChange={(value) => setNewUser({ ...newUser, locationId: value === "none" ? "" : value })}>
                   <SelectTrigger className="mt-1" data-testid="select-user-location">
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No specific location</SelectItem>
+                    <SelectItem value="none">No specific location</SelectItem>
                     {(isPrivilegeAdmin ? filteredLocations : locations?.filter(l => l.ouId === newUser.ouId))?.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                     ))}
@@ -981,12 +981,12 @@ export default function AdminPanel() {
               {(editingUser.role !== 'superadmin' || isPrivilegeAdmin) && editingUser.ouId && (
                 <div>
                   <label className="text-sm font-medium text-gray-700">Location (optional)</label>
-                  <Select value={editingUser.locationId || ""} onValueChange={(value) => setEditingUser({ ...editingUser, locationId: value || null })}>
+                  <Select value={editingUser.locationId || "none"} onValueChange={(value) => setEditingUser({ ...editingUser, locationId: value === "none" ? null : value })}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No specific location</SelectItem>
+                      <SelectItem value="none">No specific location</SelectItem>
                       {(isPrivilegeAdmin ? filteredLocations : locations?.filter(l => l.ouId === editingUser.ouId))?.map((loc) => (
                         <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
                       ))}
