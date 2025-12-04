@@ -9,11 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home } from "lucide-react";
+import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
 
 export default function AdminPanel() {
@@ -46,6 +47,7 @@ export default function AdminPanel() {
   const [editUserPassword, setEditUserPassword] = useState("");
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showTicketWizard, setShowTicketWizard] = useState(false);
 
   const { data: faqs, isLoading: faqsLoading } = useQuery<Faq[]>({
     queryKey: ["/api/faqs"],
@@ -258,6 +260,14 @@ export default function AdminPanel() {
             {isPrivilegeAdmin && userOUName && (
               <Badge className="bg-blue-600 text-white">{userOUName}</Badge>
             )}
+            <Button 
+              onClick={() => setShowTicketWizard(true)}
+              className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+              data-testid="button-new-valet-ticket"
+            >
+              <Car size={18} className="mr-2" />
+              New Valet Ticket
+            </Button>
             <Link href="/">
               <Button
                 variant="outline"
@@ -1029,6 +1039,13 @@ export default function AdminPanel() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Valet Ticket Wizard */}
+      <ValetTicketWizard 
+        isOpen={showTicketWizard}
+        onClose={() => setShowTicketWizard(false)}
+        user={user}
+      />
     </div>
   );
 }
