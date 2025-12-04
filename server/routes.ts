@@ -172,6 +172,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new valet ticket with full details
+  app.post('/api/staff/tickets', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { 
+        ticketNumber, visitorType, visitorSubType, guestName,
+        carMake, carModel, carColor, licensePlate, platePhotoUrl,
+        locationId, parkingSector, parkingLocation, 
+        createdByUserId, createdByName
+      } = req.body;
+
+      // Validate required fields
+      if (!ticketNumber || !/^\d{5}$/.test(ticketNumber)) {
+        return res.status(400).json({ message: "Invalid ticket number. Must be 5 digits." });
+      }
+      if (!visitorType || !guestName || !carMake || !carModel || !carColor) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Check if ticket already exists
+      const existingTicket = await storage.getValetTicket(ticketNumber);
+      if (existingTicket) {
+        return res.status(400).json({ message: "Ticket number already exists" });
+      }
+
+      const ticket = await storage.createValetTicket({
+        ticketNumber,
+        visitorType,
+        visitorSubType: visitorSubType || null,
+        guestName,
+        carMake,
+        carModel,
+        carColor,
+        licensePlate: licensePlate || null,
+        platePhotoUrl: platePhotoUrl || null,
+        locationId: locationId || null,
+        parkingSector: parkingSector || null,
+        parkingLocation: parkingLocation || null,
+        createdByUserId: createdByUserId || null,
+        createdByName: createdByName || null,
+        status: 'active',
+      });
+
+      // Broadcast to all connected WebSocket clients
+      broadcastToAll({
+        type: 'ticket_created',
+        data: ticket
+      });
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error creating valet ticket:", error);
+      res.status(500).json({ message: "Failed to create ticket" });
+    }
+  });
+
   app.patch('/api/staff/tickets/:ticketNumber/status', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;

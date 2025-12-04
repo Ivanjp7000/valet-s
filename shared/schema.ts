@@ -78,14 +78,28 @@ export const valetTickets = pgTable("valet_tickets", {
   locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this ticket belongs to
   status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled'
   estimatedTime: integer("estimated_time").default(5), // in minutes
+  
+  // Visitor information
+  visitorType: varchar("visitor_type").notNull(), // 'hotel_guest', 'restaurant', 'others'
+  visitorSubType: varchar("visitor_sub_type"), // For restaurant: 'regine', 'laveduta', 'wajo', 'st_regis_bar', 'le_petit'
+  guestName: varchar("guest_name").notNull(), // Full name of guest/visitor
+  
   // Car details
+  carMake: varchar("car_make").notNull(), // e.g., "Honda", "Ferrari", "Rolls Royce"
+  carModel: varchar("car_model").notNull(), // e.g., "SL55", "R1", "Passat"
+  carColor: varchar("car_color").notNull(), // e.g., "Black", "White", "Silver"
   licensePlate: varchar("license_plate"),
+  platePhotoUrl: varchar("plate_photo_url"), // Cropped photo of registration plate
   carPhoto: varchar("car_photo"), // URL to car image
   parkingLocation: varchar("parking_location"), // e.g., "A3", "C12", "T21"
   parkingSector: varchar("parking_sector"), // A, B, C, T, E
+  
   // Staff management
   staffNotes: text("staff_notes"),
   assignedStaff: varchar("assigned_staff"),
+  createdByUserId: varchar("created_by_user_id").references(() => users.id), // Staff who created this ticket
+  createdByName: varchar("created_by_name"), // Full name of staff for display
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -162,7 +176,55 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const insertValetTicketSchema = createInsertSchema(valetTickets).pick({
   ticketNumber: true,
+  visitorType: true,
+  visitorSubType: true,
+  guestName: true,
+  carMake: true,
+  carModel: true,
+  carColor: true,
+  licensePlate: true,
+  platePhotoUrl: true,
+  locationId: true,
+  parkingSector: true,
+  parkingLocation: true,
+  createdByUserId: true,
+  createdByName: true,
 });
+
+// Visitor types and sub-types
+export const VISITOR_TYPES = {
+  hotel_guest: 'Hotel Staying Guest',
+  restaurant: 'Restaurant Valet',
+  others: 'Others',
+} as const;
+
+export const RESTAURANT_SUB_TYPES = {
+  regine: 'Regine',
+  laveduta: 'LaVeduta',
+  wajo: 'Wajo',
+  st_regis_bar: 'St. Regis Bar',
+  le_petit: 'Le Petit',
+} as const;
+
+// Common car colors
+export const CAR_COLORS = [
+  'Black', 'White', 'Silver', 'Gray', 'Red', 
+  'Blue', 'Navy', 'Green', 'Gold', 'Brown',
+  'Beige', 'Orange', 'Yellow', 'Purple', 'Other'
+] as const;
+
+// Popular car makes for predictive search
+export const CAR_MAKES = [
+  'Acura', 'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMW', 
+  'Bugatti', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Citroën',
+  'Daihatsu', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'Genesis', 
+  'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Isuzu', 'Jaguar', 
+  'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Lincoln', 
+  'Lotus', 'Maserati', 'Mazda', 'McLaren', 'Mercedes-Benz', 'Mini', 
+  'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Ram', 'Renault',
+  'Rolls-Royce', 'Saab', 'Subaru', 'Suzuki', 'Tesla', 'Toyota', 
+  'Volkswagen', 'Volvo'
+] as const;
 
 export const insertFaqSchema = createInsertSchema(faqs).pick({
   question: true,

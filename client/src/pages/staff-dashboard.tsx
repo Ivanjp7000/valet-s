@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CarPhotoUploader } from "@/components/car-photo-uploader";
+import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -34,6 +35,7 @@ export default function StaffDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddTicket, setShowAddTicket] = useState(false);
+  const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -240,6 +242,18 @@ export default function StaffDashboard() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
+            {/* New Valet Ticket Button */}
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => setShowTicketWizard(true)}
+                className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+                data-testid="button-new-valet-ticket"
+              >
+                <Plus size={18} className="mr-2" />
+                New Valet Ticket
+              </Button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <Card className="shadow-sm">
                 <CardContent className="p-6 text-center">
@@ -667,6 +681,13 @@ export default function StaffDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Valet Ticket Wizard */}
+        <ValetTicketWizard 
+          isOpen={showTicketWizard}
+          onClose={() => setShowTicketWizard(false)}
+          user={user}
+        />
       </div>
     </div>
   );
