@@ -84,14 +84,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Check if user exists and is inactive (soft deleted)
+    const existingUser = await this.getUser(userData.id!);
+    if (existingUser && existingUser.isActive === false) {
+      // User was deleted, don't re-create them - just return existing inactive user
+      return existingUser;
+    }
+
     const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          ...userData,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
+          // Don't update: role, isActive, ouId, locationId (preserve admin-assigned values)
         },
       })
       .returning();
@@ -206,7 +217,7 @@ export class DatabaseStorage implements IStorage {
 
   // Additional methods for admin functionality
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(asc(users.firstName));
+    return await db.select().from(users).where(eq(users.isActive, true)).orderBy(asc(users.firstName));
   }
 
   async createUser(userData: Omit<UpsertUser, 'id'>): Promise<User> {
@@ -231,7 +242,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(users)
-      .where(eq(users.ouId, ouId))
+      .where(and(eq(users.ouId, ouId), eq(users.isActive, true)))
       .orderBy(asc(users.firstName));
   }
 

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon } from "lucide-react";
+import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff } from "lucide-react";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -42,6 +42,9 @@ export default function AdminPanel() {
     role: "standard_admin", ouId: "", locationId: "" 
   });
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserPassword, setEditUserPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const { data: faqs, isLoading: faqsLoading } = useQuery<Faq[]>({
     queryKey: ["/api/faqs"],
@@ -140,10 +143,26 @@ export default function AdminPanel() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async (userData: User) => await apiRequest("PATCH", `/api/users/${userData.id}`, userData),
+    mutationFn: async ({ userData, password }: { userData: User; password?: string }) => {
+      const updatePayload: any = {
+        username: userData.username,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role,
+        ouId: userData.ouId,
+        locationId: userData.locationId,
+      };
+      if (password) {
+        updatePayload.password = password;
+      }
+      return await apiRequest("PATCH", `/api/users/${userData.id}`, updatePayload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setEditingUser(null);
+      setEditUserPassword("");
+      setShowEditPassword(false);
       toast({ title: "Success", description: "User updated successfully" });
     },
     onError: (error) => handleError(error, "Failed to update user"),
@@ -498,7 +517,7 @@ export default function AdminPanel() {
                           {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(u.ouId)}</td>}
                           <td className="p-4 text-gray-600">{getLocationName(u.locationId)}</td>
                           <td className="p-4 text-right">
-                            <Button variant="ghost" size="icon" onClick={() => setEditingUser(u)} data-testid={`button-edit-user-${u.id}`}>
+                            <Button variant="ghost" size="icon" onClick={() => { setEditingUser(u); setEditUserPassword(""); setShowEditPassword(false); }} data-testid={`button-edit-user-${u.id}`}>
                               <Edit size={16} className="text-blue-600" />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => {
@@ -784,7 +803,23 @@ export default function AdminPanel() {
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Password</label>
-              <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="••••••••" className="mt-1" data-testid="input-user-password" />
+              <div className="relative mt-1">
+                <Input 
+                  type={showNewPassword ? "text" : "password"} 
+                  value={newUser.password} 
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} 
+                  placeholder="••••••••" 
+                  className="pr-10"
+                  data-testid="input-user-password" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Email</label>
@@ -880,6 +915,25 @@ export default function AdminPanel() {
                 <label className="text-sm font-medium text-gray-700">Email</label>
                 <Input type="email" value={editingUser.email || ""} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} className="mt-1" />
               </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">New Password (leave blank to keep current)</label>
+                <div className="relative mt-1">
+                  <Input 
+                    type={showEditPassword ? "text" : "password"} 
+                    value={editUserPassword} 
+                    onChange={(e) => setEditUserPassword(e.target.value)} 
+                    placeholder="Enter new password"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword(!showEditPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showEditPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
               {isSuperAdmin && (
                 <div>
                   <label className="text-sm font-medium text-gray-700">Role</label>
@@ -940,7 +994,7 @@ export default function AdminPanel() {
                   </Select>
                 </div>
               )}
-              <Button onClick={() => updateUserMutation.mutate(editingUser)} className="w-full bg-regis-navy hover:bg-blue-900" disabled={updateUserMutation.isPending}>
+              <Button onClick={() => updateUserMutation.mutate({ userData: editingUser, password: editUserPassword || undefined })} className="w-full bg-regis-navy hover:bg-blue-900" disabled={updateUserMutation.isPending}>
                 {updateUserMutation.isPending ? "Updating..." : "Update User"}
               </Button>
             </div>
