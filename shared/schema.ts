@@ -24,8 +24,32 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// Organizational Units (Companies like Sony, Marriott, Panasonic)
+export const organizationalUnits = pgTable("organizational_units", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Physical Locations (Buildings/offices under each OU)
+export const physicalLocations = pgTable("physical_locations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ouId: varchar("ou_id").notNull().references(() => organizationalUnits.id),
+  name: varchar("name").notNull(),
+  address: text("address"),
+  parkingSectors: text("parking_sectors"), // comma-separated: "A,B,C,T,E"
+  maxSpots: integer("max_spots").default(100),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Roles: 'superadmin', 'privilege_admin', 'standard_admin'
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: varchar("username").unique(),
@@ -34,7 +58,11 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").default("standard").notNull(), // 'superadmin', 'standard'
+  role: varchar("role").default("standard_admin").notNull(), // 'superadmin', 'privilege_admin', 'standard_admin'
+  ouId: varchar("ou_id").references(() => organizationalUnits.id), // Which OU this user belongs to
+  locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this user works at
+  createdBy: varchar("created_by"), // ID of user who created this account
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -43,6 +71,7 @@ export const users = pgTable("users", {
 export const valetTickets = pgTable("valet_tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ticketNumber: varchar("ticket_number", { length: 6 }).notNull().unique(),
+  locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this ticket belongs to
   status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled'
   estimatedTime: integer("estimated_time").default(5), // in minutes
   // Car details
@@ -80,6 +109,12 @@ export const systemSettings = pgTable("system_settings", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+export type InsertOU = typeof organizationalUnits.$inferInsert;
+export type OrganizationalUnit = typeof organizationalUnits.$inferSelect;
+
+export type InsertPhysicalLocation = typeof physicalLocations.$inferInsert;
+export type PhysicalLocation = typeof physicalLocations.$inferSelect;
+
 export type InsertValetTicket = typeof valetTickets.$inferInsert;
 export type ValetTicket = typeof valetTickets.$inferSelect;
 
@@ -89,7 +124,34 @@ export type Faq = typeof faqs.$inferSelect;
 export type InsertSystemSetting = typeof systemSettings.$inferInsert;
 export type SystemSetting = typeof systemSettings.$inferSelect;
 
+// Role type
+export type UserRole = 'superadmin' | 'privilege_admin' | 'standard_admin';
+
 // Zod schemas
+export const insertOUSchema = createInsertSchema(organizationalUnits).pick({
+  name: true,
+  description: true,
+});
+
+export const insertPhysicalLocationSchema = createInsertSchema(physicalLocations).pick({
+  ouId: true,
+  name: true,
+  address: true,
+  parkingSectors: true,
+  maxSpots: true,
+});
+
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  role: true,
+  ouId: true,
+  locationId: true,
+});
+
 export const insertValetTicketSchema = createInsertSchema(valetTickets).pick({
   ticketNumber: true,
 });

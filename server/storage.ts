@@ -1,10 +1,16 @@
 import {
   users,
+  organizationalUnits,
+  physicalLocations,
   valetTickets,
   faqs,
   systemSettings,
   type User,
   type UpsertUser,
+  type OrganizationalUnit,
+  type InsertOU,
+  type PhysicalLocation,
+  type InsertPhysicalLocation,
   type ValetTicket,
   type InsertValetTicket,
   type Faq,
@@ -13,7 +19,7 @@ import {
   type InsertSystemSetting,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -22,7 +28,26 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  getUsersByOU(ouId: string): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
   createUser(user: Omit<UpsertUser, 'id'>): Promise<User>;
+  updateUser(id: string, data: Partial<UpsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<void>;
+  
+  // Organizational Unit operations
+  createOU(ou: InsertOU): Promise<OrganizationalUnit>;
+  getOU(id: string): Promise<OrganizationalUnit | undefined>;
+  getAllOUs(): Promise<OrganizationalUnit[]>;
+  updateOU(id: string, data: Partial<InsertOU>): Promise<OrganizationalUnit | undefined>;
+  deleteOU(id: string): Promise<void>;
+  
+  // Physical Location operations
+  createLocation(location: InsertPhysicalLocation): Promise<PhysicalLocation>;
+  getLocation(id: string): Promise<PhysicalLocation | undefined>;
+  getLocationsByOU(ouId: string): Promise<PhysicalLocation[]>;
+  getAllLocations(): Promise<PhysicalLocation[]>;
+  updateLocation(id: string, data: Partial<InsertPhysicalLocation>): Promise<PhysicalLocation | undefined>;
+  deleteLocation(id: string): Promise<void>;
   
   // Valet ticket operations
   createValetTicket(ticket: InsertValetTicket): Promise<ValetTicket>;
@@ -30,6 +55,7 @@ export interface IStorage {
   updateValetTicketStatus(ticketNumber: string, status: string): Promise<ValetTicket | undefined>;
   updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined>;
   getActiveTickets(): Promise<ValetTicket[]>;
+  getTicketsByLocation(locationId: string): Promise<ValetTicket[]>;
   getCompletedTicketsToday(): Promise<ValetTicket[]>;
   getAllTickets(): Promise<ValetTicket[]>;
   
@@ -190,6 +216,122 @@ export class DatabaseStorage implements IStorage {
 
   async getAllTickets(): Promise<ValetTicket[]> {
     return await db.select().from(valetTickets).orderBy(desc(valetTickets.createdAt));
+  }
+
+  async getTicketsByLocation(locationId: string): Promise<ValetTicket[]> {
+    return await db
+      .select()
+      .from(valetTickets)
+      .where(eq(valetTickets.locationId, locationId))
+      .orderBy(desc(valetTickets.createdAt));
+  }
+
+  // Extended user operations
+  async getUsersByOU(ouId: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.ouId, ouId))
+      .orderBy(asc(users.firstName));
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.role, role))
+      .orderBy(asc(users.firstName));
+  }
+
+  async updateUser(id: string, data: Partial<UpsertUser>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.update(users).set({ isActive: false }).where(eq(users.id, id));
+  }
+
+  // Organizational Unit operations
+  async createOU(ou: InsertOU): Promise<OrganizationalUnit> {
+    const [newOU] = await db.insert(organizationalUnits).values(ou).returning();
+    return newOU;
+  }
+
+  async getOU(id: string): Promise<OrganizationalUnit | undefined> {
+    const [ou] = await db
+      .select()
+      .from(organizationalUnits)
+      .where(eq(organizationalUnits.id, id));
+    return ou;
+  }
+
+  async getAllOUs(): Promise<OrganizationalUnit[]> {
+    return await db
+      .select()
+      .from(organizationalUnits)
+      .where(eq(organizationalUnits.isActive, true))
+      .orderBy(asc(organizationalUnits.name));
+  }
+
+  async updateOU(id: string, data: Partial<InsertOU>): Promise<OrganizationalUnit | undefined> {
+    const [ou] = await db
+      .update(organizationalUnits)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(organizationalUnits.id, id))
+      .returning();
+    return ou;
+  }
+
+  async deleteOU(id: string): Promise<void> {
+    await db.update(organizationalUnits).set({ isActive: false }).where(eq(organizationalUnits.id, id));
+  }
+
+  // Physical Location operations
+  async createLocation(location: InsertPhysicalLocation): Promise<PhysicalLocation> {
+    const [newLocation] = await db.insert(physicalLocations).values(location).returning();
+    return newLocation;
+  }
+
+  async getLocation(id: string): Promise<PhysicalLocation | undefined> {
+    const [location] = await db
+      .select()
+      .from(physicalLocations)
+      .where(eq(physicalLocations.id, id));
+    return location;
+  }
+
+  async getLocationsByOU(ouId: string): Promise<PhysicalLocation[]> {
+    return await db
+      .select()
+      .from(physicalLocations)
+      .where(and(eq(physicalLocations.ouId, ouId), eq(physicalLocations.isActive, true)))
+      .orderBy(asc(physicalLocations.name));
+  }
+
+  async getAllLocations(): Promise<PhysicalLocation[]> {
+    return await db
+      .select()
+      .from(physicalLocations)
+      .where(eq(physicalLocations.isActive, true))
+      .orderBy(asc(physicalLocations.name));
+  }
+
+  async updateLocation(id: string, data: Partial<InsertPhysicalLocation>): Promise<PhysicalLocation | undefined> {
+    const [location] = await db
+      .update(physicalLocations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(physicalLocations.id, id))
+      .returning();
+    return location;
+  }
+
+  async deleteLocation(id: string): Promise<void> {
+    await db.update(physicalLocations).set({ isActive: false }).where(eq(physicalLocations.id, id));
   }
 }
 

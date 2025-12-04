@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema } from "@shared/schema";
+import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
@@ -179,18 +179,344 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Super Admin routes
+  // Role-based middleware
   const requireSuperAdmin = async (req: any, res: any, next: any) => {
-    const userId = req.user.claims.sub;
-    const user = await storage.getUser(userId);
+    const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
     
+    const user = await storage.getUser(userId);
     if (!user || user.role !== 'superadmin') {
       return res.status(403).json({ message: "Super admin access required" });
     }
-    
+    req.currentUser = user;
     next();
   };
 
+  const requirePrivilegeAdmin = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    
+    const user = await storage.getUser(userId);
+    if (!user || !['superadmin', 'privilege_admin'].includes(user.role)) {
+      return res.status(403).json({ message: "Privilege admin access required" });
+    }
+    req.currentUser = user;
+    next();
+  };
+
+  const requireStandardAdmin = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    
+    const user = await storage.getUser(userId);
+    if (!user || !['superadmin', 'privilege_admin', 'standard_admin'].includes(user.role)) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    req.currentUser = user;
+    next();
+  };
+
+  // ===== ORGANIZATIONAL UNIT ROUTES (Super Admin Only) =====
+  app.get('/api/ous', isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const ous = await storage.getAllOUs();
+      res.json(ous);
+    } catch (error) {
+      console.error("Error fetching OUs:", error);
+      res.status(500).json({ message: "Failed to fetch organizational units" });
+    }
+  });
+
+  app.post('/api/ous', isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const ouData = insertOUSchema.parse(req.body);
+      const ou = await storage.createOU(ouData);
+      res.json(ou);
+    } catch (error) {
+      console.error("Error creating OU:", error);
+      res.status(400).json({ message: "Invalid OU data" });
+    }
+  });
+
+  app.patch('/api/ous/:id', isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ouData = insertOUSchema.partial().parse(req.body);
+      const ou = await storage.updateOU(id, ouData);
+      if (!ou) return res.status(404).json({ message: "OU not found" });
+      res.json(ou);
+    } catch (error) {
+      console.error("Error updating OU:", error);
+      res.status(400).json({ message: "Invalid OU data" });
+    }
+  });
+
+  app.delete('/api/ous/:id', isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteOU(id);
+      res.json({ message: "OU deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting OU:", error);
+      res.status(500).json({ message: "Failed to delete OU" });
+    }
+  });
+
+  // ===== PHYSICAL LOCATION ROUTES (Privilege Admin and above) =====
+  app.get('/api/locations', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser;
+      // Super Admin sees all, others see their OU's locations
+      if (user.role === 'superadmin') {
+        const locations = await storage.getAllLocations();
+        res.json(locations);
+      } else if (user.ouId) {
+        const locations = await storage.getLocationsByOU(user.ouId);
+        res.json(locations);
+      } else {
+        res.json([]);
+      }
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+      res.status(500).json({ message: "Failed to fetch locations" });
+    }
+  });
+
+  app.get('/api/locations/ou/:ouId', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { ouId } = req.params;
+      const user = req.currentUser;
+      
+      // Privilege Admin can only see their assigned OU
+      if (user.role !== 'superadmin' && user.ouId !== ouId) {
+        return res.status(403).json({ message: "Access denied to this OU" });
+      }
+      
+      const locations = await storage.getLocationsByOU(ouId);
+      res.json(locations);
+    } catch (error) {
+      console.error("Error fetching locations by OU:", error);
+      res.status(500).json({ message: "Failed to fetch locations" });
+    }
+  });
+
+  app.post('/api/locations', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser;
+      const locationData = insertPhysicalLocationSchema.parse(req.body);
+      
+      // Privilege Admin can only add locations to their OU
+      if (user.role !== 'superadmin' && user.ouId !== locationData.ouId) {
+        return res.status(403).json({ message: "Can only add locations to your assigned OU" });
+      }
+      
+      const location = await storage.createLocation(locationData);
+      res.json(location);
+    } catch (error) {
+      console.error("Error creating location:", error);
+      res.status(400).json({ message: "Invalid location data" });
+    }
+  });
+
+  app.patch('/api/locations/:id', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.currentUser;
+      
+      // Check if user has access to this location
+      const existingLocation = await storage.getLocation(id);
+      if (!existingLocation) return res.status(404).json({ message: "Location not found" });
+      
+      if (user.role !== 'superadmin' && user.ouId !== existingLocation.ouId) {
+        return res.status(403).json({ message: "Access denied to this location" });
+      }
+      
+      // Parse and sanitize the update data
+      const { ouId, ...safeLocationData } = insertPhysicalLocationSchema.partial().parse(req.body);
+      
+      // Privilege Admin cannot move location to different OU
+      if (user.role !== 'superadmin' && ouId && ouId !== existingLocation.ouId) {
+        return res.status(403).json({ message: "You cannot move locations to a different organization" });
+      }
+      
+      // Only Super Admin can change OU assignment
+      const updateData = user.role === 'superadmin' && ouId 
+        ? { ...safeLocationData, ouId } 
+        : safeLocationData;
+      
+      const location = await storage.updateLocation(id, updateData);
+      res.json(location);
+    } catch (error) {
+      console.error("Error updating location:", error);
+      res.status(400).json({ message: "Invalid location data" });
+    }
+  });
+
+  app.delete('/api/locations/:id', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = req.currentUser;
+      
+      const existingLocation = await storage.getLocation(id);
+      if (!existingLocation) return res.status(404).json({ message: "Location not found" });
+      
+      if (user.role !== 'superadmin' && user.ouId !== existingLocation.ouId) {
+        return res.status(403).json({ message: "Access denied to this location" });
+      }
+      
+      await storage.deleteLocation(id);
+      res.json({ message: "Location deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting location:", error);
+      res.status(500).json({ message: "Failed to delete location" });
+    }
+  });
+
+  // ===== ENHANCED USER MANAGEMENT ROUTES =====
+  // Get users based on role permissions
+  app.get('/api/users', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser;
+      
+      if (user.role === 'superadmin') {
+        // Super Admin sees all users
+        const users = await storage.getAllUsers();
+        res.json(users);
+      } else {
+        // Privilege Admin sees only standard admins in their OU
+        const users = await storage.getUsersByOU(user.ouId!);
+        const filteredUsers = users.filter(u => u.role === 'standard_admin');
+        res.json(filteredUsers);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Create user with role-based permissions
+  app.post('/api/users', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const currentUser = req.currentUser;
+      const { username, password, email, firstName, lastName, role, ouId, locationId } = req.body;
+      
+      // Validate role assignment permissions
+      if (currentUser.role === 'privilege_admin') {
+        // Privilege Admin can only create standard_admin users
+        if (role && role !== 'standard_admin') {
+          return res.status(403).json({ message: "You can only create standard admin accounts" });
+        }
+        // Must assign to their OU
+        if (ouId && ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only create users in your OU" });
+        }
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        email,
+        firstName,
+        lastName,
+        role: role || 'standard_admin',
+        ouId: ouId || currentUser.ouId,
+        locationId,
+        createdBy: currentUser.id,
+      });
+      
+      // Don't return password in response
+      const { password: _, ...userWithoutPassword } = newUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(400).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Update user
+  app.patch('/api/users/:id', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = req.currentUser;
+      const targetUser = await storage.getUser(id);
+      
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      
+      // Privilege Admin can only modify standard_admin in their OU
+      if (currentUser.role === 'privilege_admin') {
+        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only modify standard admins in your OU" });
+        }
+      }
+      
+      const { password, role, ouId, ...safeUpdateData } = req.body;
+      
+      // Privilege Admin cannot change role or OU assignment
+      if (currentUser.role === 'privilege_admin') {
+        if (role && role !== 'standard_admin') {
+          return res.status(403).json({ message: "You cannot change user roles" });
+        }
+        if (ouId && ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You cannot move users to a different OU" });
+        }
+      }
+      
+      // Super Admin can change roles, but Privilege Admin cannot escalate
+      const updateData: any = { ...safeUpdateData };
+      if (currentUser.role === 'superadmin') {
+        if (role) updateData.role = role;
+        if (ouId) updateData.ouId = ouId;
+      }
+      
+      // If password is being updated, hash it
+      if (password) {
+        updateData.password = await bcrypt.hash(password, 10);
+      }
+      
+      const updatedUser = await storage.updateUser(id, updateData);
+      if (!updatedUser) return res.status(404).json({ message: "User not found" });
+      
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(400).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Delete user
+  app.delete('/api/users/:id', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = req.currentUser;
+      const targetUser = await storage.getUser(id);
+      
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      
+      // Privilege Admin can only delete standard_admin in their OU
+      if (currentUser.role === 'privilege_admin') {
+        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only delete standard admins in your OU" });
+        }
+      }
+      
+      // Super Admin cannot delete themselves
+      if (currentUser.id === id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+      
+      await storage.deleteUser(id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // ===== FAQ ROUTES (Super Admin Only) =====
   app.post('/api/admin/faqs', isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
       const faqData = insertFaqSchema.parse(req.body);
