@@ -19,7 +19,11 @@ export default function AdminPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("ous");
+  
+  const isSuperAdmin = user?.role === 'superadmin';
+  const isPrivilegeAdmin = user?.role === 'privilege_admin';
+  const defaultTab = isSuperAdmin ? "ous" : "locations";
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   const [editingFaq, setEditingFaq] = useState<any>(null);
   const [newFaq, setNewFaq] = useState({ question: "", answer: "" });
@@ -203,45 +207,68 @@ export default function AdminPanel() {
     }
   };
 
+  const userOUName = user?.ouId ? getOUName(user.ouId) : null;
+  
+  const filteredLocations = isPrivilegeAdmin && user?.ouId 
+    ? locations?.filter(l => l.ouId === user.ouId) 
+    : locations;
+  
+  const filteredUsers = isPrivilegeAdmin && user?.ouId
+    ? users?.filter(u => u.ouId === user.ouId && u.role !== 'superadmin')
+    : users;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-regis-navy text-white">
         <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
           <div className="flex items-center">
             <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-4">
-              <Crown className="text-regis-navy" size={24} />
+              {isSuperAdmin ? <Shield className="text-regis-navy" size={24} /> : <Crown className="text-regis-navy" size={24} />}
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Super Admin Dashboard</h1>
-              <p className="text-blue-200 text-sm">Multi-Tenant Management System</p>
+              <h1 className="text-xl font-semibold">
+                {isSuperAdmin ? "Super Admin Dashboard" : "Admin Dashboard"}
+              </h1>
+              <p className="text-blue-200 text-sm">
+                {isSuperAdmin ? "Multi-Tenant Management System" : userOUName || "Organization Management"}
+              </p>
             </div>
           </div>
-          <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white">
-            <LogOut className="mr-2" size={18} />
-            Logout
-          </a>
+          <div className="flex items-center gap-4">
+            {isPrivilegeAdmin && userOUName && (
+              <Badge className="bg-blue-600 text-white">{userOUName}</Badge>
+            )}
+            <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white" data-testid="link-logout">
+              <LogOut className="mr-2" size={18} />
+              Logout
+            </a>
+          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="ous" className="flex items-center gap-2" data-testid="tab-ous">
-              <Building size={16} />
-              Organizations
-            </TabsTrigger>
+          <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
+            {isSuperAdmin && (
+              <TabsTrigger value="ous" className="flex items-center gap-2" data-testid="tab-ous">
+                <Building size={16} />
+                Organizations
+              </TabsTrigger>
+            )}
             <TabsTrigger value="locations" className="flex items-center gap-2" data-testid="tab-locations">
               <MapPin size={16} />
               Locations
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2" data-testid="tab-users">
               <Users size={16} />
-              Users
+              {isPrivilegeAdmin ? "Staff" : "Users"}
             </TabsTrigger>
-            <TabsTrigger value="faqs" className="flex items-center gap-2" data-testid="tab-faqs">
-              <HelpCircle size={16} />
-              FAQs
-            </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="faqs" className="flex items-center gap-2" data-testid="tab-faqs">
+                <HelpCircle size={16} />
+                FAQs
+              </TabsTrigger>
+            )}
             <TabsTrigger value="settings" className="flex items-center gap-2" data-testid="tab-settings">
               <Settings size={16} />
               Settings
@@ -304,9 +331,18 @@ export default function AdminPanel() {
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-bold text-regis-navy">Physical Locations</h2>
-                <p className="text-gray-600">Manage buildings and sites where valet service operates</p>
+                <p className="text-gray-600">
+                  {isPrivilegeAdmin 
+                    ? `Manage locations for ${userOUName || 'your organization'}`
+                    : "Manage buildings and sites where valet service operates"}
+                </p>
               </div>
-              <Button onClick={() => setShowAddLocation(true)} className="bg-regis-navy hover:bg-blue-900" disabled={!ous?.length} data-testid="button-add-location">
+              <Button onClick={() => {
+                if (isPrivilegeAdmin && user?.ouId) {
+                  setNewLocation({ ...newLocation, ouId: user.ouId });
+                }
+                setShowAddLocation(true);
+              }} className="bg-regis-navy hover:bg-blue-900" disabled={isSuperAdmin && !ous?.length} data-testid="button-add-location">
                 <Plus size={16} className="mr-2" />
                 Add Location
               </Button>
@@ -316,25 +352,29 @@ export default function AdminPanel() {
               <CardContent className="p-0">
                 {locationsLoading ? (
                   <p className="p-6 text-gray-500">Loading locations...</p>
-                ) : locations?.length === 0 ? (
-                  <p className="p-6 text-gray-500">No locations found. Create an organization first, then add locations.</p>
+                ) : filteredLocations?.length === 0 ? (
+                  <p className="p-6 text-gray-500">
+                    {isPrivilegeAdmin 
+                      ? "No locations found for your organization. Add one to get started."
+                      : "No locations found. Create an organization first, then add locations."}
+                  </p>
                 ) : (
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left p-4 font-medium text-gray-600">Location</th>
                         <th className="text-left p-4 font-medium text-gray-600">Code</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Organization</th>
+                        {isSuperAdmin && <th className="text-left p-4 font-medium text-gray-600">Organization</th>}
                         <th className="text-left p-4 font-medium text-gray-600">Address</th>
                         <th className="text-right p-4 font-medium text-gray-600">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {locations?.map((loc) => (
+                      {filteredLocations?.map((loc) => (
                         <tr key={loc.id} className="border-t" data-testid={`row-location-${loc.id}`}>
                           <td className="p-4 font-medium">{loc.name}</td>
                           <td className="p-4"><Badge variant="outline">{loc.code}</Badge></td>
-                          <td className="p-4 text-gray-600">{getOUName(loc.ouId)}</td>
+                          {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(loc.ouId)}</td>}
                           <td className="p-4 text-gray-600">{loc.address || "—"}</td>
                           <td className="p-4 text-right">
                             <Button variant="ghost" size="icon" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
@@ -360,42 +400,74 @@ export default function AdminPanel() {
           <TabsContent value="users" className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-regis-navy">User Management</h2>
-                <p className="text-gray-600">Manage all admin accounts across organizations</p>
+                <h2 className="text-2xl font-bold text-regis-navy">
+                  {isPrivilegeAdmin ? "Staff Management" : "User Management"}
+                </h2>
+                <p className="text-gray-600">
+                  {isPrivilegeAdmin 
+                    ? `Manage staff accounts for ${userOUName || 'your organization'}`
+                    : "Manage all admin accounts across organizations"}
+                </p>
               </div>
-              <Button onClick={() => setShowAddUser(true)} className="bg-regis-navy hover:bg-blue-900" data-testid="button-add-user">
+              <Button onClick={() => {
+                if (isPrivilegeAdmin && user?.ouId) {
+                  setNewUser({ ...newUser, ouId: user.ouId, role: 'standard_admin' });
+                }
+                setShowAddUser(true);
+              }} className="bg-regis-navy hover:bg-blue-900" data-testid="button-add-user">
                 <Plus size={16} className="mr-2" />
-                Add User
+                {isPrivilegeAdmin ? "Add Staff" : "Add User"}
               </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-purple-600">{users?.filter(u => u.role === 'superadmin').length || 0}</p>
-                  <p className="text-sm text-gray-600">Super Admins</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-600">{users?.filter(u => u.role === 'privilege_admin').length || 0}</p>
-                  <p className="text-sm text-gray-600">Privilege Admins</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-2xl font-bold text-gray-600">{users?.filter(u => u.role === 'standard_admin').length || 0}</p>
-                  <p className="text-sm text-gray-600">Standard Admins</p>
-                </CardContent>
-              </Card>
-            </div>
+            {isSuperAdmin && (
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-purple-600">{users?.filter(u => u.role === 'superadmin').length || 0}</p>
+                    <p className="text-sm text-gray-600">Super Admins</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-blue-600">{users?.filter(u => u.role === 'privilege_admin').length || 0}</p>
+                    <p className="text-sm text-gray-600">Privilege Admins</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-gray-600">{users?.filter(u => u.role === 'standard_admin').length || 0}</p>
+                    <p className="text-sm text-gray-600">Standard Admins</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {isPrivilegeAdmin && (
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-blue-600">{filteredUsers?.filter(u => u.role === 'privilege_admin').length || 0}</p>
+                    <p className="text-sm text-gray-600">Privilege Admins</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-2xl font-bold text-gray-600">{filteredUsers?.filter(u => u.role === 'standard_admin').length || 0}</p>
+                    <p className="text-sm text-gray-600">Staff Members</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             <Card>
               <CardContent className="p-0">
                 {usersLoading ? (
                   <p className="p-6 text-gray-500">Loading users...</p>
-                ) : users?.length === 0 ? (
-                  <p className="p-6 text-gray-500">No users found.</p>
+                ) : filteredUsers?.length === 0 ? (
+                  <p className="p-6 text-gray-500">
+                    {isPrivilegeAdmin ? "No staff members found. Add one to get started." : "No users found."}
+                  </p>
                 ) : (
                   <table className="w-full">
                     <thead className="bg-gray-50">
@@ -403,13 +475,13 @@ export default function AdminPanel() {
                         <th className="text-left p-4 font-medium text-gray-600">User</th>
                         <th className="text-left p-4 font-medium text-gray-600">Username</th>
                         <th className="text-left p-4 font-medium text-gray-600">Role</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Organization</th>
+                        {isSuperAdmin && <th className="text-left p-4 font-medium text-gray-600">Organization</th>}
                         <th className="text-left p-4 font-medium text-gray-600">Location</th>
                         <th className="text-right p-4 font-medium text-gray-600">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {users?.map((u) => (
+                      {filteredUsers?.map((u) => (
                         <tr key={u.id} className="border-t" data-testid={`row-user-${u.id}`}>
                           <td className="p-4">
                             <div>
@@ -423,7 +495,7 @@ export default function AdminPanel() {
                               {u.role === 'superadmin' ? 'Super Admin' : u.role === 'privilege_admin' ? 'Privilege Admin' : 'Standard Admin'}
                             </Badge>
                           </td>
-                          <td className="p-4 text-gray-600">{getOUName(u.ouId)}</td>
+                          {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(u.ouId)}</td>}
                           <td className="p-4 text-gray-600">{getLocationName(u.locationId)}</td>
                           <td className="p-4 text-right">
                             <Button variant="ghost" size="icon" onClick={() => setEditingUser(u)} data-testid={`button-edit-user-${u.id}`}>
@@ -602,19 +674,27 @@ export default function AdminPanel() {
             <DialogTitle>Add Location</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Organization</label>
-              <Select value={newLocation.ouId} onValueChange={(value) => setNewLocation({ ...newLocation, ouId: value })}>
-                <SelectTrigger className="mt-1" data-testid="select-location-ou">
-                  <SelectValue placeholder="Select organization" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ous?.map((ou) => (
-                    <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isSuperAdmin && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Organization</label>
+                <Select value={newLocation.ouId} onValueChange={(value) => setNewLocation({ ...newLocation, ouId: value })}>
+                  <SelectTrigger className="mt-1" data-testid="select-location-ou">
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ous?.map((ou) => (
+                      <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isPrivilegeAdmin && userOUName && (
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-600">Organization</p>
+                <p className="font-medium text-regis-navy">{userOUName}</p>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-700">Name</label>
               <Input value={newLocation.name} onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })} placeholder="Tokyo Headquarters" className="mt-1" data-testid="input-location-name" />
@@ -641,19 +721,27 @@ export default function AdminPanel() {
               <DialogTitle>Edit Location</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Organization</label>
-                <Select value={editingLocation.ouId} onValueChange={(value) => setEditingLocation({ ...editingLocation, ouId: value })}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ous?.map((ou) => (
-                      <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isSuperAdmin && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Organization</label>
+                  <Select value={editingLocation.ouId} onValueChange={(value) => setEditingLocation({ ...editingLocation, ouId: value })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ous?.map((ou) => (
+                        <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {isPrivilegeAdmin && userOUName && (
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Organization</p>
+                  <p className="font-medium text-regis-navy">{userOUName}</p>
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium text-gray-700">Name</label>
                 <Input value={editingLocation.name} onChange={(e) => setEditingLocation({ ...editingLocation, name: e.target.value })} className="mt-1" />
@@ -702,51 +790,63 @@ export default function AdminPanel() {
               <label className="text-sm font-medium text-gray-700">Email</label>
               <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="jsmith@company.com" className="mt-1" data-testid="input-user-email" />
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Role</label>
-              <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
-                <SelectTrigger className="mt-1" data-testid="select-user-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="superadmin">Super Admin</SelectItem>
-                  <SelectItem value="privilege_admin">Privilege Admin</SelectItem>
-                  <SelectItem value="standard_admin">Standard Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {newUser.role !== 'superadmin' && (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Organization</label>
-                  <Select value={newUser.ouId} onValueChange={(value) => setNewUser({ ...newUser, ouId: value, locationId: "" })}>
-                    <SelectTrigger className="mt-1" data-testid="select-user-ou">
-                      <SelectValue placeholder="Select organization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ous?.map((ou) => (
-                        <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {newUser.ouId && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Location (optional)</label>
-                    <Select value={newUser.locationId} onValueChange={(value) => setNewUser({ ...newUser, locationId: value })}>
-                      <SelectTrigger className="mt-1" data-testid="select-user-location">
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">No specific location</SelectItem>
-                        {locations?.filter(l => l.ouId === newUser.ouId).map((loc) => (
-                          <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </>
+            {isSuperAdmin && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Role</label>
+                <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
+                  <SelectTrigger className="mt-1" data-testid="select-user-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                    <SelectItem value="privilege_admin">Privilege Admin</SelectItem>
+                    <SelectItem value="standard_admin">Standard Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isPrivilegeAdmin && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Role</p>
+                <p className="font-medium text-regis-navy">Standard Admin (Staff)</p>
+              </div>
+            )}
+            {isSuperAdmin && newUser.role !== 'superadmin' && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Organization</label>
+                <Select value={newUser.ouId} onValueChange={(value) => setNewUser({ ...newUser, ouId: value, locationId: "" })}>
+                  <SelectTrigger className="mt-1" data-testid="select-user-ou">
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ous?.map((ou) => (
+                      <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isPrivilegeAdmin && userOUName && (
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-600">Organization</p>
+                <p className="font-medium text-regis-navy">{userOUName}</p>
+              </div>
+            )}
+            {(newUser.role !== 'superadmin' || isPrivilegeAdmin) && newUser.ouId && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Location (optional)</label>
+                <Select value={newUser.locationId} onValueChange={(value) => setNewUser({ ...newUser, locationId: value })}>
+                  <SelectTrigger className="mt-1" data-testid="select-user-location">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No specific location</SelectItem>
+                    {(isPrivilegeAdmin ? filteredLocations : locations?.filter(l => l.ouId === newUser.ouId))?.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             <Button onClick={() => createUserMutation.mutate(newUser)} className="w-full bg-regis-navy hover:bg-blue-900" disabled={createUserMutation.isPending || !newUser.username || !newUser.password} data-testid="button-submit-user">
               {createUserMutation.isPending ? "Creating..." : "Create User"}
@@ -780,51 +880,65 @@ export default function AdminPanel() {
                 <label className="text-sm font-medium text-gray-700">Email</label>
                 <Input type="email" value={editingUser.email || ""} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} className="mt-1" />
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Role</label>
-                <Select value={editingUser.role} onValueChange={(value: any) => setEditingUser({ ...editingUser, role: value })}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="superadmin">Super Admin</SelectItem>
-                    <SelectItem value="privilege_admin">Privilege Admin</SelectItem>
-                    <SelectItem value="standard_admin">Standard Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {editingUser.role !== 'superadmin' && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Organization</label>
-                    <Select value={editingUser.ouId || ""} onValueChange={(value) => setEditingUser({ ...editingUser, ouId: value, locationId: null })}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select organization" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ous?.map((ou) => (
-                          <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {editingUser.ouId && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Location (optional)</label>
-                      <Select value={editingUser.locationId || ""} onValueChange={(value) => setEditingUser({ ...editingUser, locationId: value || null })}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">No specific location</SelectItem>
-                          {locations?.filter(l => l.ouId === editingUser.ouId).map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </>
+              {isSuperAdmin && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Role</label>
+                  <Select value={editingUser.role} onValueChange={(value: any) => setEditingUser({ ...editingUser, role: value })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      <SelectItem value="privilege_admin">Privilege Admin</SelectItem>
+                      <SelectItem value="standard_admin">Standard Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {isPrivilegeAdmin && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Role</p>
+                  <p className="font-medium text-regis-navy">
+                    {editingUser.role === 'privilege_admin' ? 'Privilege Admin' : 'Standard Admin'}
+                  </p>
+                </div>
+              )}
+              {isSuperAdmin && editingUser.role !== 'superadmin' && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Organization</label>
+                  <Select value={editingUser.ouId || ""} onValueChange={(value) => setEditingUser({ ...editingUser, ouId: value, locationId: null })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select organization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ous?.map((ou) => (
+                        <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {isPrivilegeAdmin && userOUName && (
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Organization</p>
+                  <p className="font-medium text-regis-navy">{userOUName}</p>
+                </div>
+              )}
+              {(editingUser.role !== 'superadmin' || isPrivilegeAdmin) && editingUser.ouId && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Location (optional)</label>
+                  <Select value={editingUser.locationId || ""} onValueChange={(value) => setEditingUser({ ...editingUser, locationId: value || null })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No specific location</SelectItem>
+                      {(isPrivilegeAdmin ? filteredLocations : locations?.filter(l => l.ouId === editingUser.ouId))?.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
               <Button onClick={() => updateUserMutation.mutate(editingUser)} className="w-full bg-regis-navy hover:bg-blue-900" disabled={updateUserMutation.isPending}>
                 {updateUserMutation.isPending ? "Updating..." : "Update User"}
