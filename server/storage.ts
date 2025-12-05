@@ -142,9 +142,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateValetTicketStatus(ticketNumber: string, status: string): Promise<ValetTicket | undefined> {
+    const now = new Date();
+    const updateData: Record<string, any> = { status, updatedAt: now };
+    
+    // Set stage timing fields based on status transition
+    if (status === 'retrieving') {
+      updateData.retrievalStartedAt = now;
+      updateData.stageStartedAt = now;
+      updateData.currentStage = 1;
+    } else if (status === 'transit') {
+      updateData.stageStartedAt = now;
+      updateData.currentStage = 2;
+    } else if (status === 'ready') {
+      updateData.stageStartedAt = now;
+      updateData.currentStage = 3;
+    } else if (status === 'completed') {
+      updateData.currentStage = 4;
+    }
+    
     const [ticket] = await db
       .update(valetTickets)
-      .set({ status, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
     return ticket;

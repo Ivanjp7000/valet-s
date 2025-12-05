@@ -20,6 +20,7 @@ const stages = [
 export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetrievalProgressProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [currentStageIndex, setCurrentStageIndex] = useState<number>(0);
+  const [hasTriggeredComplete, setHasTriggeredComplete] = useState<boolean>(false);
 
   useEffect(() => {
     // Determine current stage based on ticket status
@@ -30,6 +31,7 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
     else return; // Not in active retrieval
 
     setCurrentStageIndex(stageIndex);
+    setHasTriggeredComplete(false); // Reset the guard when stage changes
 
     // Calculate time remaining based on stageStartedAt
     const stageStarted = ticket.stageStartedAt ? new Date(ticket.stageStartedAt).getTime() : Date.now();
@@ -46,16 +48,20 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
         const newTime = Math.max(0, prev - 1000);
-        if (newTime === 0 && onStageComplete && currentStageIndex < 2) {
-          // Auto-progress to next stage
-          onStageComplete(ticket.ticketNumber, currentStageIndex + 2);
-        }
         return newTime;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [ticket.status, ticket.ticketNumber, currentStageIndex, onStageComplete]);
+  }, [ticket.status, ticket.ticketNumber]);
+
+  // Separate effect for auto-progression with one-shot guard
+  useEffect(() => {
+    if (timeRemaining === 0 && !hasTriggeredComplete && onStageComplete && currentStageIndex < 2) {
+      setHasTriggeredComplete(true);
+      onStageComplete(ticket.ticketNumber, currentStageIndex + 2);
+    }
+  }, [timeRemaining, hasTriggeredComplete, onStageComplete, currentStageIndex, ticket.ticketNumber]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
