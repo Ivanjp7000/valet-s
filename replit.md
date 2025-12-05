@@ -1,6 +1,6 @@
 # Overview
 
-This is a St. Regis Osaka Valet Management System - a comprehensive car valet management app that digitalizes the traditional paper ticket system. Features include customer ticket scanning/entry, real-time retrieval tracking with animated progress stages, and a full admin system for managing staff users, tickets, car details (photos, plates, models), and parking locations across sectors A, B, C, T, E with numbered spots 1-100. The system provides role-based access control with superadmin capabilities for comprehensive ticket and user management.
+This is a St. Regis Osaka Valet Management System - a multi-tenant SaaS valet platform that digitalizes paper ticket systems. Supports multiple client companies (Organizational Units/OUs like Sony, Marriott, Panasonic) with multiple physical locations. Features hierarchical 3-tier role system (Super Admin, Privilege Admin, Standard Admin) with role-based access control and OU/location scoping, plus passwordless customer access via 5-digit tickets for self-service vehicle retrieval with live progress tracking.
 
 # User Preferences
 
@@ -28,17 +28,42 @@ Preferred communication style: Simple, everyday language.
 - **Primary Database**: PostgreSQL with Neon serverless hosting
 - **Schema Management**: Drizzle with migration support
 - **Key Tables**:
-  - Users (Replit Auth integration)
-  - Valet Tickets (core business logic)
+  - organizational_units: Client companies (Sony, Marriott, etc.)
+  - physical_locations: Valet locations within each OU
+  - users: Staff accounts with role and OU/location assignments
+  - user_location_scopes: Location restrictions for Standard Admins
+  - valet_tickets: Core ticket data with ouId for OU-level scoping
   - FAQs (customer support)
   - System Settings (configuration)
   - Sessions (authentication state)
 
 ## Authentication & Authorization
-- **Provider**: Replit Auth with OpenID Connect
+- **Provider**: Replit Auth with OpenID Connect + Local auth (username/password)
 - **Session Storage**: PostgreSQL-backed sessions with connect-pg-simple
-- **Role-based Access**: Two roles (standard, superadmin) with route protection
-- **Security**: HTTP-only cookies, secure session handling
+- **Security**: HTTP-only cookies, secure session handling, bcrypt password hashing
+
+## Hierarchical Access Control (3-Tier Role System)
+- **Super Admin**: Full system access across all OUs and locations
+  - Can manage OUs, all locations, all users, all tickets
+  - Can assign any role to users
+  - Sees global data
+- **Privilege Admin**: OU-scoped access
+  - Assigned to one OU
+  - Can manage locations within their OU
+  - Can create/manage Standard Admins within their OU
+  - Can assign location scopes to restrict Standard Admins
+  - Sees only data within their OU
+- **Standard Admin**: Location-scoped or OU-scoped access
+  - Assigned to one OU
+  - If location scopes assigned: sees only data from those locations
+  - If no location scopes: sees all data within their OU
+  - Can create tickets, update status, manage daily operations
+
+## Data Scoping Implementation
+- **user_location_scopes table**: Links Standard Admins to specific locations
+- **ouId on valet_tickets**: Denormalized OU reference for efficient filtering
+- **Scoped queries**: getScopedTickets, getScopedUsers, getScopedLocations filter data based on user role and assignments
+- **API enforcement**: Routes validate access before returning scoped data
 
 ## API Architecture
 - **Style**: RESTful API with Express routes
