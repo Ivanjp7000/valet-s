@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +50,12 @@ export default function StaffDashboard() {
     staffNotes: "",
     carPhoto: "",
   });
+  
+  // Ticket management modals state
+  const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
+  const [editTicketData, setEditTicketData] = useState<ValetTicket | null>(null);
+  const [deleteTicket, setDeleteTicket] = useState<ValetTicket | null>(null);
+  const [archiveTicket, setArchiveTicket] = useState<ValetTicket | null>(null);
   
   // WebSocket connection for real-time updates
   const { lastMessage } = useWebSocket();
@@ -154,6 +160,69 @@ export default function StaffDashboard() {
   const handleNewTicketPhotoUpload = (photoUrl: string) => {
     setNewTicketData(prev => ({ ...prev, carPhoto: photoUrl }));
   };
+
+  // Update ticket details mutation
+  const updateTicketMutation = useMutation({
+    mutationFn: async (ticketData: Partial<ValetTicket> & { ticketNumber: string }) => {
+      await apiRequest("PATCH", `/api/admin/tickets/${ticketData.ticketNumber}`, ticketData);
+    },
+    onSuccess: () => {
+      setEditTicketData(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      toast({ title: "Success", description: "Ticket updated successfully" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to update ticket", variant: "destructive" });
+    },
+  });
+
+  // Delete ticket mutation
+  const deleteTicketMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      await apiRequest("DELETE", `/api/admin/tickets/${ticketNumber}`);
+    },
+    onSuccess: () => {
+      setDeleteTicket(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      toast({ title: "Success", description: "Ticket deleted permanently" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to delete ticket", variant: "destructive" });
+    },
+  });
+
+  // Archive ticket mutation (sets status to 'cancelled')
+  const archiveTicketMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      await apiRequest("PATCH", `/api/admin/tickets/${ticketNumber}/archive`);
+    },
+    onSuccess: () => {
+      setArchiveTicket(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      toast({ title: "Success", description: "Ticket archived successfully" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
+        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        return;
+      }
+      toast({ title: "Error", description: "Failed to archive ticket", variant: "destructive" });
+    },
+  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -457,30 +526,77 @@ export default function StaffDashboard() {
                               <Badge variant={
                                 ticket.status === 'completed' ? 'default' :
                                 ticket.status === 'ready' ? 'default' :
+                                ticket.status === 'cancelled' ? 'destructive' :
                                 ticket.status === 'transit' ? 'secondary' : 'outline'
                               }>
-                                {ticket.status}
+                                {ticket.status === 'cancelled' ? 'Archived' : ticket.status}
                               </Badge>
                             </div>
-                            <p className="text-sm text-gray-500">
-                              {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Unknown'}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-gray-500 mr-2">
+                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Unknown'}
+                              </p>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setViewTicket(ticket)}
+                                className="h-8 px-2"
+                                data-testid={`button-view-ticket-${ticket.ticketNumber}`}
+                              >
+                                <Eye size={14} className="mr-1" />
+                                View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditTicketData(ticket)}
+                                className="h-8 px-2"
+                                data-testid={`button-edit-ticket-${ticket.ticketNumber}`}
+                              >
+                                <Edit size={14} className="mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setArchiveTicket(ticket)}
+                                className="h-8 px-2 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                disabled={ticket.status === 'cancelled'}
+                                data-testid={`button-archive-ticket-${ticket.ticketNumber}`}
+                              >
+                                <Archive size={14} className="mr-1" />
+                                Archive
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setDeleteTicket(ticket)}
+                                className="h-8 px-2 text-red-600 border-red-300 hover:bg-red-50"
+                                data-testid={`button-delete-ticket-${ticket.ticketNumber}`}
+                              >
+                                <Trash2 size={14} className="mr-1" />
+                                Delete
+                              </Button>
+                            </div>
                           </div>
                           
-                          {ticket.licensePlate && (
-                            <p className="text-sm text-gray-600 mb-2">
-                              <strong>License Plate:</strong> {ticket.licensePlate}
-                            </p>
-                          )}
-                          
-                          {ticket.parkingLocation && (
-                            <p className="text-sm text-gray-600 mb-2">
-                              <strong>Parking:</strong> {ticket.parkingLocation}
-                            </p>
-                          )}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-600">
+                            {ticket.guestName && (
+                              <p><strong>Guest:</strong> {ticket.guestName}</p>
+                            )}
+                            {ticket.carMake && ticket.carModel && (
+                              <p><strong>Vehicle:</strong> {ticket.carMake} {ticket.carModel}</p>
+                            )}
+                            {ticket.licensePlate && (
+                              <p><strong>Plate:</strong> {ticket.licensePlate}</p>
+                            )}
+                            {ticket.parkingLocation && (
+                              <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
+                            )}
+                          </div>
                           
                           {ticket.staffNotes && (
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-gray-600 mt-2">
                               <strong>Notes:</strong> {ticket.staffNotes}
                             </p>
                           )}
@@ -688,6 +804,383 @@ export default function StaffDashboard() {
           onClose={() => setShowTicketWizard(false)}
           user={user}
         />
+
+        {/* View Ticket Modal */}
+        <Dialog open={!!viewTicket} onOpenChange={() => setViewTicket(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <TicketIcon size={20} />
+                Ticket #{viewTicket?.ticketNumber}
+              </DialogTitle>
+            </DialogHeader>
+            {viewTicket && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-regis-navy">Status</h3>
+                    <Badge variant={
+                      viewTicket.status === 'completed' ? 'default' :
+                      viewTicket.status === 'ready' ? 'default' :
+                      viewTicket.status === 'cancelled' ? 'destructive' :
+                      viewTicket.status === 'transit' ? 'secondary' : 'outline'
+                    } className="text-sm">
+                      {viewTicket.status === 'cancelled' ? 'Archived' : viewTicket.status}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-regis-navy">Created</h3>
+                    <p className="text-sm text-gray-600">
+                      {viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleString() : 'Unknown'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-regis-navy mb-3">Guest Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Guest Name</p>
+                      <p className="font-medium">{viewTicket.guestName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Visitor Type</p>
+                      <p className="font-medium capitalize">{viewTicket.visitorType?.replace('_', ' ') || 'N/A'}</p>
+                    </div>
+                    {viewTicket.visitorSubType && (
+                      <div>
+                        <p className="text-xs text-gray-500">Sub Type</p>
+                        <p className="font-medium capitalize">{viewTicket.visitorSubType.replace('_', ' ')}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-regis-navy mb-3">Vehicle Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Make</p>
+                      <p className="font-medium">{viewTicket.carMake || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Model</p>
+                      <p className="font-medium">{viewTicket.carModel || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Color</p>
+                      <p className="font-medium">{viewTicket.carColor || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">License Plate</p>
+                      <p className="font-medium">{viewTicket.licensePlate || 'N/A'}</p>
+                    </div>
+                  </div>
+                  {viewTicket.platePhotoUrl && (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 mb-2">Registration Photo</p>
+                      <img 
+                        src={viewTicket.platePhotoUrl} 
+                        alt="License plate" 
+                        className="w-full max-w-xs h-32 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-regis-navy mb-3">Parking Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Parking Location</p>
+                      <p className="font-medium">{viewTicket.parkingLocation || 'Not assigned'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Sector</p>
+                      <p className="font-medium">{viewTicket.parkingSector || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {viewTicket.staffNotes && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold text-regis-navy mb-3">Staff Notes</h3>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{viewTicket.staffNotes}</p>
+                  </div>
+                )}
+
+                <div className="border-t pt-4">
+                  <h3 className="font-semibold text-regis-navy mb-3">Staff Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Created By</p>
+                      <p className="font-medium">{viewTicket.createdByName || 'Unknown'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Assigned Staff</p>
+                      <p className="font-medium">{viewTicket.assignedStaff || 'Unassigned'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t">
+                  <Button variant="outline" onClick={() => setViewTicket(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Ticket Modal */}
+        <Dialog open={!!editTicketData} onOpenChange={() => setEditTicketData(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Edit size={20} />
+                Edit Ticket #{editTicketData?.ticketNumber}
+              </DialogTitle>
+            </DialogHeader>
+            {editTicketData && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Status</label>
+                  <Select
+                    value={editTicketData.status}
+                    onValueChange={(value) => setEditTicketData({ ...editTicketData, status: value })}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="retrieving">Retrieving</SelectItem>
+                      <SelectItem value="transit">Transit</SelectItem>
+                      <SelectItem value="ready">Ready</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Guest Name</label>
+                    <Input
+                      value={editTicketData.guestName || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, guestName: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">License Plate</label>
+                    <Input
+                      value={editTicketData.licensePlate || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, licensePlate: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Car Make</label>
+                    <Input
+                      value={editTicketData.carMake || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, carMake: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Car Model</label>
+                    <Input
+                      value={editTicketData.carModel || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, carModel: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Car Color</label>
+                    <Input
+                      value={editTicketData.carColor || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, carColor: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Parking Sector</label>
+                    <Select
+                      value={editTicketData.parkingSector || ''}
+                      onValueChange={(value) => setEditTicketData({ ...editTicketData, parkingSector: value })}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select sector" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A">Sector A</SelectItem>
+                        <SelectItem value="B">Sector B</SelectItem>
+                        <SelectItem value="C">Sector C</SelectItem>
+                        <SelectItem value="T">Sector T</SelectItem>
+                        <SelectItem value="E">Sector E</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Parking Location</label>
+                    <Input
+                      value={editTicketData.parkingLocation || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, parkingLocation: e.target.value })}
+                      placeholder="e.g., A23"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Staff Notes</label>
+                  <Textarea
+                    value={editTicketData.staffNotes || ''}
+                    onChange={(e) => setEditTicketData({ ...editTicketData, staffNotes: e.target.value })}
+                    placeholder="Add notes..."
+                    className="mt-1"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex space-x-2 pt-4">
+                  <Button
+                    onClick={() => updateTicketMutation.mutate({
+                      ticketNumber: editTicketData.ticketNumber,
+                      status: editTicketData.status,
+                      guestName: editTicketData.guestName,
+                      licensePlate: editTicketData.licensePlate,
+                      carMake: editTicketData.carMake,
+                      carModel: editTicketData.carModel,
+                      carColor: editTicketData.carColor,
+                      parkingSector: editTicketData.parkingSector,
+                      parkingLocation: editTicketData.parkingLocation,
+                      staffNotes: editTicketData.staffNotes,
+                    })}
+                    disabled={updateTicketMutation.isPending}
+                    className="flex-1 bg-regis-navy hover:bg-blue-900"
+                    data-testid="button-save-ticket"
+                  >
+                    <Save size={16} className="mr-2" />
+                    {updateTicketMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditTicketData(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Modal */}
+        <Dialog open={!!deleteTicket} onOpenChange={() => setDeleteTicket(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle size={20} />
+                Delete Ticket
+              </DialogTitle>
+            </DialogHeader>
+            {deleteTicket && (
+              <div className="space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">
+                    Are you sure you want to <strong>permanently delete</strong> ticket <strong>#{deleteTicket.ticketNumber}</strong>?
+                  </p>
+                  <p className="text-sm text-red-600 mt-2">
+                    This action cannot be undone. All ticket data will be lost.
+                  </p>
+                </div>
+                
+                <div className="text-sm text-gray-600">
+                  <p><strong>Guest:</strong> {deleteTicket.guestName || 'N/A'}</p>
+                  <p><strong>Vehicle:</strong> {deleteTicket.carMake} {deleteTicket.carModel}</p>
+                </div>
+
+                <div className="flex space-x-2 pt-4">
+                  <Button
+                    onClick={() => deleteTicketMutation.mutate(deleteTicket.ticketNumber)}
+                    disabled={deleteTicketMutation.isPending}
+                    variant="destructive"
+                    className="flex-1"
+                    data-testid="button-confirm-delete"
+                  >
+                    <Trash2 size={16} className="mr-2" />
+                    {deleteTicketMutation.isPending ? "Deleting..." : "Delete Permanently"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteTicket(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Archive Confirmation Modal */}
+        <Dialog open={!!archiveTicket} onOpenChange={() => setArchiveTicket(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-orange-600">
+                <Archive size={20} />
+                Archive Ticket
+              </DialogTitle>
+            </DialogHeader>
+            {archiveTicket && (
+              <div className="space-y-4">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <p className="text-sm text-orange-800">
+                    Are you sure you want to <strong>archive</strong> ticket <strong>#{archiveTicket.ticketNumber}</strong>?
+                  </p>
+                  <p className="text-sm text-orange-600 mt-2">
+                    Archived tickets are kept for historical records but won't appear in active lists.
+                  </p>
+                </div>
+                
+                <div className="text-sm text-gray-600">
+                  <p><strong>Guest:</strong> {archiveTicket.guestName || 'N/A'}</p>
+                  <p><strong>Vehicle:</strong> {archiveTicket.carMake} {archiveTicket.carModel}</p>
+                  <p><strong>Current Status:</strong> {archiveTicket.status}</p>
+                </div>
+
+                <div className="flex space-x-2 pt-4">
+                  <Button
+                    onClick={() => archiveTicketMutation.mutate(archiveTicket.ticketNumber)}
+                    disabled={archiveTicketMutation.isPending}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700"
+                    data-testid="button-confirm-archive"
+                  >
+                    <Archive size={16} className="mr-2" />
+                    {archiveTicketMutation.isPending ? "Archiving..." : "Archive Ticket"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setArchiveTicket(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

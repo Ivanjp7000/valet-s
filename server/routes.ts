@@ -711,6 +711,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update ticket (admin)
+  app.patch("/api/admin/tickets/:ticketNumber", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { status, guestName, licensePlate, carMake, carModel, carColor, parkingSector, parkingLocation, staffNotes } = req.body;
+
+      const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
+        status,
+        guestName,
+        licensePlate,
+        carMake,
+        carModel,
+        carColor,
+        parkingSector,
+        parkingLocation,
+        staffNotes,
+      });
+
+      if (!updatedTicket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Broadcast update
+      broadcastToAll({
+        type: 'ticket_updated',
+        data: updatedTicket,
+      });
+
+      res.json(updatedTicket);
+    } catch (error) {
+      console.error("Error updating ticket:", error);
+      res.status(500).json({ error: "Failed to update ticket" });
+    }
+  });
+
+  // Delete ticket (admin)
+  app.delete("/api/admin/tickets/:ticketNumber", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      
+      const deleted = await storage.deleteValetTicket(ticketNumber);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Broadcast deletion
+      broadcastToAll({
+        type: 'ticket_deleted',
+        data: { ticketNumber },
+      });
+
+      res.json({ success: true, message: "Ticket deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting ticket:", error);
+      res.status(500).json({ error: "Failed to delete ticket" });
+    }
+  });
+
+  // Archive ticket (admin) - sets status to 'cancelled'
+  app.patch("/api/admin/tickets/:ticketNumber/archive", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      
+      const archivedTicket = await storage.updateValetTicketStatus(ticketNumber, 'cancelled');
+      
+      if (!archivedTicket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Broadcast archive
+      broadcastToAll({
+        type: 'ticket_archived',
+        data: archivedTicket,
+      });
+
+      res.json(archivedTicket);
+    } catch (error) {
+      console.error("Error archiving ticket:", error);
+      res.status(500).json({ error: "Failed to archive ticket" });
+    }
+  });
+
   // Car Photo Management Routes
   app.post('/api/car-photos/upload', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {

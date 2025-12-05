@@ -54,6 +54,7 @@ export interface IStorage {
   getValetTicket(ticketNumber: string): Promise<ValetTicket | undefined>;
   updateValetTicketStatus(ticketNumber: string, status: string): Promise<ValetTicket | undefined>;
   updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined>;
+  deleteValetTicket(ticketNumber: string): Promise<boolean>;
   getActiveTickets(): Promise<ValetTicket[]>;
   getTicketsByLocation(locationId: string): Promise<ValetTicket[]>;
   getCompletedTicketsToday(): Promise<ValetTicket[]>;
@@ -139,6 +140,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
     return ticket;
+  }
+
+  async deleteValetTicket(ticketNumber: string): Promise<boolean> {
+    const result = await db
+      .delete(valetTickets)
+      .where(eq(valetTickets.ticketNumber, ticketNumber))
+      .returning();
+    return result.length > 0;
   }
 
   async getActiveTickets(): Promise<ValetTicket[]> {
