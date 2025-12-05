@@ -594,6 +594,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== USER LOCATION SCOPE ROUTES (Privilege Admin and above) =====
+  // Get location scopes for a user
+  app.get('/api/users/:userId/location-scopes', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const currentUser = req.currentUser;
+      const targetUser = await storage.getUser(userId);
+      
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      
+      // Privilege Admin can only view scopes for standard_admin in their OU
+      if (currentUser.role === 'privilege_admin') {
+        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const scopes = await storage.getUserLocationScopes(userId);
+      res.json(scopes);
+    } catch (error) {
+      console.error("Error fetching user location scopes:", error);
+      res.status(500).json({ message: "Failed to fetch location scopes" });
+    }
+  });
+
+  // Add location scope to a user (Privilege Admin assigns Standard Admin to specific locations)
+  app.post('/api/users/:userId/location-scopes', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { locationId } = req.body;
+      const currentUser = req.currentUser;
+      
+      if (!locationId) {
+        return res.status(400).json({ message: "Location ID is required" });
+      }
+      
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      
+      // Privilege Admin can only assign scopes to standard_admin in their OU
+      if (currentUser.role === 'privilege_admin') {
+        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only assign location scopes to standard admins in your OU" });
+        }
+      }
+      
+      // Verify location exists and is in the user's OU
+      const location = await storage.getLocation(locationId);
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      
+      if (location.ouId !== targetUser.ouId) {
+        return res.status(400).json({ message: "Location must be in the user's OU" });
+      }
+      
+      const scope = await storage.addUserLocationScope({ userId, locationId });
+      res.json(scope);
+    } catch (error) {
+      console.error("Error adding user location scope:", error);
+      res.status(400).json({ message: "Failed to add location scope" });
+    }
+  });
+
+  // Remove location scope from a user
+  app.delete('/api/users/:userId/location-scopes/:locationId', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { userId, locationId } = req.params;
+      const currentUser = req.currentUser;
+      
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      
+      // Privilege Admin can only remove scopes from standard_admin in their OU
+      if (currentUser.role === 'privilege_admin') {
+        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      await storage.removeUserLocationScope(userId, locationId);
+      res.json({ message: "Location scope removed successfully" });
+    } catch (error) {
+      console.error("Error removing user location scope:", error);
+      res.status(500).json({ message: "Failed to remove location scope" });
+    }
+  });
+
+  // Get all users with their location scopes (for admin UI)
+  app.get('/api/users-with-scopes', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const currentUser = req.currentUser;
+      
+      if (currentUser.role === 'superadmin') {
+        // Super Admin: Get all users with scopes
+        const users = await storage.getAllUsers();
+        const usersWithScopes = await Promise.all(
+          users.map(async (user) => ({
+            ...user,
+            locationScopes: await storage.getUserLocationScopes(user.id)
+          }))
+        );
+        res.json(usersWithScopes);
+      } else if (currentUser.ouId) {
+        // Privilege Admin: Get standard admins in their OU with scopes
+        const result = await storage.getUsersWithLocationScopes(currentUser.ouId);
+        const filteredResult = result
+          .filter(r => r.user.role === 'standard_admin')
+          .map(r => ({ ...r.user, locationScopes: r.scopes }));
+        res.json(filteredResult);
+      } else {
+        res.json([]);
+      }
+    } catch (error) {
+      console.error("Error fetching users with scopes:", error);
+      res.status(500).json({ message: "Failed to fetch users with scopes" });
+    }
+  });
+
   // ===== FAQ ROUTES (Super Admin Only) =====
   app.post('/api/admin/faqs', isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
