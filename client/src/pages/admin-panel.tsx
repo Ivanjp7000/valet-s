@@ -440,9 +440,9 @@ export default function AdminPanel() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="text-left p-4 font-medium text-gray-600">Location</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Code</th>
                         {isSuperAdmin && <th className="text-left p-4 font-medium text-gray-600">Organization</th>}
+                        <th className="text-left p-4 font-medium text-gray-600">Code</th>
+                        <th className="text-left p-4 font-medium text-gray-600">Location</th>
                         <th className="text-left p-4 font-medium text-gray-600">Address</th>
                         <th className="text-right p-4 font-medium text-gray-600">Actions</th>
                       </tr>
@@ -450,9 +450,9 @@ export default function AdminPanel() {
                     <tbody>
                       {filteredLocations?.map((loc) => (
                         <tr key={loc.id} className="border-t" data-testid={`row-location-${loc.id}`}>
-                          <td className="p-4 font-medium">{loc.name}</td>
-                          <td className="p-4"><Badge variant="outline">{loc.code}</Badge></td>
                           {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(loc.ouId)}</td>}
+                          <td className="p-4"><Badge variant="outline">{loc.code}</Badge></td>
+                          <td className="p-4 font-medium">{loc.name}</td>
                           <td className="p-4 text-gray-600">{loc.address || "—"}</td>
                           <td className="p-4 text-right">
                             <Button variant="ghost" size="icon" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
