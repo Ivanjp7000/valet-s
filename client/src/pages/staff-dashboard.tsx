@@ -34,21 +34,12 @@ export default function StaffDashboard() {
   });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showAddUser, setShowAddUser] = useState(false);
-  const [showAddTicket, setShowAddTicket] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
     lastName: "",
     role: "standard",
-  });
-  const [newTicketData, setNewTicketData] = useState({
-    ticketNumber: "",
-    licensePlate: "",
-    parkingSector: "",
-    parkingLocation: "",
-    staffNotes: "",
-    carPhoto: "",
   });
   
   // Ticket management modals state
@@ -117,49 +108,6 @@ export default function StaffDashboard() {
       toast({ title: "Error", description: "Failed to add user", variant: "destructive" });
     },
   });
-
-  const addTicketMutation = useMutation({
-    mutationFn: async (ticketData: typeof newTicketData) => {
-      // Combine sector and spot number for final parking location
-      const finalData = {
-        ...ticketData,
-        parkingLocation: ticketData.parkingSector && ticketData.parkingLocation 
-          ? `${ticketData.parkingSector}${ticketData.parkingLocation.replace(/[A-Z]/g, '')}` 
-          : ticketData.parkingLocation
-      };
-      await apiRequest("POST", "/api/admin/tickets", finalData);
-    },
-    onSuccess: () => {
-      setShowAddTicket(false);
-      setNewTicketData({
-        ticketNumber: "", licensePlate: "", parkingSector: "", 
-        parkingLocation: "", staffNotes: "", carPhoto: ""
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-      toast({ 
-        title: "Success", 
-        description: "New ticket with car details added successfully",
-        duration: 3000
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
-        return;
-      }
-      toast({ title: "Error", description: "Failed to add ticket", variant: "destructive" });
-    },
-  });
-
-  const handleNewTicketPhotoUpload = (photoUrl: string) => {
-    setNewTicketData(prev => ({ ...prev, carPhoto: photoUrl }));
-  };
 
   // Update ticket details mutation
   const updateTicketMutation = useMutation({
@@ -503,13 +451,6 @@ export default function StaffDashboard() {
             <TabsContent value="tickets" className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-regis-navy">Ticket Management</h2>
-                <Button
-                  onClick={() => setShowAddTicket(true)}
-                  className="bg-regis-navy hover:bg-blue-900 text-white"
-                >
-                  <Plus size={16} className="mr-2" />
-                  Add New Ticket
-                </Button>
               </div>
 
               <Card>
@@ -686,113 +627,6 @@ export default function StaffDashboard() {
                 <Button
                   variant="outline"
                   onClick={() => setShowAddUser(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Ticket Modal */}
-        <Dialog open={showAddTicket} onOpenChange={setShowAddTicket}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Ticket</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Ticket Number</label>
-                <Input
-                  value={newTicketData.ticketNumber}
-                  onChange={(e) => setNewTicketData(prev => ({ ...prev, ticketNumber: e.target.value }))}
-                  placeholder="Enter ticket number"
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Car Photo</label>
-                <CarPhotoUploader 
-                  onPhotoUploaded={handleNewTicketPhotoUpload}
-                  currentPhoto={newTicketData.carPhoto}
-                />
-                {newTicketData.carPhoto && (
-                  <img 
-                    src={newTicketData.carPhoto} 
-                    alt="Uploaded car" 
-                    className="mt-2 w-full h-32 object-cover rounded border"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">License Plate</label>
-                <Input
-                  value={newTicketData.licensePlate}
-                  onChange={(e) => setNewTicketData(prev => ({ ...prev, licensePlate: e.target.value }))}
-                  placeholder="Enter license plate"
-                  className="mt-1"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Parking Sector</label>
-                  <Select
-                    value={newTicketData.parkingSector}
-                    onValueChange={(value) => setNewTicketData(prev => ({ ...prev, parkingSector: value }))}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select sector" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="A">Sector A</SelectItem>
-                      <SelectItem value="B">Sector B</SelectItem>
-                      <SelectItem value="C">Sector C</SelectItem>
-                      <SelectItem value="T">Sector T</SelectItem>
-                      <SelectItem value="E">Sector E</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Spot Number (1-100)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={newTicketData.parkingLocation}
-                    onChange={(e) => setNewTicketData(prev => ({ ...prev, parkingLocation: e.target.value }))}
-                    placeholder="e.g., 23"
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Staff Notes</label>
-                <Textarea
-                  value={newTicketData.staffNotes}
-                  onChange={(e) => setNewTicketData(prev => ({ ...prev, staffNotes: e.target.value }))}
-                  placeholder="Add any notes about the vehicle..."
-                  className="mt-1"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex space-x-2 pt-4">
-                <Button
-                  onClick={() => addTicketMutation.mutate(newTicketData)}
-                  disabled={addTicketMutation.isPending}
-                  className="flex-1 bg-regis-navy hover:bg-blue-900"
-                >
-                  {addTicketMutation.isPending ? "Adding..." : "Add Ticket"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowAddTicket(false)}
                   className="flex-1"
                 >
                   Cancel
