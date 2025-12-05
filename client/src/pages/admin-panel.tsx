@@ -15,7 +15,7 @@ import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
-import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
+import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, UserLocationScope } from "@shared/schema";
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -48,6 +48,8 @@ export default function AdminPanel() {
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
+  const [managingUserScopes, setManagingUserScopes] = useState<User | null>(null);
+  const [userLocationScopes, setUserLocationScopes] = useState<UserLocationScope[]>([]);
 
   const { data: faqs, isLoading: faqsLoading } = useQuery<Faq[]>({
     queryKey: ["/api/faqs"],
@@ -169,6 +171,42 @@ export default function AdminPanel() {
       toast({ title: "Success", description: "User updated successfully" });
     },
     onError: (error) => handleError(error, "Failed to update user"),
+  });
+
+  const fetchUserLocationScopes = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/users/${userId}/location-scopes`);
+      if (response.ok) {
+        const scopes = await response.json();
+        setUserLocationScopes(scopes);
+      }
+    } catch (error) {
+      console.error("Error fetching location scopes:", error);
+    }
+  };
+
+  const addLocationScopeMutation = useMutation({
+    mutationFn: async ({ userId, locationId }: { userId: string; locationId: string }) => 
+      await apiRequest("POST", `/api/users/${userId}/location-scopes`, { locationId }),
+    onSuccess: () => {
+      if (managingUserScopes) {
+        fetchUserLocationScopes(managingUserScopes.id);
+      }
+      toast({ title: "Success", description: "Location added to user's access" });
+    },
+    onError: (error) => handleError(error, "Failed to add location access"),
+  });
+
+  const removeLocationScopeMutation = useMutation({
+    mutationFn: async ({ userId, locationId }: { userId: string; locationId: string }) => 
+      await apiRequest("DELETE", `/api/users/${userId}/location-scopes/${locationId}`, {}),
+    onSuccess: () => {
+      if (managingUserScopes) {
+        fetchUserLocationScopes(managingUserScopes.id);
+      }
+      toast({ title: "Success", description: "Location removed from user's access" });
+    },
+    onError: (error) => handleError(error, "Failed to remove location access"),
   });
 
   const deleteUserMutation = useMutation({
@@ -537,7 +575,21 @@ export default function AdminPanel() {
                           </td>
                           {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(u.ouId)}</td>}
                           <td className="p-4 text-gray-600">{getLocationName(u.locationId)}</td>
-                          <td className="p-4 text-right">
+                          <td className="p-4 text-right flex justify-end gap-1">
+                            {u.role === 'standard_admin' && (isPrivilegeAdmin || isSuperAdmin) && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => {
+                                  setManagingUserScopes(u);
+                                  fetchUserLocationScopes(u.id);
+                                }}
+                                title="Manage Location Access"
+                                data-testid={`button-manage-scopes-${u.id}`}
+                              >
+                                <MapPin size={16} className="text-green-600" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" onClick={() => { setEditingUser(u); setEditUserPassword(""); setShowEditPassword(false); }} data-testid={`button-edit-user-${u.id}`}>
                               <Edit size={16} className="text-blue-600" />
                             </Button>
@@ -1034,6 +1086,101 @@ export default function AdminPanel() {
               <Textarea placeholder="Answer" value={editingFaq.answer} onChange={(e) => setEditingFaq({ ...editingFaq, answer: e.target.value })} />
               <Button onClick={() => updateFaqMutation.mutate(editingFaq)} className="w-full bg-regis-navy hover:bg-blue-900" disabled={updateFaqMutation.isPending}>
                 Update FAQ
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Location Scope Management Dialog */}
+      {managingUserScopes && (
+        <Dialog open={!!managingUserScopes} onOpenChange={() => setManagingUserScopes(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Manage Location Access</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-600">Staff Member</p>
+                <p className="font-medium text-regis-navy">
+                  {managingUserScopes.firstName} {managingUserScopes.lastName}
+                </p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Current Location Access</label>
+                {userLocationScopes.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded-lg">
+                    No specific locations assigned - user has access to all locations in their organization
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {userLocationScopes.map((scope) => {
+                      const location = locations?.find(l => l.id === scope.locationId);
+                      return (
+                        <div key={scope.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <MapPin size={16} className="text-green-600" />
+                            <span className="font-medium">{location?.name || 'Unknown Location'}</span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => removeLocationScopeMutation.mutate({ 
+                              userId: managingUserScopes.id, 
+                              locationId: scope.locationId 
+                            })}
+                            disabled={removeLocationScopeMutation.isPending}
+                            data-testid={`button-remove-scope-${scope.locationId}`}
+                          >
+                            <Trash2 size={16} className="text-red-600" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Add Location Access</label>
+                <Select 
+                  value="" 
+                  onValueChange={(locationId) => {
+                    if (locationId) {
+                      addLocationScopeMutation.mutate({ 
+                        userId: managingUserScopes.id, 
+                        locationId 
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger data-testid="select-add-location-scope">
+                    <SelectValue placeholder="Select a location to add..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(isPrivilegeAdmin ? filteredLocations : locations?.filter(l => l.ouId === managingUserScopes.ouId))
+                      ?.filter(loc => !userLocationScopes.some(s => s.locationId === loc.id))
+                      .map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="p-3 bg-yellow-50 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Note:</strong> If no specific locations are assigned, the staff member will have access to all locations in their organization. 
+                  Assigning specific locations will restrict their access to only those locations.
+                </p>
+              </div>
+              
+              <Button 
+                onClick={() => setManagingUserScopes(null)} 
+                className="w-full bg-regis-navy hover:bg-blue-900"
+                data-testid="button-close-scope-dialog"
+              >
+                Done
               </Button>
             </div>
           </DialogContent>

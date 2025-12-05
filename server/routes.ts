@@ -185,6 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new valet ticket with full details
   app.post('/api/staff/tickets', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
+      const currentUser = req.currentUser;
       const { 
         ticketNumber, visitorType, visitorSubType, guestName,
         carMake, carModel, carColor, licensePlate, platePhotoUrl,
@@ -206,6 +207,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Ticket number already exists" });
       }
 
+      // Derive ouId from location or from current user
+      let ouId: string | null = null;
+      if (locationId) {
+        const location = await storage.getLocation(locationId);
+        if (location) {
+          ouId = location.ouId;
+        }
+      }
+      // Fallback to user's OU if no location or location has no OU
+      if (!ouId && currentUser.ouId) {
+        ouId = currentUser.ouId;
+      }
+      
+      // Ensure ouId is set for proper scoping
+      if (!ouId) {
+        return res.status(400).json({ message: "Cannot determine organization. Please select a location or ensure your account is assigned to an organization." });
+      }
+
       const ticket = await storage.createValetTicket({
         ticketNumber,
         visitorType,
@@ -217,6 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         licensePlate: licensePlate || null,
         platePhotoUrl: platePhotoUrl || null,
         locationId: locationId || null,
+        ouId: ouId,
         parkingSector: parkingSector || null,
         parkingLocation: parkingLocation || null,
         createdByUserId: createdByUserId || null,
