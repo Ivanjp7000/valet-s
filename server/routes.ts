@@ -161,10 +161,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Helper to get user's scoped location IDs (for Standard Admins with location restrictions)
+  const getUserScopedLocationIds = async (user: any): Promise<string[] | undefined> => {
+    if (user.role !== 'standard_admin') return undefined;
+    const scopes = await storage.getUserLocationScopes(user.id);
+    if (scopes.length === 0) return undefined; // No restrictions, see full OU
+    return scopes.map(s => s.locationId);
+  };
+
   // Protected routes (Staff/Admin only) - requires standard_admin or higher
   app.get('/api/staff/tickets', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
-      const activeTickets = await storage.getActiveTickets();
+      const user = req.currentUser;
+      const scopedLocationIds = await getUserScopedLocationIds(user);
+      const activeTickets = await storage.getScopedActiveTickets(user, scopedLocationIds);
       res.json(activeTickets);
     } catch (error) {
       console.error("Error fetching active tickets:", error);
@@ -253,14 +263,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/staff/stats', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
-      const activeTickets = await storage.getActiveTickets();
-      const completedToday = await storage.getCompletedTicketsToday();
+      const user = req.currentUser;
+      const scopedLocationIds = await getUserScopedLocationIds(user);
+      const allTickets = await storage.getScopedTickets(user, scopedLocationIds);
+      
+      // Filter for different status counts
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
       
       const stats = {
-        pending: activeTickets.filter(t => t.status === 'retrieving').length,
-        transit: activeTickets.filter(t => t.status === 'transit').length,
-        ready: activeTickets.filter(t => t.status === 'ready').length,
-        completed: completedToday.length,
+        pending: allTickets.filter(t => t.status === 'active' || t.status === 'retrieving').length,
+        transit: allTickets.filter(t => t.status === 'transit').length,
+        ready: allTickets.filter(t => t.status === 'ready').length,
+        completed: allTickets.filter(t => 
+          t.status === 'completed' && 
+          t.updatedAt && new Date(t.updatedAt) >= today
+        ).length,
         avgTime: '4.2m'
       };
 
@@ -637,30 +655,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes for user management
-  app.get("/api/admin/users", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+  // Admin routes for user management (Privilege Admin and above)
+  app.get("/api/admin/users", isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
     try {
-      const users = await storage.getAllUsers();
-      res.json(users);
+      const user = req.currentUser;
+      const scopedUsers = await storage.getScopedUsers(user);
+      res.json(scopedUsers);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
     }
   });
 
-  app.post("/api/admin/users", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
-    const { email, firstName, lastName, role } = req.body;
+  app.post("/api/admin/users", isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    const user = req.currentUser;
+    const { email, firstName, lastName, role, ouId, locationId } = req.body;
 
     if (!email || !firstName || !lastName) {
       return res.status(400).json({ error: "Email, first name, and last name are required" });
     }
 
     try {
+      // Privilege Admin can only create standard_admin users in their OU
+      let finalOuId = ouId;
+      let finalRole = role || "standard_admin";
+      
+      if (user.role !== 'superadmin') {
+        finalOuId = user.ouId; // Force to their OU
+        finalRole = 'standard_admin'; // Can only create standard admins
+      }
+
       const newUser = await storage.createUser({
         email,
         firstName,
         lastName,
-        role: role || "standard",
+        role: finalRole,
+        ouId: finalOuId || null,
+        locationId: locationId || null,
       });
       res.json(newUser);
     } catch (error) {
@@ -669,9 +700,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/tickets", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+  app.get("/api/admin/tickets", isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
-      const tickets = await storage.getAllTickets();
+      const user = req.currentUser;
+      const scopedLocationIds = await getUserScopedLocationIds(user);
+      const tickets = await storage.getScopedTickets(user, scopedLocationIds);
       res.json(tickets);
     } catch (error) {
       console.error("Error fetching all tickets:", error);
