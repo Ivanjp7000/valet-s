@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Car, Truck, CheckCircle, Clock } from "lucide-react";
@@ -18,50 +18,53 @@ const stages = [
 ];
 
 export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetrievalProgressProps) {
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATION_MS);
   const [currentStageIndex, setCurrentStageIndex] = useState<number>(0);
-  const [hasTriggeredComplete, setHasTriggeredComplete] = useState<boolean>(false);
+  const hasTriggeredRef = useRef<string | null>(null);
 
+  // Calculate initial time and stage
   useEffect(() => {
-    // Determine current stage based on ticket status
     let stageIndex = 0;
     if (ticket.status === "retrieving") stageIndex = 0;
     else if (ticket.status === "transit") stageIndex = 1;
     else if (ticket.status === "ready") stageIndex = 2;
-    else return; // Not in active retrieval
+    else return;
 
     setCurrentStageIndex(stageIndex);
-    setHasTriggeredComplete(false); // Reset the guard when stage changes
 
-    // Calculate time remaining based on stageStartedAt
     const stageStarted = ticket.stageStartedAt ? new Date(ticket.stageStartedAt).getTime() : Date.now();
     const elapsed = Date.now() - stageStarted;
     const remaining = Math.max(0, STAGE_DURATION_MS - elapsed);
     setTimeRemaining(remaining);
   }, [ticket.status, ticket.stageStartedAt]);
 
+  // Countdown timer
   useEffect(() => {
     if (ticket.status !== "retrieving" && ticket.status !== "transit" && ticket.status !== "ready") {
       return;
     }
 
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        const newTime = Math.max(0, prev - 1000);
-        return newTime;
-      });
+      setTimeRemaining((prev) => Math.max(0, prev - 1000));
     }, 1000);
 
     return () => clearInterval(interval);
   }, [ticket.status, ticket.ticketNumber]);
 
-  // Separate effect for auto-progression with one-shot guard
+  // Auto-progression with ref-based guard to prevent infinite loops
   useEffect(() => {
-    if (timeRemaining === 0 && !hasTriggeredComplete && onStageComplete && currentStageIndex < 2) {
-      setHasTriggeredComplete(true);
+    const key = `${ticket.ticketNumber}-${ticket.status}`;
+    
+    if (
+      timeRemaining === 0 &&
+      hasTriggeredRef.current !== key &&
+      onStageComplete &&
+      currentStageIndex < 2
+    ) {
+      hasTriggeredRef.current = key;
       onStageComplete(ticket.ticketNumber, currentStageIndex + 2);
     }
-  }, [timeRemaining, hasTriggeredComplete, onStageComplete, currentStageIndex, ticket.ticketNumber]);
+  }, [timeRemaining, ticket.ticketNumber, ticket.status, onStageComplete, currentStageIndex]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
