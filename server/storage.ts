@@ -2,6 +2,7 @@ import {
   users,
   organizationalUnits,
   physicalLocations,
+  userLocationScopes,
   valetTickets,
   faqs,
   systemSettings,
@@ -11,6 +12,8 @@ import {
   type InsertOU,
   type PhysicalLocation,
   type InsertPhysicalLocation,
+  type UserLocationScope,
+  type InsertUserLocationScope,
   type ValetTicket,
   type InsertValetTicket,
   type Faq,
@@ -19,7 +22,7 @@ import {
   type InsertSystemSetting,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and } from "drizzle-orm";
+import { eq, desc, asc, and, or, inArray } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -70,6 +73,20 @@ export interface IStorage {
   getSystemSetting(key: string): Promise<SystemSetting | undefined>;
   upsertSystemSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
   getAllSystemSettings(): Promise<SystemSetting[]>;
+  
+  // User Location Scope operations (for Privilege Admins to confine Standard Admins)
+  getUserLocationScopes(userId: string): Promise<UserLocationScope[]>;
+  addUserLocationScope(scope: InsertUserLocationScope): Promise<UserLocationScope>;
+  removeUserLocationScope(userId: string, locationId: string): Promise<void>;
+  getUsersWithLocationScopes(ouId: string): Promise<{user: User, scopes: UserLocationScope[]}[]>;
+  
+  // Scoped data access methods (for role-based filtering)
+  getScopedTickets(user: User, scopedLocationIds?: string[]): Promise<ValetTicket[]>;
+  getScopedActiveTickets(user: User, scopedLocationIds?: string[]): Promise<ValetTicket[]>;
+  getScopedUsers(user: User): Promise<User[]>;
+  getScopedLocations(user: User): Promise<PhysicalLocation[]>;
+  getTicketsByOU(ouId: string): Promise<ValetTicket[]>;
+  getTicketsByLocations(locationIds: string[]): Promise<ValetTicket[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -352,6 +369,115 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLocation(id: string): Promise<void> {
     await db.update(physicalLocations).set({ isActive: false }).where(eq(physicalLocations.id, id));
+  }
+
+  // User Location Scope operations
+  async getUserLocationScopes(userId: string): Promise<UserLocationScope[]> {
+    return await db
+      .select()
+      .from(userLocationScopes)
+      .where(eq(userLocationScopes.userId, userId));
+  }
+
+  async addUserLocationScope(scope: InsertUserLocationScope): Promise<UserLocationScope> {
+    const [newScope] = await db.insert(userLocationScopes).values(scope).returning();
+    return newScope;
+  }
+
+  async removeUserLocationScope(userId: string, locationId: string): Promise<void> {
+    await db
+      .delete(userLocationScopes)
+      .where(and(
+        eq(userLocationScopes.userId, userId),
+        eq(userLocationScopes.locationId, locationId)
+      ));
+  }
+
+  async getUsersWithLocationScopes(ouId: string): Promise<{user: User, scopes: UserLocationScope[]}[]> {
+    const ouUsers = await this.getUsersByOU(ouId);
+    const results = await Promise.all(
+      ouUsers.map(async (user) => {
+        const scopes = await this.getUserLocationScopes(user.id);
+        return { user, scopes };
+      })
+    );
+    return results;
+  }
+
+  // Scoped data access methods
+  async getScopedTickets(user: User, scopedLocationIds?: string[]): Promise<ValetTicket[]> {
+    // Super Admin: see all tickets
+    if (user.role === 'superadmin') {
+      return await this.getAllTickets();
+    }
+
+    // No OU assigned: return empty (shouldn't happen for non-superadmins)
+    if (!user.ouId) {
+      return [];
+    }
+
+    // If user has specific location scopes, filter by those locations
+    if (scopedLocationIds && scopedLocationIds.length > 0) {
+      return await this.getTicketsByLocations(scopedLocationIds);
+    }
+
+    // Privilege Admin or unscoped Standard Admin: see all tickets in their OU
+    return await this.getTicketsByOU(user.ouId);
+  }
+
+  async getScopedActiveTickets(user: User, scopedLocationIds?: string[]): Promise<ValetTicket[]> {
+    const allTickets = await this.getScopedTickets(user, scopedLocationIds);
+    // Return only active/non-completed tickets
+    return allTickets.filter(t => 
+      t.status !== 'completed' && t.status !== 'cancelled'
+    );
+  }
+
+  async getScopedUsers(user: User): Promise<User[]> {
+    // Super Admin: see all users
+    if (user.role === 'superadmin') {
+      return await this.getAllUsers();
+    }
+
+    // No OU assigned: return empty
+    if (!user.ouId) {
+      return [];
+    }
+
+    // Privilege Admin or Standard Admin: see users in their OU
+    return await this.getUsersByOU(user.ouId);
+  }
+
+  async getScopedLocations(user: User): Promise<PhysicalLocation[]> {
+    // Super Admin: see all locations
+    if (user.role === 'superadmin') {
+      return await this.getAllLocations();
+    }
+
+    // No OU assigned: return empty
+    if (!user.ouId) {
+      return [];
+    }
+
+    // Others: see locations in their OU
+    return await this.getLocationsByOU(user.ouId);
+  }
+
+  async getTicketsByOU(ouId: string): Promise<ValetTicket[]> {
+    return await db
+      .select()
+      .from(valetTickets)
+      .where(eq(valetTickets.ouId, ouId))
+      .orderBy(desc(valetTickets.createdAt));
+  }
+
+  async getTicketsByLocations(locationIds: string[]): Promise<ValetTicket[]> {
+    if (locationIds.length === 0) return [];
+    return await db
+      .select()
+      .from(valetTickets)
+      .where(inArray(valetTickets.locationId, locationIds))
+      .orderBy(desc(valetTickets.createdAt));
   }
 }
 
