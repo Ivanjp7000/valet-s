@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,24 @@ const STEPS = [
   { id: 2, title: "Registration & Guest", icon: Camera },
   { id: 3, title: "Ticket & Confirm", icon: Ticket },
 ];
+
+const COLOR_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  'Black': { bg: 'bg-black', text: 'text-white', border: 'border-black' },
+  'White': { bg: 'bg-white', text: 'text-gray-800', border: 'border-gray-300' },
+  'Silver': { bg: 'bg-gray-300', text: 'text-gray-800', border: 'border-gray-400' },
+  'Gray': { bg: 'bg-gray-500', text: 'text-white', border: 'border-gray-600' },
+  'Red': { bg: 'bg-red-600', text: 'text-white', border: 'border-red-700' },
+  'Blue': { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' },
+  'Navy': { bg: 'bg-blue-900', text: 'text-white', border: 'border-blue-950' },
+  'Green': { bg: 'bg-green-600', text: 'text-white', border: 'border-green-700' },
+  'Gold': { bg: 'bg-yellow-500', text: 'text-gray-900', border: 'border-yellow-600' },
+  'Brown': { bg: 'bg-amber-800', text: 'text-white', border: 'border-amber-900' },
+  'Beige': { bg: 'bg-amber-100', text: 'text-gray-800', border: 'border-amber-200' },
+  'Orange': { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600' },
+  'Yellow': { bg: 'bg-yellow-400', text: 'text-gray-900', border: 'border-yellow-500' },
+  'Purple': { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' },
+  'Other': { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
+};
 
 export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardProps) {
   const { toast } = useToast();
@@ -151,6 +169,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     switch (type) {
       case "hotel_guest": return <Hotel className="w-6 h-6" />;
       case "restaurant": return <UtensilsCrossed className="w-6 h-6" />;
+      case "event": return <CalendarDays className="w-6 h-6" />;
       case "others": return <Users className="w-6 h-6" />;
     }
   };
@@ -255,20 +274,24 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <div>
             <label className="text-sm font-medium text-gray-700">Color</label>
             <div className="grid grid-cols-5 gap-2 mt-2">
-              {CAR_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setFormData({ ...formData, carColor: color })}
-                  className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${
-                    formData.carColor === color 
-                      ? "border-regis-gold bg-regis-gold/10" 
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                  data-testid={`color-${color}`}
-                >
-                  {color}
-                </button>
-              ))}
+              {CAR_COLORS.map((color) => {
+                const colorStyle = COLOR_STYLES[color] || COLOR_STYLES['Other'];
+                const isSelected = formData.carColor === color;
+                return (
+                  <button
+                    key={color}
+                    onClick={() => setFormData({ ...formData, carColor: color })}
+                    className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${colorStyle.bg} ${colorStyle.text} ${
+                      isSelected 
+                        ? "ring-2 ring-regis-gold ring-offset-2 scale-105" 
+                        : `${colorStyle.border} hover:scale-105`
+                    }`}
+                    data-testid={`color-${color}`}
+                  >
+                    {color}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

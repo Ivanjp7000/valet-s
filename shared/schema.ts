@@ -195,6 +195,7 @@ export const insertValetTicketSchema = createInsertSchema(valetTickets).pick({
 export const VISITOR_TYPES = {
   hotel_guest: 'Hotel Staying Guest',
   restaurant: 'Restaurant Valet',
+  event: 'Event',
   others: 'Others',
 } as const;
 
