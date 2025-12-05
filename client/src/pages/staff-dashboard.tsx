@@ -28,7 +28,6 @@ export default function StaffDashboard() {
   const [carFormData, setCarFormData] = useState({
     licensePlate: "",
     parkingLocation: "",
-    parkingSector: "",
     staffNotes: "",
     carPhoto: "",
   });
@@ -728,15 +727,9 @@ export default function StaffDashboard() {
 
                 <div className="border-t pt-4">
                   <h3 className="font-semibold text-regis-navy mb-3">Parking Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Parking Location</p>
-                      <p className="font-medium">{viewTicket.parkingLocation || 'Not assigned'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Sector</p>
-                      <p className="font-medium">{viewTicket.parkingSector || 'N/A'}</p>
-                    </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Parking Location</p>
+                    <p className="font-medium">{viewTicket.parkingLocation || 'Not assigned'}</p>
                   </div>
                 </div>
 
@@ -847,34 +840,14 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Parking Sector</label>
-                    <Select
-                      value={editTicketData.parkingSector || ''}
-                      onValueChange={(value) => setEditTicketData({ ...editTicketData, parkingSector: value })}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select sector" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A">Sector A</SelectItem>
-                        <SelectItem value="B">Sector B</SelectItem>
-                        <SelectItem value="C">Sector C</SelectItem>
-                        <SelectItem value="T">Sector T</SelectItem>
-                        <SelectItem value="E">Sector E</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Parking Location</label>
-                    <Input
-                      value={editTicketData.parkingLocation || ''}
-                      onChange={(e) => setEditTicketData({ ...editTicketData, parkingLocation: e.target.value })}
-                      placeholder="e.g., A23"
-                      className="mt-1"
-                    />
-                  </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Parking Location</label>
+                  <Input
+                    value={editTicketData.parkingLocation || ''}
+                    onChange={(e) => setEditTicketData({ ...editTicketData, parkingLocation: e.target.value })}
+                    placeholder="e.g., A23"
+                    className="mt-1"
+                  />
                 </div>
 
                 <div>
@@ -898,7 +871,6 @@ export default function StaffDashboard() {
                       carMake: editTicketData.carMake,
                       carModel: editTicketData.carModel,
                       carColor: editTicketData.carColor,
-                      parkingSector: editTicketData.parkingSector,
                       parkingLocation: editTicketData.parkingLocation,
                       staffNotes: editTicketData.staffNotes,
                     })}
