@@ -478,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName,
         role: role || 'standard_admin',
         ouId: ouId || currentUser.ouId,
-        locationId,
+        locationId: locationId || null,
         createdBy: currentUser.id,
       });
       
@@ -507,7 +507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const { password, role, ouId, ...safeUpdateData } = req.body;
+      const { password, role, ouId, locationId, ...safeUpdateData } = req.body;
       
       // Privilege Admin cannot change role or OU assignment
       if (currentUser.role === 'privilege_admin') {
@@ -524,6 +524,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (currentUser.role === 'superadmin') {
         if (role) updateData.role = role;
         if (ouId) updateData.ouId = ouId;
+      }
+      
+      // Handle locationId - convert empty string to null
+      if (locationId !== undefined) {
+        updateData.locationId = locationId || null;
       }
       
       // If password is being updated, hash it
