@@ -51,6 +51,15 @@ export const physicalLocations = pgTable("physical_locations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// User Location Scopes - allows Privilege Admins to confine Standard Admins to specific locations
+export const userLocationScopes = pgTable("user_location_scopes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  locationId: varchar("location_id").notNull().references(() => physicalLocations.id, { onDelete: 'cascade' }),
+  assignedBy: varchar("assigned_by").references(() => users.id), // Privilege Admin who assigned this scope
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
 // Roles: 'superadmin', 'privilege_admin', 'standard_admin'
@@ -75,6 +84,7 @@ export const users = pgTable("users", {
 export const valetTickets = pgTable("valet_tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ticketNumber: varchar("ticket_number", { length: 6 }).notNull().unique(),
+  ouId: varchar("ou_id").references(() => organizationalUnits.id), // Which OU this ticket belongs to (denormalized for faster queries)
   locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this ticket belongs to
   status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled'
   estimatedTime: integer("estimated_time").default(5), // in minutes
@@ -132,6 +142,9 @@ export type OrganizationalUnit = typeof organizationalUnits.$inferSelect;
 
 export type InsertPhysicalLocation = typeof physicalLocations.$inferInsert;
 export type PhysicalLocation = typeof physicalLocations.$inferSelect;
+
+export type InsertUserLocationScope = typeof userLocationScopes.$inferInsert;
+export type UserLocationScope = typeof userLocationScopes.$inferSelect;
 
 export type InsertValetTicket = typeof valetTickets.$inferInsert;
 export type ValetTicket = typeof valetTickets.$inferSelect;
