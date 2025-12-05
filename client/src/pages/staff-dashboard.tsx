@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle } from "lucide-react";
+import { UnifiedRetrievalBox } from "@/components/active-retrieval-progress";
+import { CircularTimer } from "@/components/circular-timer";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -270,100 +272,128 @@ export default function StaffDashboard() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <Card className="shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Car className="text-blue-600" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.pending || 0}</p>
-                  <p className="text-sm text-gray-600">Retrieving</p>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Unified Active Retrieval Box */}
+              <div className="lg:col-span-2">
+                <UnifiedRetrievalBox 
+                  tickets={activeTickets || []} 
+                  onStageComplete={(ticketNumber, nextStage) => {
+                    const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
+                    const newStatus = statusMap[nextStage];
+                    if (newStatus) {
+                      updateStatusMutation.mutate({ ticketNumber, status: newStatus });
+                    }
+                  }}
+                />
+              </div>
 
-              <Card className="shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Construction className="text-yellow-600" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.transit || 0}</p>
-                  <p className="text-sm text-gray-600">In Transit</p>
-                </CardContent>
-              </Card>
+              {/* Stats Summary */}
+              <div className="space-y-4">
+                <Card className="shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <Check className="text-gray-600" size={20} />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
+                    <p className="text-sm text-gray-600">Completed Today</p>
+                  </CardContent>
+                </Card>
 
-              <Card className="shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Check className="text-green-600" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.ready || 0}</p>
-                  <p className="text-sm text-gray-600">Ready</p>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Check className="text-gray-600" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
-                  <p className="text-sm text-gray-600">Completed Today</p>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Timer className="text-purple-600" size={20} />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
-                  <p className="text-sm text-gray-600">Avg. Time</p>
-                </CardContent>
-              </Card>
+                <Card className="shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                      <Timer className="text-purple-600" size={20} />
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
+                    <p className="text-sm text-gray-600">Avg. Time</p>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
+            {/* Waiting Tickets (Active status - not yet in retrieval) */}
             <Card>
               <CardHeader>
-                <CardTitle>Active Tickets</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="text-regis-navy" size={20} />
+                  Waiting Tickets
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {ticketsLoading ? (
                   <div className="text-center py-8">Loading tickets...</div>
                 ) : (
-                  <div className="space-y-4">
-                    {activeTickets?.map((ticket) => (
-                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-3">
-                          <div className="flex items-center space-x-3">
-                            {getStatusIcon(ticket.status)}
-                            <div>
-                              <p className="font-medium">Ticket #{ticket.ticketNumber}</p>
-                              <p className="text-sm text-gray-600">
-                                Created {ticket.createdAt ? new Date(ticket.createdAt).toLocaleTimeString() : 'Unknown'}
-                              </p>
-                            </div>
+                          <div>
+                            <p className="font-bold text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                            <p className="text-xs text-gray-500">
+                              {ticket.carMake} {ticket.carModel}
+                            </p>
                           </div>
-                          <Badge variant={
-                            ticket.status === 'ready' ? 'default' :
-                            ticket.status === 'transit' ? 'secondary' : 'outline'
-                          }>
-                            {ticket.status}
-                          </Badge>
+                          <CircularTimer 
+                            createdAt={ticket.createdAt || new Date()} 
+                            maxHours={24}
+                            size={50}
+                            strokeWidth={3}
+                          />
                         </div>
 
-                        {ticket.licensePlate && (
-                          <p className="text-sm text-gray-600 mb-2">
-                            <strong>License:</strong> {ticket.licensePlate}
-                          </p>
-                        )}
+                        <div className="space-y-1 text-sm text-gray-600 mb-3">
+                          <p><strong>Guest:</strong> {ticket.guestName}</p>
+                          <p><strong>Color:</strong> {ticket.carColor}</p>
+                          {ticket.parkingLocation && (
+                            <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
+                          )}
+                        </div>
 
-                        {ticket.parkingLocation && (
-                          <p className="text-sm text-gray-600 mb-2">
-                            <strong>Parking:</strong> {ticket.parkingLocation}
-                          </p>
-                        )}
+                        <Button
+                          size="sm"
+                          className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+                          onClick={() => updateStatusMutation.mutate({ 
+                            ticketNumber: ticket.ticketNumber, 
+                            status: 'retrieving' 
+                          })}
+                          data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
+                        >
+                          <Play size={14} className="mr-1" />
+                          Start Retrieval
+                        </Button>
+                      </div>
+                    ))}
+                    {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                      <div className="col-span-full text-center py-8 text-gray-400">
+                        <Clock size={40} className="mx-auto mb-2 opacity-40" />
+                        <p>No waiting tickets</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                        <div className="flex space-x-2 mt-3">
+            {/* Quick Actions for Active Retrievals */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Status Updates</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {ticketsLoading ? (
+                  <div className="text-center py-8">Loading tickets...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeTickets?.filter(t => t.status === 'retrieving' || t.status === 'transit' || t.status === 'ready').map((ticket) => (
+                      <div key={ticket.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          {getStatusIcon(ticket.status)}
+                          <div>
+                            <p className="font-medium">#{ticket.ticketNumber}</p>
+                            <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
                           <Button
                             size="sm"
                             variant="outline"
@@ -373,7 +403,7 @@ export default function StaffDashboard() {
                             })}
                             disabled={ticket.status !== 'retrieving'}
                           >
-                            Mark Transit
+                            Transit
                           </Button>
                           <Button
                             size="sm"
