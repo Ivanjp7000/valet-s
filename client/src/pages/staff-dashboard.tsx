@@ -556,27 +556,31 @@ export default function StaffDashboard() {
                                 <Edit size={14} className="mr-1" />
                                 Edit
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setArchiveTicket(ticket)}
-                                className="h-8 px-2 text-orange-600 border-orange-300 hover:bg-orange-50"
-                                disabled={ticket.status === 'cancelled'}
-                                data-testid={`button-archive-ticket-${ticket.ticketNumber}`}
-                              >
-                                <Archive size={14} className="mr-1" />
-                                Archive
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setDeleteTicket(ticket)}
-                                className="h-8 px-2 text-red-600 border-red-300 hover:bg-red-50"
-                                data-testid={`button-delete-ticket-${ticket.ticketNumber}`}
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                Delete
-                              </Button>
+                              {user?.role === 'superadmin' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setArchiveTicket(ticket)}
+                                  className="h-8 px-2 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                  disabled={ticket.status === 'cancelled'}
+                                  data-testid={`button-archive-ticket-${ticket.ticketNumber}`}
+                                >
+                                  <Archive size={14} className="mr-1" />
+                                  Archive
+                                </Button>
+                              )}
+                              {user?.role === 'superadmin' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setDeleteTicket(ticket)}
+                                  className="h-8 px-2 text-red-600 border-red-300 hover:bg-red-50"
+                                  data-testid={`button-delete-ticket-${ticket.ticketNumber}`}
+                                >
+                                  <Trash2 size={14} className="mr-1" />
+                                  Delete
+                                </Button>
+                              )}
                             </div>
                           </div>
                           
