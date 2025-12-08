@@ -59,6 +59,54 @@ function GuestOutCard({ ticket, onBack }: { ticket: ValetTicket; onBack: () => v
   );
 }
 
+function GuestOutCardFull({ ticket, onBack }: { ticket: ValetTicket; onBack: () => void }) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!ticket.guestDepartedAt) return;
+    
+    const departedAt = new Date(ticket.guestDepartedAt).getTime();
+    const updateTimer = () => {
+      setElapsedSeconds(Math.floor((Date.now() - departedAt) / 1000));
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [ticket.guestDepartedAt]);
+
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const mins = Math.floor((elapsedSeconds % 3600) / 60);
+  const secs = elapsedSeconds % 60;
+  const timeDisplay = hours > 0 
+    ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    : `${mins}:${secs.toString().padStart(2, '0')}`;
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <p className="font-bold text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+          <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
+        </div>
+        <div className="text-right">
+          <Badge className="bg-blue-600 text-white mb-1">Out with Guest</Badge>
+          <p className="text-lg font-mono font-bold text-blue-700">{timeDisplay}</p>
+        </div>
+      </div>
+      <div className="text-sm text-gray-600 mb-3">
+        <p><strong>Guest:</strong> {ticket.guestName}</p>
+      </div>
+      <Button 
+        size="sm" 
+        className="w-full bg-green-600 hover:bg-green-700 text-white"
+        onClick={onBack}
+      >
+        Back
+      </Button>
+    </div>
+  );
+}
+
 export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -481,6 +529,62 @@ export default function StaffDashboard() {
             ) : (
               /* Full View (existing layout) */
               <>
+                {/* Ready for Collection - Full View */}
+                <Card className="shadow-lg border-2 border-green-200 bg-gradient-to-br from-white to-green-50/30 mb-4">
+                  <CardHeader className="p-4 sm:p-6 pb-2">
+                    <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                      <div className="flex items-center gap-2 text-green-700">
+                        <Check size={20} />
+                        Ready for Collection
+                      </div>
+                      <Badge className="bg-green-600 text-white text-lg px-4 py-1">
+                        {activeTickets?.filter(t => t.status === 'ready').length || 0}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6 pt-2">
+                    {activeTickets?.filter(t => t.status === 'ready').length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <Check size={36} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No cars ready for collection</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {activeTickets?.filter(t => t.status === 'ready').map((ticket) => (
+                          <div key={ticket.id} className="bg-green-50 border border-green-200 rounded-lg p-4 shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <p className="font-bold text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                                <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
+                              </div>
+                              <Badge className="bg-green-600 text-white">Ready</Badge>
+                            </div>
+                            <div className="text-sm text-gray-600 mb-3">
+                              <p><strong>Guest:</strong> {ticket.guestName}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
+                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
+                              >
+                                Departed
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
+                              >
+                                Coming Back
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                   {/* Unified Active Retrieval Box */}
                   <div className="lg:col-span-2">
@@ -519,6 +623,39 @@ export default function StaffDashboard() {
                     </Card>
                   </div>
                 </div>
+
+                {/* Guest will Return - Full View */}
+                <Card className="shadow-lg border-2 border-blue-200 bg-gradient-to-br from-white to-blue-50/30 mt-4">
+                  <CardHeader className="p-4 sm:p-6 pb-2">
+                    <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <Car size={20} />
+                        Car Currently in Use - Guest will Return
+                      </div>
+                      <Badge className="bg-blue-600 text-white text-lg px-4 py-1">
+                        {activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6 pt-2">
+                    {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <Car size={36} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No cars out with guests</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
+                          <GuestOutCardFull 
+                            key={ticket.id} 
+                            ticket={ticket} 
+                            onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)} 
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </>
             )}
 
