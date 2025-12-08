@@ -447,29 +447,65 @@ export default function AdminPanel() {
                       : "No locations found. Create an organization first."}
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[500px]">
+                  <div className="space-y-2 p-2 sm:hidden">
+                    {/* Mobile card view */}
+                    {filteredLocations?.map((loc) => (
+                      <div key={loc.id} className="border rounded-lg p-3 bg-gray-50" data-testid={`card-location-${loc.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className="text-xs flex-shrink-0">{loc.code}</Badge>
+                              <span className="font-medium text-sm truncate">{loc.name}</span>
+                            </div>
+                            {isSuperAdmin && (
+                              <p className="text-xs text-gray-500 truncate">Org: {getOUName(loc.ouId)}</p>
+                            )}
+                            {loc.address && (
+                              <p className="text-xs text-gray-500 truncate mt-1">{loc.address}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
+                              <Edit size={14} className="text-blue-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
+                              if (confirm("Delete this location?")) {
+                                deleteLocationMutation.mutate(loc.id);
+                              }
+                            }} data-testid={`button-delete-location-${loc.id}`}>
+                              <Trash2 size={14} className="text-red-600" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Desktop table view */}
+                {filteredLocations && filteredLocations.length > 0 && (
+                  <div className="overflow-x-auto hidden sm:block">
+                    <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
-                          {isSuperAdmin && <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Org</th>}
-                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Code</th>
-                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Location</th>
-                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden sm:table-cell">Address</th>
-                          <th className="text-right p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Actions</th>
+                          {isSuperAdmin && <th className="text-left p-4 font-medium text-gray-600 text-sm">Org</th>}
+                          <th className="text-left p-4 font-medium text-gray-600 text-sm">Code</th>
+                          <th className="text-left p-4 font-medium text-gray-600 text-sm">Location</th>
+                          <th className="text-left p-4 font-medium text-gray-600 text-sm">Address</th>
+                          <th className="text-right p-4 font-medium text-gray-600 text-sm">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredLocations?.map((loc) => (
                           <tr key={loc.id} className="border-t" data-testid={`row-location-${loc.id}`}>
-                            {isSuperAdmin && <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm truncate max-w-[80px]">{getOUName(loc.ouId)}</td>}
-                            <td className="p-2 sm:p-4"><Badge variant="outline" className="text-xs">{loc.code}</Badge></td>
-                            <td className="p-2 sm:p-4 font-medium text-xs sm:text-sm truncate max-w-[100px]">{loc.name}</td>
-                            <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell truncate max-w-[150px]">{loc.address || "—"}</td>
-                            <td className="p-2 sm:p-4 text-right">
-                              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
+                            {isSuperAdmin && <td className="p-4 text-gray-600 text-sm truncate max-w-[120px]">{getOUName(loc.ouId)}</td>}
+                            <td className="p-4"><Badge variant="outline" className="text-xs">{loc.code}</Badge></td>
+                            <td className="p-4 font-medium text-sm">{loc.name}</td>
+                            <td className="p-4 text-gray-600 text-sm truncate max-w-[200px]">{loc.address || "—"}</td>
+                            <td className="p-4 text-right">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
                                 <Edit size={14} className="text-blue-600" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => {
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                                 if (confirm("Delete this location?")) {
                                   deleteLocationMutation.mutate(loc.id);
                                 }
