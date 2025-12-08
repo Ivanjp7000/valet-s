@@ -576,7 +576,7 @@ export default function StaffDashboard() {
                         key={ticket.id} 
                         ticket={ticket} 
                         onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                        onEdit={() => setEditingTicket(ticket)}
+                        onEdit={() => setEditTicketData(ticket)}
                       />
                     ))}
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -740,16 +740,29 @@ export default function StaffDashboard() {
                               {ticket.carMake} {ticket.carModel}
                             </p>
                           </div>
-                          <CircularTimer 
-                            createdAt={ticket.createdAt || new Date()} 
-                            maxHours={24}
-                            size={40}
-                            strokeWidth={3}
-                          />
+                          <div className="flex items-start gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setEditTicketData(ticket)}
+                            >
+                              <Edit size={16} className="text-gray-500" />
+                            </Button>
+                            <CircularTimer 
+                              createdAt={ticket.createdAt || new Date()} 
+                              maxHours={24}
+                              size={40}
+                              strokeWidth={3}
+                            />
+                          </div>
                         </div>
 
                         <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                           <p><strong>Guest:</strong> {ticket.guestName}</p>
+                          {ticket.roomNumber && (
+                            <p><strong>Room:</strong> {ticket.roomNumber}</p>
+                          )}
                           <p><strong>Color:</strong> {ticket.carColor}</p>
                           {ticket.parkingLocation && (
                             <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
@@ -766,7 +779,7 @@ export default function StaffDashboard() {
                           data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
                         >
                           <Play size={14} className="mr-1" />
-                          Start Retrieval
+                          Retrieve
                         </Button>
                       </div>
                     ))}
