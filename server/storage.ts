@@ -158,6 +158,13 @@ export class DatabaseStorage implements IStorage {
       updateData.currentStage = 3;
     } else if (status === 'completed') {
       updateData.currentStage = 4;
+      updateData.departedAt = now;
+      // Calculate total stay time from ticket creation
+      const existingTicket = await this.getValetTicket(ticketNumber);
+      if (existingTicket?.createdAt) {
+        const createdAt = new Date(existingTicket.createdAt);
+        updateData.totalStaySeconds = Math.floor((now.getTime() - createdAt.getTime()) / 1000);
+      }
     } else if (status === 'out_with_guest') {
       // Guest is taking the car out ("Coming Back" was clicked)
       updateData.guestDepartedAt = now;

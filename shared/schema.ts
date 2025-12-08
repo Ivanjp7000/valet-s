@@ -121,6 +121,10 @@ export const valetTickets = pgTable("valet_tickets", {
   guestReturnedAt: timestamp("guest_returned_at"), // When guest returned the car (Back clicked)
   totalTimeOut: integer("total_time_out"), // Duration in seconds car was out with guest
   
+  // Total stay tracking
+  totalStaySeconds: integer("total_stay_seconds"), // Duration in seconds from ticket creation to departure
+  departedAt: timestamp("departed_at"), // When the guest finally departed (completed)
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

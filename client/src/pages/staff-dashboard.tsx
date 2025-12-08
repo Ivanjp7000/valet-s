@@ -619,27 +619,36 @@ export default function StaffDashboard() {
                   </button>
                   {departedExpanded && (
                     <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
-                      {activeTickets?.filter(t => t.status === 'completed').map((ticket) => (
-                        <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
-                              <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                      {activeTickets?.filter(t => t.status === 'completed').map((ticket) => {
+                        const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                        const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                        return (
+                          <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
+                                <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                              </div>
+                              <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                              {stayHours !== null && (
+                                <p className="text-xs text-blue-600 font-medium">
+                                  ⏱️ Stayed: {stayHours}h {stayMins}m
+                                </p>
+                              )}
                             </div>
-                            <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                            <div className="flex gap-1">
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="h-6 w-6 p-0"
+                                onClick={() => setViewTicket(ticket)}
+                              >
+                                <Eye size={14} className="text-gray-400" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex gap-1">
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                              onClick={() => setViewTicket(ticket)}
-                            >
-                              <Eye size={14} className="text-gray-400" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
                         <p className="text-xs text-gray-400 text-center py-2">No departed vehicles</p>
                       )}
@@ -883,32 +892,41 @@ export default function StaffDashboard() {
               {departedExpanded && (
                 <CardContent className="p-4 sm:p-6 pt-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {activeTickets?.filter(t => t.status === 'completed').map((ticket) => (
-                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50 shadow-sm">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
-                            <p className="text-xs text-gray-400">
-                              {ticket.carMake} {ticket.carModel} • {ticket.carColor}
-                            </p>
+                    {activeTickets?.filter(t => t.status === 'completed').map((ticket) => {
+                      const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                      const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                      return (
+                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50 shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
+                              <p className="text-xs text-gray-400">
+                                {ticket.carMake} {ticket.carModel} • {ticket.carColor}
+                              </p>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setViewTicket(ticket)}
+                            >
+                              <Eye size={16} className="text-gray-400" />
+                            </Button>
                           </div>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                            onClick={() => setViewTicket(ticket)}
-                          >
-                            <Eye size={16} className="text-gray-400" />
-                          </Button>
+                          <div className="text-xs text-gray-500">
+                            <p><strong>Guest:</strong> {ticket.guestName}</p>
+                            {ticket.roomNumber && (
+                              <p><strong>Room:</strong> {ticket.roomNumber}</p>
+                            )}
+                            {stayHours !== null && (
+                              <p className="text-blue-600 font-medium mt-1">
+                                ⏱️ Total Stay: {stayHours}h {stayMins}m
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          <p><strong>Guest:</strong> {ticket.guestName}</p>
-                          {ticket.roomNumber && (
-                            <p><strong>Room:</strong> {ticket.roomNumber}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
                       <div className="col-span-full text-center py-6 text-gray-400">
                         <LogOut size={36} className="mx-auto mb-2 opacity-40" />
