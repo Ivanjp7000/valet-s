@@ -523,8 +523,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Don't return password in response
       const { password: _, ...userWithoutPassword } = newUser;
       res.json(userWithoutPassword);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating user:", error);
+      // Check for duplicate username constraint violation
+      if (error?.code === '23505' && error?.constraint === 'users_username_key') {
+        return res.status(400).json({ message: "Username already exists. Please choose a different username." });
+      }
       res.status(400).json({ message: "Failed to create user" });
     }
   });
