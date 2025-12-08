@@ -576,10 +576,7 @@ export default function StaffDashboard() {
                         key={ticket.id} 
                         ticket={ticket} 
                         onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                        onEdit={() => {
-                          setSelectedTicket(ticket);
-                          setIsEditModalOpen(true);
-                        }}
+                        onEdit={() => setEditingTicket(ticket)}
                       />
                     ))}
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
