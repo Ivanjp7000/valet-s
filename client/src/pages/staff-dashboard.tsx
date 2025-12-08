@@ -14,7 +14,7 @@ import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import { UnifiedRetrievalBox } from "@/components/active-retrieval-progress";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,9 @@ export default function StaffDashboard() {
   const [editTicketData, setEditTicketData] = useState<ValetTicket | null>(null);
   const [deleteTicket, setDeleteTicket] = useState<ValetTicket | null>(null);
   const [archiveTicket, setArchiveTicket] = useState<ValetTicket | null>(null);
+  
+  // Compact view toggle for mobile
+  const [compactView, setCompactView] = useState(false);
   
   // WebSocket connection for real-time updates
   const { lastMessage } = useWebSocket();
@@ -266,76 +269,174 @@ export default function StaffDashboard() {
           </div>
 
           {/* Dashboard Tab */}
-          <TabsContent value="dashboard" className="space-y-6">
-            {/* New Valet Ticket Button */}
-            <div className="flex justify-end">
+          <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
+            {/* Header with Toggle and New Ticket Button */}
+            <div className="flex justify-between items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCompactView(!compactView)}
+                className="sm:hidden flex items-center gap-1"
+                data-testid="button-toggle-view"
+              >
+                {compactView ? <LayoutGrid size={16} /> : <List size={16} />}
+                {compactView ? "Full" : "Compact"}
+              </Button>
               <Button 
                 onClick={() => setShowTicketWizard(true)}
+                size="sm"
                 className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
                 data-testid="button-new-valet-ticket"
               >
-                <Plus size={18} className="mr-2" />
-                New Valet Ticket
+                <Plus size={16} className="mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">New Valet Ticket</span>
+                <span className="sm:hidden">New</span>
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Unified Active Retrieval Box */}
-              <div className="lg:col-span-2">
-                <UnifiedRetrievalBox 
-                  tickets={activeTickets || []} 
-                  onStageComplete={(ticketNumber, nextStage) => {
-                    const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
-                    const newStatus = statusMap[nextStage];
-                    if (newStatus) {
-                      updateStatusMutation.mutate({ ticketNumber, status: newStatus });
-                    }
-                  }}
-                />
+            {/* Compact View for Mobile */}
+            {compactView ? (
+              <div className="space-y-3 sm:hidden">
+                {/* Compact Stats Row */}
+                <div className="flex gap-2">
+                  <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
+                    <p className="text-xs text-gray-500">Done</p>
+                  </div>
+                  <div className="flex-1 bg-purple-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-purple-600">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
+                    <p className="text-xs text-gray-500">Avg</p>
+                  </div>
+                  <div className="flex-1 bg-blue-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
+                    <p className="text-xs text-gray-500">Wait</p>
+                  </div>
+                  <div className="flex-1 bg-orange-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-orange-600">{activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0}</p>
+                    <p className="text-xs text-gray-500">Active</p>
+                  </div>
+                </div>
+
+                {/* Compact Active Retrievals */}
+                <div className="bg-white border rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
+                    <Car size={14} /> Active ({activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0})
+                  </h3>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).map((ticket) => (
+                      <div key={ticket.id} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(ticket.status)}
+                          <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {ticket.status === 'retrieving' && (
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
+                          )}
+                          {ticket.status === 'transit' && (
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
+                          )}
+                          {ticket.status === 'ready' && (
+                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}>Done</Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">No active retrievals</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compact Waiting Tickets */}
+                <div className="bg-white border rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
+                    <Clock size={14} /> Waiting ({activeTickets?.filter(t => t.status === 'active').length || 0})
+                  </h3>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                      <div key={ticket.id} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                        <div>
+                          <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+                          <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="h-7 px-2 text-xs bg-regis-gold text-regis-navy"
+                          onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                        >
+                          <Play size={12} className="mr-1" />Start
+                        </Button>
+                      </div>
+                    ))}
+                    {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">No waiting tickets</p>
+                    )}
+                  </div>
+                </div>
               </div>
+            ) : (
+              /* Full View (existing layout) */
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {/* Unified Active Retrieval Box */}
+                  <div className="lg:col-span-2">
+                    <UnifiedRetrievalBox 
+                      tickets={activeTickets || []} 
+                      onStageComplete={(ticketNumber, nextStage) => {
+                        const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
+                        const newStatus = statusMap[nextStage];
+                        if (newStatus) {
+                          updateStatusMutation.mutate({ ticketNumber, status: newStatus });
+                        }
+                      }}
+                    />
+                  </div>
 
-              {/* Stats Summary */}
-              <div className="space-y-4">
-                <Card className="shadow-sm">
-                  <CardContent className="p-6 text-center">
-                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <Check className="text-gray-600" size={20} />
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
-                    <p className="text-sm text-gray-600">Completed Today</p>
-                  </CardContent>
-                </Card>
+                  {/* Stats Summary */}
+                  <div className="space-y-4">
+                    <Card className="shadow-sm">
+                      <CardContent className="p-4 sm:p-6 text-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                          <Check className="text-gray-600" size={18} />
+                        </div>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Completed Today</p>
+                      </CardContent>
+                    </Card>
 
-                <Card className="shadow-sm">
-                  <CardContent className="p-6 text-center">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                      <Timer className="text-purple-600" size={20} />
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
-                    <p className="text-sm text-gray-600">Avg. Time</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                    <Card className="shadow-sm">
+                      <CardContent className="p-4 sm:p-6 text-center">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2 sm:mb-3">
+                          <Timer className="text-purple-600" size={18} />
+                        </div>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">Avg. Time</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </>
+            )}
 
-            {/* Waiting Tickets (Active status - not yet in retrieval) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="text-regis-navy" size={20} />
+            {/* Waiting Tickets - hidden on mobile compact view */}
+            <Card className={compactView ? "hidden sm:block" : ""}>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Clock className="text-regis-navy" size={18} />
                   Waiting Tickets
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 {ticketsLoading ? (
-                  <div className="text-center py-8">Loading tickets...</div>
+                  <div className="text-center py-6 sm:py-8">Loading tickets...</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-3">
+                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-2 sm:mb-3">
                           <div>
-                            <p className="font-bold text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                            <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
                             <p className="text-xs text-gray-500">
                               {ticket.carMake} {ticket.carModel}
                             </p>
@@ -343,12 +444,12 @@ export default function StaffDashboard() {
                           <CircularTimer 
                             createdAt={ticket.createdAt || new Date()} 
                             maxHours={24}
-                            size={50}
+                            size={40}
                             strokeWidth={3}
                           />
                         </div>
 
-                        <div className="space-y-1 text-sm text-gray-600 mb-3">
+                        <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                           <p><strong>Guest:</strong> {ticket.guestName}</p>
                           <p><strong>Color:</strong> {ticket.carColor}</p>
                           {ticket.parkingLocation && (
@@ -358,7 +459,7 @@ export default function StaffDashboard() {
 
                         <Button
                           size="sm"
-                          className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+                          className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
                           onClick={() => updateStatusMutation.mutate({ 
                             ticketNumber: ticket.ticketNumber, 
                             status: 'retrieving' 
@@ -371,9 +472,9 @@ export default function StaffDashboard() {
                       </div>
                     ))}
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                      <div className="col-span-full text-center py-8 text-gray-400">
-                        <Clock size={40} className="mx-auto mb-2 opacity-40" />
-                        <p>No waiting tickets</p>
+                      <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
+                        <Clock size={36} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No waiting tickets</p>
                       </div>
                     )}
                   </div>
@@ -381,29 +482,30 @@ export default function StaffDashboard() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions for Active Retrievals */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Status Updates</CardTitle>
+            {/* Quick Actions - hidden on mobile compact view */}
+            <Card className={compactView ? "hidden sm:block" : ""}>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Quick Status Updates</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 {ticketsLoading ? (
-                  <div className="text-center py-8">Loading tickets...</div>
+                  <div className="text-center py-6 sm:py-8">Loading tickets...</div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {activeTickets?.filter(t => t.status === 'retrieving' || t.status === 'transit' || t.status === 'ready').map((ticket) => (
-                      <div key={ticket.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
+                      <div key={ticket.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg gap-2">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
                           {getStatusIcon(ticket.status)}
                           <div>
-                            <p className="font-medium">#{ticket.ticketNumber}</p>
+                            <p className="font-medium text-sm">#{ticket.ticketNumber}</p>
                             <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
                           </div>
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-1 sm:space-x-2">
                           <Button
                             size="sm"
                             variant="outline"
+                            className="flex-1 sm:flex-none text-xs h-8"
                             onClick={() => updateStatusMutation.mutate({ 
                               ticketNumber: ticket.ticketNumber, 
                               status: 'transit' 
@@ -415,22 +517,23 @@ export default function StaffDashboard() {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="flex-1 sm:flex-none text-xs h-8"
                             onClick={() => updateStatusMutation.mutate({ 
                               ticketNumber: ticket.ticketNumber, 
                               status: 'ready' 
                             })}
                             disabled={ticket.status !== 'transit'}
                           >
-                            Mark Ready
+                            Ready
                           </Button>
                           <Button
                             size="sm"
+                            className="flex-1 sm:flex-none text-xs h-8 bg-green-600 hover:bg-green-700"
                             onClick={() => updateStatusMutation.mutate({ 
                               ticketNumber: ticket.ticketNumber, 
                               status: 'completed' 
                             })}
                             disabled={ticket.status !== 'ready'}
-                            className="bg-green-600 hover:bg-green-700"
                           >
                             Complete
                           </Button>
