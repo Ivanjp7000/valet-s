@@ -93,6 +93,7 @@ export const valetTickets = pgTable("valet_tickets", {
   visitorType: varchar("visitor_type").notNull(), // 'hotel_guest', 'restaurant', 'others'
   visitorSubType: varchar("visitor_sub_type"), // For restaurant: 'regine', 'laveduta', 'wajo', 'st_regis_bar', 'le_petit'
   guestName: varchar("guest_name").notNull(), // Full name of guest/visitor
+  roomNumber: varchar("room_number"), // Optional room number for hotel guests
   
   // Car details
   carMake: varchar("car_make").notNull(), // e.g., "Honda", "Ferrari", "Rolls Royce"

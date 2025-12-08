@@ -33,6 +33,7 @@ interface TicketFormData {
   carColor: string;
   platePhotoUrl: string;
   guestName: string;
+  roomNumber: string;
   ticketNumber: string;
 }
 
@@ -76,6 +77,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     carColor: "",
     platePhotoUrl: "",
     guestName: "",
+    roomNumber: "",
     ticketNumber: "",
   });
 
@@ -98,6 +100,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         visitorType: data.visitorType,
         visitorSubType: data.visitorSubType || null,
         guestName: data.guestName,
+        roomNumber: data.roomNumber || null,
         carMake: data.carMake,
         carModel: data.carModel,
         carColor: data.carColor,
@@ -133,6 +136,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       carColor: "",
       platePhotoUrl: "",
       guestName: "",
+      roomNumber: "",
       ticketNumber: "",
     });
     setCarMakeSearch("");
@@ -358,15 +362,27 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
       <div>
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Guest Information</h3>
-        <div>
-          <label className="text-sm font-medium text-gray-700">Full Name *</label>
-          <Input
-            value={formData.guestName}
-            onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-            placeholder="Enter guest's full name"
-            className="mt-1"
-            data-testid="input-guest-name"
-          />
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-gray-700">Full Name *</label>
+            <Input
+              value={formData.guestName}
+              onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+              placeholder="Enter guest's full name"
+              className="mt-1"
+              data-testid="input-guest-name"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Room Number</label>
+            <Input
+              value={formData.roomNumber}
+              onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+              placeholder="Enter room number (optional)"
+              className="mt-1"
+              data-testid="input-room-number"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -452,6 +468,9 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <div className="bg-gray-50 p-3 rounded-lg">
             <span className="text-gray-500">Guest Name</span>
             <p className="font-medium">{formData.guestName}</p>
+            {formData.roomNumber && (
+              <p className="text-xs text-gray-500 mt-1">Room: {formData.roomNumber}</p>
+            )}
           </div>
           <div className="bg-gray-50 p-3 rounded-lg">
             <span className="text-gray-500">Vehicle</span>

@@ -59,6 +59,72 @@ function GuestOutCard({ ticket, onBack }: { ticket: ValetTicket; onBack: () => v
   );
 }
 
+function CompactInHouseCard({ ticket, onRetrieve, onEdit }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void }) {
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!ticket.createdAt) return;
+    
+    const createdAt = new Date(ticket.createdAt).getTime();
+    const maxMs = 24 * 60 * 60 * 1000; // 24 hours
+    
+    const updateTimer = () => {
+      const elapsed = Date.now() - createdAt;
+      const remaining = Math.max(0, maxMs - elapsed);
+      setRemainingSeconds(Math.floor(remaining / 1000));
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [ticket.createdAt]);
+
+  const hours = Math.floor(remainingSeconds / 3600);
+  const mins = Math.floor((remainingSeconds % 3600) / 60);
+  const secs = remainingSeconds % 60;
+  const timeDisplay = `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const isUrgent = remainingSeconds < 3600; // Less than 1 hour
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-2 space-y-1">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-sm text-regis-navy">#{ticket.ticketNumber}</span>
+            <span className={`text-xs font-mono ${isUrgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+              {timeDisplay}
+            </span>
+          </div>
+          <p className="text-xs text-gray-700 truncate">{ticket.guestName}</p>
+          {ticket.roomNumber && (
+            <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
+          )}
+          <p className="text-xs text-gray-500 truncate">{ticket.carMake} {ticket.carModel}</p>
+          {ticket.parkingLocation && (
+            <p className="text-xs text-blue-600 font-medium">📍 {ticket.parkingLocation}</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            onClick={onEdit}
+          >
+            <Edit size={14} className="text-gray-500" />
+          </Button>
+        </div>
+      </div>
+      <Button 
+        size="sm" 
+        className="h-7 w-full text-xs bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+        onClick={onRetrieve}
+      >
+        <Play size={12} className="mr-1" />Retrieve
+      </Button>
+    </div>
+  );
+}
+
 function GuestOutCardFull({ ticket, onBack }: { ticket: ValetTicket; onBack: () => void }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -504,21 +570,17 @@ export default function StaffDashboard() {
                   <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
                     <Clock size={14} /> In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
                   </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
                     {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                      <div key={ticket.id} className="flex items-center justify-between bg-gray-50 rounded p-2">
-                        <div>
-                          <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
-                          <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          className="h-7 px-2 text-xs bg-regis-gold text-regis-navy"
-                          onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                        >
-                          <Play size={12} className="mr-1" />Start
-                        </Button>
-                      </div>
+                      <CompactInHouseCard 
+                        key={ticket.id} 
+                        ticket={ticket} 
+                        onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                        onEdit={() => {
+                          setSelectedTicket(ticket);
+                          setIsEditModalOpen(true);
+                        }}
+                      />
                     ))}
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
                       <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
