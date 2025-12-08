@@ -86,7 +86,7 @@ export const valetTickets = pgTable("valet_tickets", {
   ticketNumber: varchar("ticket_number", { length: 6 }).notNull().unique(),
   ouId: varchar("ou_id").references(() => organizationalUnits.id), // Which OU this ticket belongs to (denormalized for faster queries)
   locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this ticket belongs to
-  status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled'
+  status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'out_with_guest', 'completed', 'cancelled'
   estimatedTime: integer("estimated_time").default(5), // in minutes
   
   // Visitor information
@@ -114,6 +114,11 @@ export const valetTickets = pgTable("valet_tickets", {
   retrievalStartedAt: timestamp("retrieval_started_at"), // When retrieval process began (for 15-min total)
   stageStartedAt: timestamp("stage_started_at"), // When current stage started (for 5-min countdown)
   currentStage: integer("current_stage").default(0), // 0=not started, 1=retrieving, 2=transit, 3=ready
+  
+  // Guest vehicle out tracking
+  guestDepartedAt: timestamp("guest_departed_at"), // When guest took the car out (Coming Back clicked)
+  guestReturnedAt: timestamp("guest_returned_at"), // When guest returned the car (Back clicked)
+  totalTimeOut: integer("total_time_out"), // Duration in seconds car was out with guest
   
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

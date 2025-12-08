@@ -158,6 +158,10 @@ export class DatabaseStorage implements IStorage {
       updateData.currentStage = 3;
     } else if (status === 'completed') {
       updateData.currentStage = 4;
+    } else if (status === 'out_with_guest') {
+      // Guest is taking the car out ("Coming Back" was clicked)
+      updateData.guestDepartedAt = now;
+      updateData.currentStage = 5;
     }
     
     const [ticket] = await db
@@ -175,6 +179,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
     return ticket;
+  }
+
+  // Mark guest as returned with car - calculates time out and moves to active status
+  async markGuestReturned(ticketNumber: string): Promise<ValetTicket | undefined> {
+    // First get the ticket to calculate time out
+    const ticket = await this.getValetTicket(ticketNumber);
+    if (!ticket || !ticket.guestDepartedAt) {
+      return undefined;
+    }
+
+    const now = new Date();
+    const departedAt = new Date(ticket.guestDepartedAt);
+    const totalTimeOutSeconds = Math.floor((now.getTime() - departedAt.getTime()) / 1000);
+
+    const [updatedTicket] = await db
+      .update(valetTickets)
+      .set({
+        status: 'active',
+        guestReturnedAt: now,
+        totalTimeOut: totalTimeOutSeconds,
+        currentStage: 0, // Reset to active state
+        updatedAt: now,
+      })
+      .where(eq(valetTickets.ticketNumber, ticketNumber))
+      .returning();
+    return updatedTicket;
   }
 
   async deleteValetTicket(ticketNumber: string): Promise<boolean> {
