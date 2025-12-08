@@ -10,7 +10,7 @@ import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema"
 
 export default function Home() {
   const { user } = useAuth();
-  const [compactView, setCompactView] = useState(false);
+  const [compactView, setCompactView] = useState(true);
 
   const { data: ous } = useQuery<OrganizationalUnit[]>({
     queryKey: ["/api/ous"],

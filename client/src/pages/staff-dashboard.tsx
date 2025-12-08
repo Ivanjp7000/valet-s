@@ -50,7 +50,7 @@ export default function StaffDashboard() {
   const [archiveTicket, setArchiveTicket] = useState<ValetTicket | null>(null);
   
   // Compact view toggle for mobile
-  const [compactView, setCompactView] = useState(false);
+  const [compactView, setCompactView] = useState(true);
   
   // WebSocket connection for real-time updates
   const { lastMessage } = useWebSocket();
