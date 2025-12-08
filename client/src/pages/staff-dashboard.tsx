@@ -456,7 +456,7 @@ export default function StaffDashboard() {
                 data-testid="button-toggle-view"
               >
                 {compactView ? <LayoutGrid size={16} /> : <List size={16} />}
-                {compactView ? "Full" : "Compact"}
+                {compactView ? "Extended View" : "Regular View"}
               </Button>
               <Button 
                 onClick={() => setShowTicketWizard(true)}
