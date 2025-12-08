@@ -198,65 +198,72 @@ export default function StaffDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="border-b bg-white px-6 py-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <Crown className="text-regis-navy" size={24} />
-            <div>
-              <h1 className="text-xl font-bold text-regis-navy">Staff Dashboard</h1>
-              <p className="text-sm text-gray-600">Hotel St. Regis Osaka</p>
-              <p className="text-xs text-gray-500">Role: {user?.role || 'Loading...'} | User: {user?.email}</p>
+      <div className="border-b bg-white px-3 sm:px-6 py-3 sm:py-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <Crown className="text-regis-navy flex-shrink-0" size={20} />
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold text-regis-navy truncate">Staff Dashboard</h1>
+              <p className="text-xs sm:text-sm text-gray-600 truncate">Hotel St. Regis Osaka</p>
+              <p className="text-xs text-gray-500 truncate">
+                <span className="hidden sm:inline">Role: </span>{user?.role || 'Loading...'}
+                <span className="hidden sm:inline"> | User: {user?.email}</span>
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Link href="/">
               <Button
                 variant="outline"
-                className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white"
+                size="sm"
+                className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white px-2 sm:px-3"
                 data-testid="button-back-home"
               >
-                <Home size={16} className="mr-2" />
-                Home
+                <Home size={16} />
+                <span className="hidden sm:inline ml-2">Home</span>
               </Button>
             </Link>
             <Button
               onClick={() => window.location.href = '/api/logout'}
               variant="outline"
-              className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white"
+              size="sm"
+              className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white px-2 sm:px-3"
             >
-              <LogOut size={16} className="mr-2" />
-              Logout
+              <LogOut size={16} />
+              <span className="hidden sm:inline ml-2">Logout</span>
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="p-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="dashboard" className="flex items-center space-x-2">
-              <Car size={16} />
-              <span>Dashboard</span>
-            </TabsTrigger>
-            {user?.role === 'superadmin' && (
-              <TabsTrigger value="users" className="flex items-center space-x-2">
-                <Users size={16} />
-                <span>User Management</span>
+      <div className="p-3 sm:p-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-4">
+              <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                <Car size={14} className="sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline sm:inline">Dashboard</span>
               </TabsTrigger>
-            )}
-            {user?.role === 'superadmin' && (
-              <TabsTrigger value="tickets" className="flex items-center space-x-2">
-                <TicketIcon size={16} />
-                <span>Ticket Management</span>
-              </TabsTrigger>
-            )}
-            {user?.role === 'superadmin' && (
-              <TabsTrigger value="settings" className="flex items-center space-x-2">
-                <Settings size={16} />
-                <span>Settings</span>
-              </TabsTrigger>
-            )}
-          </TabsList>
+              {user?.role === 'superadmin' && (
+                <TabsTrigger value="users" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                  <Users size={14} className="sm:w-4 sm:h-4" />
+                  <span className="hidden xs:inline sm:inline">Users</span>
+                </TabsTrigger>
+              )}
+              {user?.role === 'superadmin' && (
+                <TabsTrigger value="tickets" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                  <TicketIcon size={14} className="sm:w-4 sm:h-4" />
+                  <span className="hidden xs:inline sm:inline">Tickets</span>
+                </TabsTrigger>
+              )}
+              {user?.role === 'superadmin' && (
+                <TabsTrigger value="settings" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                  <Settings size={14} className="sm:w-4 sm:h-4" />
+                  <span className="hidden xs:inline sm:inline">Settings</span>
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
