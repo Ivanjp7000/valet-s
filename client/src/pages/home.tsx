@@ -1,14 +1,16 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Crown, LogOut, Users, Settings, Car, Building, MapPin, Shield } from "lucide-react";
+import { Crown, LogOut, Users, Settings, Car, Building, MapPin, Shield, Minimize2, Maximize2 } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
 
 export default function Home() {
   const { user } = useAuth();
+  const [compactView, setCompactView] = useState(false);
 
   const { data: ous } = useQuery<OrganizationalUnit[]>({
     queryKey: ["/api/ous"],
@@ -67,98 +69,198 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="shadow-lg" data-testid="card-staff-dashboard">
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Car className="text-blue-600" size={32} />
-              </div>
-              <h2 className="text-xl font-semibold text-regis-navy mb-2">Operations Dashboard</h2>
-              <p className="text-gray-600 mb-6 text-sm">Manage active valet requests, update ticket status, and view daily statistics</p>
-              <Link href="/staff">
-                <Button className="w-full bg-regis-navy hover:bg-blue-900" data-testid="button-staff-dashboard">
-                  Access Operations
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+        {/* Compact View Toggle - visible on mobile only */}
+        <div className="sm:hidden flex justify-end mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCompactView(!compactView)}
+            className="text-xs"
+            data-testid="button-toggle-compact-view"
+          >
+            {compactView ? <Maximize2 size={14} className="mr-1" /> : <Minimize2 size={14} className="mr-1" />}
+            {compactView ? "Expand" : "Compact"}
+          </Button>
+        </div>
 
-          {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
-            <Card className="shadow-lg" data-testid="card-admin-panel">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-regis-gold/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  {user?.role === 'superadmin' ? (
-                    <Shield className="text-regis-gold" size={32} />
-                  ) : (
-                    <Settings className="text-regis-gold" size={32} />
-                  )}
+        {/* Compact View for Mobile */}
+        {compactView && (
+          <div className="sm:hidden space-y-2">
+            {/* Compact Operations Dashboard */}
+            <Link href="/staff">
+              <div className="bg-white border rounded-lg p-3 flex items-center gap-3 shadow-sm active:bg-gray-50">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Car className="text-blue-600" size={20} />
                 </div>
-                <h2 className="text-xl font-semibold text-regis-navy mb-2">
-                  {user?.role === 'superadmin' ? 'Super Admin Panel' : 'Admin Panel'}
-                </h2>
-                <p className="text-gray-600 mb-6 text-sm">
-                  {user?.role === 'superadmin' 
-                    ? 'Manage organizations, locations, all users, and system settings'
-                    : 'Manage locations and staff within your organization'}
-                </p>
-                <Link href="/admin">
-                  <Button className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-medium" data-testid="button-admin-panel">
-                    Access Admin Panel
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-regis-navy text-sm">Operations Dashboard</h3>
+                  <p className="text-xs text-gray-500 truncate">Manage valet requests & tickets</p>
+                </div>
+                <Button size="sm" className="bg-regis-navy hover:bg-blue-900 text-xs px-3" data-testid="button-staff-dashboard-compact">
+                  Open
+                </Button>
+              </div>
+            </Link>
+
+            {/* Compact Admin Panel */}
+            {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
+              <Link href="/admin">
+                <div className="bg-white border rounded-lg p-3 flex items-center gap-3 shadow-sm active:bg-gray-50">
+                  <div className="w-10 h-10 bg-regis-gold/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    {user?.role === 'superadmin' ? (
+                      <Shield className="text-regis-gold" size={20} />
+                    ) : (
+                      <Settings className="text-regis-gold" size={20} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-regis-navy text-sm">
+                      {user?.role === 'superadmin' ? 'Super Admin' : 'Admin Panel'}
+                    </h3>
+                    <p className="text-xs text-gray-500 truncate">Manage settings & users</p>
+                  </div>
+                  <Button size="sm" className="bg-regis-gold hover:bg-yellow-600 text-regis-navy text-xs px-3" data-testid="button-admin-panel-compact">
+                    Open
+                  </Button>
+                </div>
+              </Link>
+            )}
+
+            {/* Compact System Overview */}
+            {user?.role === 'superadmin' && (
+              <div className="bg-white border-2 border-purple-200 rounded-lg p-3 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building className="text-purple-600" size={16} />
+                  <h3 className="font-semibold text-regis-navy text-sm">System Overview</h3>
+                </div>
+                <div className="flex justify-around text-center">
+                  <div>
+                    <p className="text-lg font-bold text-purple-600">{ous?.length ?? 0}</p>
+                    <p className="text-xs text-gray-500">Orgs</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-purple-600">{locations?.length ?? 0}</p>
+                    <p className="text-xs text-gray-500">Locations</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-purple-600">{users?.length ?? 0}</p>
+                    <p className="text-xs text-gray-500">Users</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Compact Access Level */}
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2">
+                <Badge className={`${getRoleColor(user?.role || '')} text-white text-xs`}>
+                  {getRoleLabel(user?.role || '')}
+                </Badge>
+                <span className="text-xs text-gray-600">
+                  {user?.role === 'superadmin' && "Full system access"}
+                  {user?.role === 'privilege_admin' && "OU-level access"}
+                  {user?.role === 'standard_admin' && "Daily operations"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Standard View - hidden on mobile when compact is active */}
+        <div className={compactView ? "hidden sm:block" : ""}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <Card className="shadow-lg" data-testid="card-staff-dashboard">
+              <CardContent className="p-6 sm:p-8 text-center">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                  <Car className="text-blue-600" size={24} />
+                </div>
+                <h2 className="text-lg sm:text-xl font-semibold text-regis-navy mb-2">Operations Dashboard</h2>
+                <p className="text-gray-600 mb-4 sm:mb-6 text-xs sm:text-sm">Manage active valet requests, update ticket status, and view daily statistics</p>
+                <Link href="/staff">
+                  <Button className="w-full bg-regis-navy hover:bg-blue-900" data-testid="button-staff-dashboard">
+                    Access Operations
                   </Button>
                 </Link>
               </CardContent>
             </Card>
-          )}
 
-          {user?.role === 'superadmin' && (
-            <Card className="shadow-lg border-2 border-purple-200" data-testid="card-super-admin-stats">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Building className="text-purple-600" size={20} />
+            {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
+              <Card className="shadow-lg" data-testid="card-admin-panel">
+                <CardContent className="p-6 sm:p-8 text-center">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-regis-gold/20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    {user?.role === 'superadmin' ? (
+                      <Shield className="text-regis-gold" size={24} />
+                    ) : (
+                      <Settings className="text-regis-gold" size={24} />
+                    )}
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-regis-navy">System Overview</h3>
-                    <p className="text-xs text-gray-500">Multi-tenant statistics</p>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-sm text-gray-600">Organizations</span>
-                    <span className="font-semibold text-regis-navy">{ous?.length ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-sm text-gray-600">Locations</span>
-                    <span className="font-semibold text-regis-navy">{locations?.length ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-gray-600">Total Users</span>
-                    <span className="font-semibold text-regis-navy">{users?.length ?? 0}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                  <h2 className="text-lg sm:text-xl font-semibold text-regis-navy mb-2">
+                    {user?.role === 'superadmin' ? 'Super Admin Panel' : 'Admin Panel'}
+                  </h2>
+                  <p className="text-gray-600 mb-4 sm:mb-6 text-xs sm:text-sm">
+                    {user?.role === 'superadmin' 
+                      ? 'Manage organizations, locations, all users, and system settings'
+                      : 'Manage locations and staff within your organization'}
+                  </p>
+                  <Link href="/admin">
+                    <Button className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-medium" data-testid="button-admin-panel">
+                      Access Admin Panel
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
 
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h3 className="font-medium text-regis-navy mb-2">Your Access Level</h3>
-          {user?.role === 'superadmin' && (
-            <p className="text-sm text-gray-600">
-              As a Super Admin, you have full access to manage all organizations, locations, and users across the entire system.
-            </p>
-          )}
-          {user?.role === 'privilege_admin' && (
-            <p className="text-sm text-gray-600">
-              As a Privilege Admin, you can manage locations and standard admin accounts within your assigned organization.
-            </p>
-          )}
-          {user?.role === 'standard_admin' && (
-            <p className="text-sm text-gray-600">
-              As a Standard Admin, you can manage daily valet operations including ticket handling and vehicle tracking.
-            </p>
-          )}
+            {user?.role === 'superadmin' && (
+              <Card className="shadow-lg border-2 border-purple-200" data-testid="card-super-admin-stats">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <Building className="text-purple-600" size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-regis-navy">System Overview</h3>
+                      <p className="text-xs text-gray-500">Multi-tenant statistics</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-gray-600">Organizations</span>
+                      <span className="font-semibold text-regis-navy">{ous?.length ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-gray-600">Locations</span>
+                      <span className="font-semibold text-regis-navy">{locations?.length ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm text-gray-600">Total Users</span>
+                      <span className="font-semibold text-regis-navy">{users?.length ?? 0}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="mt-6 sm:mt-8 p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h3 className="font-medium text-regis-navy mb-2 text-sm sm:text-base">Your Access Level</h3>
+            {user?.role === 'superadmin' && (
+              <p className="text-xs sm:text-sm text-gray-600">
+                As a Super Admin, you have full access to manage all organizations, locations, and users across the entire system.
+              </p>
+            )}
+            {user?.role === 'privilege_admin' && (
+              <p className="text-xs sm:text-sm text-gray-600">
+                As a Privilege Admin, you can manage locations and standard admin accounts within your assigned organization.
+              </p>
+            )}
+            {user?.role === 'standard_admin' && (
+              <p className="text-xs sm:text-sm text-gray-600">
+                As a Standard Admin, you can manage daily valet operations including ticket handling and vehicle tracking.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
