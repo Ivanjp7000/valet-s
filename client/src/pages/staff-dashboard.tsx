@@ -14,7 +14,7 @@ import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/active-retrieval-progress";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -211,6 +211,10 @@ export default function StaffDashboard() {
   
   // Compact view toggle for mobile
   const [compactView, setCompactView] = useState(true);
+  
+  // Collapsible sections state
+  const [inHouseExpanded, setInHouseExpanded] = useState(false);
+  const [departedExpanded, setDepartedExpanded] = useState(false);
   
   // WebSocket connection for real-time updates
   const { lastMessage } = useWebSocket();
@@ -573,25 +577,74 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                {/* Compact In House */}
+                {/* Compact In House - Collapsible */}
                 <div className="bg-white border rounded-lg p-3">
-                  <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
-                    <Clock size={14} /> In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                      <CompactInHouseCard 
-                        key={ticket.id} 
-                        ticket={ticket} 
-                        onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                        onEdit={() => setEditTicketData(ticket)}
-                        onView={() => setViewTicket(ticket)}
-                      />
-                    ))}
-                    {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
-                    )}
-                  </div>
+                  <button 
+                    className="w-full text-sm font-semibold text-regis-navy flex items-center justify-between"
+                    onClick={() => setInHouseExpanded(!inHouseExpanded)}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} /> In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
+                    </span>
+                    <ChevronDown size={16} className={`transition-transform ${inHouseExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  {inHouseExpanded && (
+                    <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
+                      {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                        <CompactInHouseCard 
+                          key={ticket.id} 
+                          ticket={ticket} 
+                          onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                          onEdit={() => setEditTicketData(ticket)}
+                          onView={() => setViewTicket(ticket)}
+                        />
+                      ))}
+                      {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Checked Out - Departed - Collapsible */}
+                <div className="bg-white border border-gray-300 rounded-lg p-3">
+                  <button 
+                    className="w-full text-sm font-semibold text-gray-600 flex items-center justify-between"
+                    onClick={() => setDepartedExpanded(!departedExpanded)}
+                  >
+                    <span className="flex items-center gap-1">
+                      <LogOut size={14} /> Checked Out - Departed ({activeTickets?.filter(t => t.status === 'completed').length || 0})
+                    </span>
+                    <ChevronDown size={16} className={`transition-transform ${departedExpanded ? 'rotate-180' : ''}`} />
+                  </button>
+                  {departedExpanded && (
+                    <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
+                      {activeTickets?.filter(t => t.status === 'completed').map((ticket) => (
+                        <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
+                              <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                            </div>
+                            <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-6 w-6 p-0"
+                              onClick={() => setViewTicket(ticket)}
+                            >
+                              <Eye size={14} className="text-gray-400" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
+                        <p className="text-xs text-gray-400 text-center py-2">No departed vehicles</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -727,88 +780,144 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* In House - hidden on mobile compact view */}
+            {/* In House - Collapsible */}
             <Card className={compactView ? "hidden sm:block" : ""}>
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Clock className="text-regis-navy" size={18} />
-                  In House
+              <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
+                <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                  <div className="flex items-center gap-2">
+                    <Clock className="text-regis-navy" size={18} />
+                    In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
+                  </div>
+                  <ChevronDown size={20} className={`transition-transform ${inHouseExpanded ? 'rotate-180' : ''}`} />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                {ticketsLoading ? (
-                  <div className="text-center py-6 sm:py-8">Loading tickets...</div>
-                ) : (
+              {inHouseExpanded && (
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  {ticketsLoading ? (
+                    <div className="text-center py-6 sm:py-8">Loading tickets...</div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-2 sm:mb-3">
+                            <div>
+                              <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                              <p className="text-xs text-gray-500">
+                                {ticket.carMake} {ticket.carModel}
+                              </p>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => setViewTicket(ticket)}
+                              >
+                                <Eye size={16} className="text-gray-500" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => setEditTicketData(ticket)}
+                              >
+                                <Edit size={16} className="text-gray-500" />
+                              </Button>
+                              <CircularTimer 
+                                createdAt={ticket.createdAt || new Date()} 
+                                maxHours={24}
+                                size={40}
+                                strokeWidth={3}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                            <p><strong>Guest:</strong> {ticket.guestName}</p>
+                            {ticket.roomNumber && (
+                              <p><strong>Room:</strong> {ticket.roomNumber}</p>
+                            )}
+                            <p><strong>Color:</strong> {ticket.carColor}</p>
+                            {ticket.parkingLocation && (
+                              <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
+                            )}
+                          </div>
+
+                          <Button
+                            size="sm"
+                            className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
+                            onClick={() => updateStatusMutation.mutate({ 
+                              ticketNumber: ticket.ticketNumber, 
+                              status: 'retrieving' 
+                            })}
+                            data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
+                          >
+                            <Play size={14} className="mr-1" />
+                            Retrieve
+                          </Button>
+                        </div>
+                      ))}
+                      {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                        <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
+                          <Clock size={36} className="mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">No vehicles in house</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+
+            {/* Checked Out - Departed - Collapsible */}
+            <Card className={compactView ? "hidden sm:block" : ""}>
+              <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedExpanded(!departedExpanded)}>
+                <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <LogOut size={18} />
+                    Checked Out - Departed ({activeTickets?.filter(t => t.status === 'completed').length || 0})
+                  </div>
+                  <ChevronDown size={20} className={`transition-transform ${departedExpanded ? 'rotate-180' : ''}`} />
+                </CardTitle>
+              </CardHeader>
+              {departedExpanded && (
+                <CardContent className="p-4 sm:p-6 pt-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-2 sm:mb-3">
+                    {activeTickets?.filter(t => t.status === 'completed').map((ticket) => (
+                      <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50 shadow-sm">
+                        <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
-                            <p className="text-xs text-gray-500">
-                              {ticket.carMake} {ticket.carModel}
+                            <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
+                            <p className="text-xs text-gray-400">
+                              {ticket.carMake} {ticket.carModel} • {ticket.carColor}
                             </p>
                           </div>
-                          <div className="flex items-start gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={() => setViewTicket(ticket)}
-                            >
-                              <Eye size={16} className="text-gray-500" />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={() => setEditTicketData(ticket)}
-                            >
-                              <Edit size={16} className="text-gray-500" />
-                            </Button>
-                            <CircularTimer 
-                              createdAt={ticket.createdAt || new Date()} 
-                              maxHours={24}
-                              size={40}
-                              strokeWidth={3}
-                            />
-                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setViewTicket(ticket)}
+                          >
+                            <Eye size={16} className="text-gray-400" />
+                          </Button>
                         </div>
-
-                        <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                        <div className="text-xs text-gray-500">
                           <p><strong>Guest:</strong> {ticket.guestName}</p>
                           {ticket.roomNumber && (
                             <p><strong>Room:</strong> {ticket.roomNumber}</p>
                           )}
-                          <p><strong>Color:</strong> {ticket.carColor}</p>
-                          {ticket.parkingLocation && (
-                            <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
-                          )}
                         </div>
-
-                        <Button
-                          size="sm"
-                          className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
-                          onClick={() => updateStatusMutation.mutate({ 
-                            ticketNumber: ticket.ticketNumber, 
-                            status: 'retrieving' 
-                          })}
-                          data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
-                        >
-                          <Play size={14} className="mr-1" />
-                          Retrieve
-                        </Button>
                       </div>
                     ))}
-                    {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                      <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
-                        <Clock size={36} className="mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">No vehicles in house</p>
+                    {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
+                      <div className="col-span-full text-center py-6 text-gray-400">
+                        <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No departed vehicles</p>
                       </div>
                     )}
                   </div>
-                )}
-              </CardContent>
+                </CardContent>
+              )}
             </Card>
 
             {/* Quick Actions - hidden on mobile compact view */}
