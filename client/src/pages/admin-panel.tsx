@@ -312,11 +312,11 @@ export default function AdminPanel() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-blue-300 text-blue-200 hover:bg-blue-800 hover:text-white px-2 sm:px-3"
+                  className="border-regis-gold bg-regis-gold/10 text-regis-navy hover:bg-regis-gold hover:text-regis-navy px-2 sm:px-3"
                   data-testid="button-back-home"
                 >
-                  <Home size={16} />
-                  <span className="hidden sm:inline ml-2">Home</span>
+                  <Home size={16} className="text-regis-gold" />
+                  <span className="hidden sm:inline ml-2 text-white">Home</span>
                 </Button>
               </Link>
               <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white p-2" data-testid="link-logout">
