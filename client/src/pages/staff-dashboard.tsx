@@ -1349,7 +1349,7 @@ export default function StaffDashboard() {
                       <p className="font-medium">{viewTicket.createdByName || 'Unknown'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500">Duration Stay</p>
+                      <p className="text-xs text-gray-500">Visitor Duration Stay</p>
                       <p className="font-medium">
                         {viewTicket.totalStaySeconds 
                           ? `${Math.floor(viewTicket.totalStaySeconds / 3600)}h ${Math.floor((viewTicket.totalStaySeconds % 3600) / 60)}m`
