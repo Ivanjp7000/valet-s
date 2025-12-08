@@ -347,10 +347,10 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                {/* Compact In House - Valet Care */}
+                {/* Compact In House */}
                 <div className="bg-white border rounded-lg p-3">
                   <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
-                    <Clock size={14} /> In House - Valet Care ({activeTickets?.filter(t => t.status === 'active').length || 0})
+                    <Clock size={14} /> In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
                   </h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
@@ -418,12 +418,12 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* In House - Valet Care - hidden on mobile compact view */}
+            {/* In House - hidden on mobile compact view */}
             <Card className={compactView ? "hidden sm:block" : ""}>
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   <Clock className="text-regis-navy" size={18} />
-                  In House - Valet Care
+                  In House
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0">
