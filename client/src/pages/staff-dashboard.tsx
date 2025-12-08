@@ -268,7 +268,7 @@ export default function StaffDashboard() {
   // Update ticket details mutation
   const updateTicketMutation = useMutation({
     mutationFn: async (ticketData: Partial<ValetTicket> & { ticketNumber: string }) => {
-      await apiRequest("PATCH", `/api/admin/tickets/${ticketData.ticketNumber}`, ticketData);
+      await apiRequest("PATCH", `/api/staff/tickets/${ticketData.ticketNumber}/edit`, ticketData);
     },
     onSuccess: () => {
       setEditTicketData(null);

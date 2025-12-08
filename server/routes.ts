@@ -1019,6 +1019,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Staff endpoint for editing ticket details (accessible by standard admin)
+  app.patch('/api/staff/tickets/:ticketNumber/edit', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes } = req.body;
+      
+      const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
+        status,
+        guestName,
+        roomNumber,
+        licensePlate,
+        carMake,
+        carModel,
+        carColor,
+        parkingLocation,
+        parkingSector,
+        staffNotes,
+      });
+
+      // Broadcast update to WebSocket clients
+      broadcastToAll({
+        type: 'ticket_updated',
+        data: updatedTicket,
+      });
+
+      res.json(updatedTicket);
+    } catch (error) {
+      console.error("Error updating ticket:", error);
+      res.status(500).json({ message: "Failed to update ticket" });
+    }
+  });
+
   // Enhanced Staff Routes for Car Management
   app.patch('/api/staff/tickets/:ticketNumber/car-details', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
