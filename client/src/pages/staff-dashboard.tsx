@@ -490,60 +490,65 @@ export default function StaffDashboard() {
               </div>
 
               <Card>
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-6">
                   {allTicketsLoading ? (
                     <div className="text-center py-8">Loading tickets...</div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {allTickets?.map((ticket) => (
-                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <p className="font-medium">Ticket #{ticket.ticketNumber}</p>
+                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 mb-3">
+                            <div className="flex items-center justify-between sm:block">
+                              <div>
+                                <p className="font-medium text-sm sm:text-base">Ticket #{ticket.ticketNumber}</p>
+                                <p className="text-xs text-gray-500 sm:hidden">
+                                  {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Unknown'}
+                                </p>
+                              </div>
                               <Badge variant={
                                 ticket.status === 'completed' ? 'default' :
                                 ticket.status === 'ready' ? 'default' :
                                 ticket.status === 'cancelled' ? 'destructive' :
                                 ticket.status === 'transit' ? 'secondary' : 'outline'
-                              }>
+                              } className="text-xs">
                                 {ticket.status === 'cancelled' ? 'Archived' : ticket.status}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm text-gray-500 mr-2">
+                            <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                              <p className="text-sm text-gray-500 mr-2 hidden sm:block">
                                 {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Unknown'}
                               </p>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setViewTicket(ticket)}
-                                className="h-8 px-2"
+                                className="h-7 sm:h-8 px-2 text-xs sm:text-sm"
                                 data-testid={`button-view-ticket-${ticket.ticketNumber}`}
                               >
-                                <Eye size={14} className="mr-1" />
-                                View
+                                <Eye size={12} className="sm:mr-1" />
+                                <span className="hidden sm:inline">View</span>
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setEditTicketData(ticket)}
-                                className="h-8 px-2"
+                                className="h-7 sm:h-8 px-2 text-xs sm:text-sm"
                                 data-testid={`button-edit-ticket-${ticket.ticketNumber}`}
                               >
-                                <Edit size={14} className="mr-1" />
-                                Edit
+                                <Edit size={12} className="sm:mr-1" />
+                                <span className="hidden sm:inline">Edit</span>
                               </Button>
                               {user?.role === 'superadmin' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => setArchiveTicket(ticket)}
-                                  className="h-8 px-2 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                  className="h-7 sm:h-8 px-2 text-xs sm:text-sm text-orange-600 border-orange-300 hover:bg-orange-50"
                                   disabled={ticket.status === 'cancelled'}
                                   data-testid={`button-archive-ticket-${ticket.ticketNumber}`}
                                 >
-                                  <Archive size={14} className="mr-1" />
-                                  Archive
+                                  <Archive size={12} className="sm:mr-1" />
+                                  <span className="hidden sm:inline">Archive</span>
                                 </Button>
                               )}
                               {user?.role === 'superadmin' && (
@@ -551,33 +556,33 @@ export default function StaffDashboard() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => setDeleteTicket(ticket)}
-                                  className="h-8 px-2 text-red-600 border-red-300 hover:bg-red-50"
+                                  className="h-7 sm:h-8 px-2 text-xs sm:text-sm text-red-600 border-red-300 hover:bg-red-50"
                                   data-testid={`button-delete-ticket-${ticket.ticketNumber}`}
                                 >
-                                  <Trash2 size={14} className="mr-1" />
-                                  Delete
+                                  <Trash2 size={12} className="sm:mr-1" />
+                                  <span className="hidden sm:inline">Delete</span>
                                 </Button>
                               )}
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-600">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
                             {ticket.guestName && (
-                              <p><strong>Guest:</strong> {ticket.guestName}</p>
+                              <p className="truncate"><strong>Guest:</strong> {ticket.guestName}</p>
                             )}
                             {ticket.carMake && ticket.carModel && (
-                              <p><strong>Vehicle:</strong> {ticket.carMake} {ticket.carModel}</p>
+                              <p className="truncate"><strong>Vehicle:</strong> {ticket.carMake} {ticket.carModel}</p>
                             )}
                             {ticket.licensePlate && (
-                              <p><strong>Plate:</strong> {ticket.licensePlate}</p>
+                              <p className="truncate"><strong>Plate:</strong> {ticket.licensePlate}</p>
                             )}
                             {ticket.parkingLocation && (
-                              <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
+                              <p className="truncate"><strong>Parking:</strong> {ticket.parkingLocation}</p>
                             )}
                           </div>
                           
                           {ticket.staffNotes && (
-                            <p className="text-sm text-gray-600 mt-2">
+                            <p className="text-xs sm:text-sm text-gray-600 mt-2 line-clamp-2">
                               <strong>Notes:</strong> {ticket.staffNotes}
                             </p>
                           )}
