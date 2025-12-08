@@ -308,18 +308,18 @@ export default function StaffDashboard() {
                   </div>
                   <div className="flex-1 bg-blue-50 rounded-lg p-2 text-center">
                     <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
-                    <p className="text-xs text-gray-500">Wait</p>
+                    <p className="text-xs text-gray-500">In House</p>
                   </div>
                   <div className="flex-1 bg-orange-50 rounded-lg p-2 text-center">
                     <p className="text-lg font-bold text-orange-600">{activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0}</p>
-                    <p className="text-xs text-gray-500">Active</p>
+                    <p className="text-xs text-gray-500">Retrieving</p>
                   </div>
                 </div>
 
-                {/* Compact Active Retrievals */}
+                {/* Compact Being Retrieved */}
                 <div className="bg-white border rounded-lg p-3">
                   <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
-                    <Car size={14} /> Active ({activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0})
+                    <Car size={14} /> Being Retrieved ({activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0})
                   </h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).map((ticket) => (
@@ -347,10 +347,10 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                {/* Compact Waiting Tickets */}
+                {/* Compact In House - Valet Care */}
                 <div className="bg-white border rounded-lg p-3">
                   <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
-                    <Clock size={14} /> Waiting ({activeTickets?.filter(t => t.status === 'active').length || 0})
+                    <Clock size={14} /> In House - Valet Care ({activeTickets?.filter(t => t.status === 'active').length || 0})
                   </h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
@@ -369,7 +369,7 @@ export default function StaffDashboard() {
                       </div>
                     ))}
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-2">No waiting tickets</p>
+                      <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
                     )}
                   </div>
                 </div>
@@ -418,12 +418,12 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* Waiting Tickets - hidden on mobile compact view */}
+            {/* In House - Valet Care - hidden on mobile compact view */}
             <Card className={compactView ? "hidden sm:block" : ""}>
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   <Clock className="text-regis-navy" size={18} />
-                  Waiting Tickets
+                  In House - Valet Care
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0">
@@ -473,7 +473,7 @@ export default function StaffDashboard() {
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
                       <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
                         <Clock size={36} className="mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">No waiting tickets</p>
+                        <p className="text-sm">No vehicles in house</p>
                       </div>
                     )}
                   </div>
