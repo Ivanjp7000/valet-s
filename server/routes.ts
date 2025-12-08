@@ -281,6 +281,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Guest returns with car after "Coming Back" - records time out and moves back to active
+  app.post('/api/staff/tickets/:ticketNumber/guest-returned', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      
+      const ticket = await storage.markGuestReturned(ticketNumber);
+      
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found or guest had not departed" });
+      }
+
+      // Broadcast status update to all connected clients
+      broadcastToAll({
+        type: 'ticket_status_updated',
+        data: ticket
+      });
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error marking guest returned:", error);
+      res.status(400).json({ message: "Failed to mark guest as returned" });
+    }
+  });
+
   app.get('/api/staff/stats', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const user = req.currentUser;

@@ -21,6 +21,44 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, User as UserType } from "@shared/schema";
 
+function GuestOutCard({ ticket, onBack }: { ticket: ValetTicket; onBack: () => void }) {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!ticket.guestDepartedAt) return;
+    
+    const departedAt = new Date(ticket.guestDepartedAt).getTime();
+    const updateTimer = () => {
+      setElapsedSeconds(Math.floor((Date.now() - departedAt) / 1000));
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [ticket.guestDepartedAt]);
+
+  const mins = Math.floor(elapsedSeconds / 60);
+  const secs = elapsedSeconds % 60;
+
+  return (
+    <div className="bg-blue-50 rounded p-2 space-y-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+          <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
+        </div>
+        <span className="text-xs font-mono font-bold text-blue-700">{mins}:{secs.toString().padStart(2, '0')}</span>
+      </div>
+      <Button 
+        size="sm" 
+        className="h-6 px-3 text-xs bg-green-600 hover:bg-green-700 text-white w-full"
+        onClick={onBack}
+      >
+        Back
+      </Button>
+    </div>
+  );
+}
+
 export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -131,6 +169,18 @@ export default function StaffDashboard() {
         return;
       }
       toast({ title: "Error", description: "Failed to update ticket", variant: "destructive" });
+    },
+  });
+
+  // Guest returned mutation (when car comes back after "Coming Back")
+  const guestReturnedMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      await apiRequest("POST", `/api/staff/tickets/${ticketNumber}/guest-returned`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+      toast({ title: "Welcome Back", description: "Guest has returned, car moved to In House" });
     },
   });
 
@@ -316,13 +366,51 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                {/* Compact Being Retrieved */}
+                {/* Ready for Collection - on top */}
+                <div className="bg-white border-2 border-green-200 rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-1">
+                    <Check size={14} /> Ready for Collection ({activeTickets?.filter(t => t.status === 'ready').length || 0})
+                  </h3>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeTickets?.filter(t => t.status === 'ready').map((ticket) => (
+                      <div key={ticket.id} className="bg-green-50 rounded p-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+                            <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button 
+                            size="sm" 
+                            className="h-6 px-2 text-xs bg-gray-600 hover:bg-gray-700 text-white flex-1"
+                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
+                          >
+                            Departed
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
+                          >
+                            Coming Back
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {activeTickets?.filter(t => t.status === 'ready').length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">No cars ready for collection</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compact Being Retrieved - only retrieving and transit */}
                 <div className="bg-white border rounded-lg p-3">
                   <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
-                    <Car size={14} /> Being Retrieved ({activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0})
+                    <Car size={14} /> Being Retrieved ({activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})
                   </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).map((ticket) => (
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).map((ticket) => (
                       <div key={ticket.id} className="bg-gray-50 rounded p-2 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
@@ -333,17 +421,32 @@ export default function StaffDashboard() {
                             {ticket.status === 'transit' && (
                               <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
                             )}
-                            {ticket.status === 'ready' && (
-                              <Button size="sm" className="h-6 px-2 text-xs bg-green-600" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}>Done</Button>
-                            )}
                           </div>
                         </div>
-                        {/* Mini progress indicator with icons and timer */}
                         <CompactRetrievalProgress ticket={ticket} />
                       </div>
                     ))}
-                    {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length === 0 && (
+                    {activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length === 0 && (
                       <p className="text-xs text-gray-400 text-center py-2">No active retrievals</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Car Currently in Use Guest will Return */}
+                <div className="bg-white border-2 border-blue-200 rounded-lg p-3">
+                  <h3 className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
+                    <Car size={14} /> Guest will Return ({activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})
+                  </h3>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
+                      <GuestOutCard 
+                        key={ticket.id} 
+                        ticket={ticket} 
+                        onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)} 
+                      />
+                    ))}
+                    {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">No cars out with guests</p>
                     )}
                   </div>
                 </div>
