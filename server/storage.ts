@@ -475,9 +475,9 @@ export class DatabaseStorage implements IStorage {
 
   async getScopedActiveTickets(user: User, scopedLocationIds?: string[]): Promise<ValetTicket[]> {
     const allTickets = await this.getScopedTickets(user, scopedLocationIds);
-    // Return only active/non-completed tickets
+    // Return only active/non-cancelled tickets (including completed for history)
     return allTickets.filter(t => 
-      t.status !== 'completed' && t.status !== 'cancelled'
+      t.status !== 'cancelled'
     );
   }
 
