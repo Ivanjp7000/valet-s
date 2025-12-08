@@ -561,7 +561,7 @@ export default function StaffDashboard() {
                 {/* Car Currently in Use Guest will Return */}
                 <div className="bg-white border-2 border-blue-200 rounded-lg p-3">
                   <h3 className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
-                    <Car size={14} /> Guest will Return ({activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})
+                    <Car size={14} /> Car in Use Guest Will Return ({activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})
                   </h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
@@ -760,7 +760,7 @@ export default function StaffDashboard() {
                     <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                       <div className="flex items-center gap-2 text-blue-700">
                         <Car size={20} />
-                        Car Currently in Use - Guest will Return
+                        Car in Use - Guest Will Return
                       </div>
                       <Badge className="bg-blue-600 text-white text-lg px-4 py-1">
                         {activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}
