@@ -289,8 +289,7 @@ export default function StaffDashboard() {
                 data-testid="button-new-valet-ticket"
               >
                 <Plus size={16} className="mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">New Valet Ticket</span>
-                <span className="sm:hidden">New</span>
+                New Valet Ticket
               </Button>
             </div>
 
