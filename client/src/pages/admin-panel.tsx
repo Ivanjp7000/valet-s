@@ -280,86 +280,96 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-regis-navy text-white">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-4">
-              {isSuperAdmin ? <Shield className="text-regis-navy" size={24} /> : <Crown className="text-regis-navy" size={24} />}
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
+                {isSuperAdmin ? <Shield className="text-regis-navy" size={20} /> : <Crown className="text-regis-navy" size={20} />}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-semibold truncate">
+                  {isSuperAdmin ? "Super Admin" : "Admin Panel"}
+                </h1>
+                <p className="text-blue-200 text-xs sm:text-sm truncate">
+                  {isSuperAdmin ? "Multi-Tenant System" : userOUName || "Management"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-semibold">
-                {isSuperAdmin ? "Super Admin Dashboard" : "Admin Dashboard"}
-              </h1>
-              <p className="text-blue-200 text-sm">
-                {isSuperAdmin ? "Multi-Tenant Management System" : userOUName || "Organization Management"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {isPrivilegeAdmin && userOUName && (
-              <Badge className="bg-blue-600 text-white">{userOUName}</Badge>
-            )}
-            <Button 
-              onClick={() => setShowTicketWizard(true)}
-              className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
-              data-testid="button-new-valet-ticket"
-            >
-              <Car size={18} className="mr-2" />
-              New Valet Ticket
-            </Button>
-            <Link href="/">
-              <Button
-                variant="outline"
-                className="border-blue-300 text-blue-200 hover:bg-blue-800 hover:text-white"
-                data-testid="button-back-home"
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              {isPrivilegeAdmin && userOUName && (
+                <Badge className="bg-blue-600 text-white text-xs hidden sm:inline-flex">{userOUName}</Badge>
+              )}
+              <Button 
+                onClick={() => setShowTicketWizard(true)}
+                size="sm"
+                className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold px-2 sm:px-3"
+                data-testid="button-new-valet-ticket"
               >
-                <Home className="mr-2" size={18} />
-                Home
+                <Car size={16} />
+                <span className="hidden sm:inline ml-2">New Ticket</span>
               </Button>
-            </Link>
-            <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white" data-testid="link-logout">
-              <LogOut className="mr-2" size={18} />
-              Logout
-            </a>
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-300 text-blue-200 hover:bg-blue-800 hover:text-white px-2 sm:px-3"
+                  data-testid="button-back-home"
+                >
+                  <Home size={16} />
+                  <span className="hidden sm:inline ml-2">Home</span>
+                </Button>
+              </Link>
+              <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white p-2" data-testid="link-logout">
+                <LogOut size={16} />
+                <span className="hidden sm:inline ml-2">Logout</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
-            {isSuperAdmin && (
-              <TabsTrigger value="ous" className="flex items-center gap-2" data-testid="tab-ous">
-                <Building size={16} />
-                Organizations
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
+              {isSuperAdmin && (
+                <TabsTrigger value="ous" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-ous">
+                  <Building size={14} />
+                  <span className="hidden sm:inline">Organizations</span>
+                  <span className="sm:hidden">Orgs</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="locations" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-locations">
+                <MapPin size={14} />
+                <span className="hidden sm:inline">Locations</span>
+                <span className="sm:hidden">Loc</span>
               </TabsTrigger>
-            )}
-            <TabsTrigger value="locations" className="flex items-center gap-2" data-testid="tab-locations">
-              <MapPin size={16} />
-              Locations
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2" data-testid="tab-users">
-              <Users size={16} />
-              {isPrivilegeAdmin ? "Staff" : "Users"}
-            </TabsTrigger>
-            {isSuperAdmin && (
-              <TabsTrigger value="faqs" className="flex items-center gap-2" data-testid="tab-faqs">
-                <HelpCircle size={16} />
-                FAQs
+              <TabsTrigger value="users" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-users">
+                <Users size={14} />
+                <span className="hidden sm:inline">{isPrivilegeAdmin ? "Staff" : "Users"}</span>
+                <span className="sm:hidden">Users</span>
               </TabsTrigger>
-            )}
-            <TabsTrigger value="settings" className="flex items-center gap-2" data-testid="tab-settings">
-              <Settings size={16} />
-              Settings
-            </TabsTrigger>
-          </TabsList>
+              {isSuperAdmin && (
+                <TabsTrigger value="faqs" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-faqs">
+                  <HelpCircle size={14} />
+                  <span>FAQs</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="settings" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-settings">
+                <Settings size={14} />
+                <span className="hidden sm:inline">Settings</span>
+                <span className="sm:hidden">Set</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="ous" className="space-y-6">
-            <div className="flex justify-between items-center">
+          <TabsContent value="ous" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-regis-navy">Organizations</h2>
-                <p className="text-gray-600">Manage client companies using the valet system</p>
+                <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Organizations</h2>
+                <p className="text-xs sm:text-base text-gray-600">Manage client companies</p>
               </div>
-              <Button onClick={() => setShowAddOU(true)} className="bg-regis-navy hover:bg-blue-900" data-testid="button-add-ou">
+              <Button onClick={() => setShowAddOU(true)} size="sm" className="bg-regis-navy hover:bg-blue-900 w-full sm:w-auto" data-testid="button-add-ou">
                 <Plus size={16} className="mr-2" />
                 Add Organization
               </Button>
@@ -405,14 +415,14 @@ export default function AdminPanel() {
             </div>
           </TabsContent>
 
-          <TabsContent value="locations" className="space-y-6">
-            <div className="flex justify-between items-center">
+          <TabsContent value="locations" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-regis-navy">Physical Locations</h2>
-                <p className="text-gray-600">
+                <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Locations</h2>
+                <p className="text-xs sm:text-base text-gray-600">
                   {isPrivilegeAdmin 
-                    ? `Manage locations for ${userOUName || 'your organization'}`
-                    : "Manage buildings and sites where valet service operates"}
+                    ? `Manage locations for ${userOUName || 'your org'}`
+                    : "Manage valet service locations"}
                 </p>
               </div>
               <Button onClick={() => {
@@ -420,7 +430,7 @@ export default function AdminPanel() {
                   setNewLocation({ ...newLocation, ouId: user.ouId });
                 }
                 setShowAddLocation(true);
-              }} className="bg-regis-navy hover:bg-blue-900" disabled={isSuperAdmin && !ous?.length} data-testid="button-add-location">
+              }} size="sm" className="bg-regis-navy hover:bg-blue-900 w-full sm:w-auto" disabled={isSuperAdmin && !ous?.length} data-testid="button-add-location">
                 <Plus size={16} className="mr-2" />
                 Add Location
               </Button>
@@ -429,62 +439,64 @@ export default function AdminPanel() {
             <Card>
               <CardContent className="p-0">
                 {locationsLoading ? (
-                  <p className="p-6 text-gray-500">Loading locations...</p>
+                  <p className="p-4 sm:p-6 text-gray-500">Loading locations...</p>
                 ) : filteredLocations?.length === 0 ? (
-                  <p className="p-6 text-gray-500">
+                  <p className="p-4 sm:p-6 text-gray-500 text-sm">
                     {isPrivilegeAdmin 
-                      ? "No locations found for your organization. Add one to get started."
-                      : "No locations found. Create an organization first, then add locations."}
+                      ? "No locations found. Add one to get started."
+                      : "No locations found. Create an organization first."}
                   </p>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {isSuperAdmin && <th className="text-left p-4 font-medium text-gray-600">Organization</th>}
-                        <th className="text-left p-4 font-medium text-gray-600">Code</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Location</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Address</th>
-                        <th className="text-right p-4 font-medium text-gray-600">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLocations?.map((loc) => (
-                        <tr key={loc.id} className="border-t" data-testid={`row-location-${loc.id}`}>
-                          {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(loc.ouId)}</td>}
-                          <td className="p-4"><Badge variant="outline">{loc.code}</Badge></td>
-                          <td className="p-4 font-medium">{loc.name}</td>
-                          <td className="p-4 text-gray-600">{loc.address || "—"}</td>
-                          <td className="p-4 text-right">
-                            <Button variant="ghost" size="icon" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
-                              <Edit size={16} className="text-blue-600" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => {
-                              if (confirm("Delete this location?")) {
-                                deleteLocationMutation.mutate(loc.id);
-                              }
-                            }} data-testid={`button-delete-location-${loc.id}`}>
-                              <Trash2 size={16} className="text-red-600" />
-                            </Button>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[500px]">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {isSuperAdmin && <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Org</th>}
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Code</th>
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Location</th>
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden sm:table-cell">Address</th>
+                          <th className="text-right p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredLocations?.map((loc) => (
+                          <tr key={loc.id} className="border-t" data-testid={`row-location-${loc.id}`}>
+                            {isSuperAdmin && <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm truncate max-w-[80px]">{getOUName(loc.ouId)}</td>}
+                            <td className="p-2 sm:p-4"><Badge variant="outline" className="text-xs">{loc.code}</Badge></td>
+                            <td className="p-2 sm:p-4 font-medium text-xs sm:text-sm truncate max-w-[100px]">{loc.name}</td>
+                            <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell truncate max-w-[150px]">{loc.address || "—"}</td>
+                            <td className="p-2 sm:p-4 text-right">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => setEditingLocation(loc)} data-testid={`button-edit-location-${loc.id}`}>
+                                <Edit size={14} className="text-blue-600" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => {
+                                if (confirm("Delete this location?")) {
+                                  deleteLocationMutation.mutate(loc.id);
+                                }
+                              }} data-testid={`button-delete-location-${loc.id}`}>
+                                <Trash2 size={14} className="text-red-600" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="users" className="space-y-6">
-            <div className="flex justify-between items-center">
+          <TabsContent value="users" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-regis-navy">
-                  {isPrivilegeAdmin ? "Staff Management" : "User Management"}
+                <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">
+                  {isPrivilegeAdmin ? "Staff" : "Users"}
                 </h2>
-                <p className="text-gray-600">
+                <p className="text-xs sm:text-base text-gray-600">
                   {isPrivilegeAdmin 
-                    ? `Manage staff accounts for ${userOUName || 'your organization'}`
-                    : "Manage all admin accounts across organizations"}
+                    ? `Manage staff for ${userOUName || 'your org'}`
+                    : "Manage admin accounts"}
                 </p>
               </div>
               <Button onClick={() => {
@@ -492,47 +504,47 @@ export default function AdminPanel() {
                   setNewUser({ ...newUser, ouId: user.ouId, role: 'standard_admin' });
                 }
                 setShowAddUser(true);
-              }} className="bg-regis-navy hover:bg-blue-900" data-testid="button-add-user">
+              }} size="sm" className="bg-regis-navy hover:bg-blue-900 w-full sm:w-auto" data-testid="button-add-user">
                 <Plus size={16} className="mr-2" />
                 {isPrivilegeAdmin ? "Add Staff" : "Add User"}
               </Button>
             </div>
 
             {isSuperAdmin && (
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-purple-600">{users?.filter(u => u.role === 'superadmin').length || 0}</p>
-                    <p className="text-sm text-gray-600">Super Admins</p>
+                  <CardContent className="p-2 sm:p-4 text-center">
+                    <p className="text-lg sm:text-2xl font-bold text-purple-600">{users?.filter(u => u.role === 'superadmin').length || 0}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Super</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-blue-600">{users?.filter(u => u.role === 'privilege_admin').length || 0}</p>
-                    <p className="text-sm text-gray-600">Privilege Admins</p>
+                  <CardContent className="p-2 sm:p-4 text-center">
+                    <p className="text-lg sm:text-2xl font-bold text-blue-600">{users?.filter(u => u.role === 'privilege_admin').length || 0}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Privilege</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-gray-600">{users?.filter(u => u.role === 'standard_admin').length || 0}</p>
-                    <p className="text-sm text-gray-600">Standard Admins</p>
+                  <CardContent className="p-2 sm:p-4 text-center">
+                    <p className="text-lg sm:text-2xl font-bold text-gray-600">{users?.filter(u => u.role === 'standard_admin').length || 0}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Standard</p>
                   </CardContent>
                 </Card>
               </div>
             )}
 
             {isPrivilegeAdmin && (
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4 sm:mb-6">
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-blue-600">{filteredUsers?.filter(u => u.role === 'privilege_admin').length || 0}</p>
-                    <p className="text-sm text-gray-600">Privilege Admins</p>
+                  <CardContent className="p-2 sm:p-4 text-center">
+                    <p className="text-lg sm:text-2xl font-bold text-blue-600">{filteredUsers?.filter(u => u.role === 'privilege_admin').length || 0}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Privilege</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-gray-600">{filteredUsers?.filter(u => u.role === 'standard_admin').length || 0}</p>
-                    <p className="text-sm text-gray-600">Staff Members</p>
+                  <CardContent className="p-2 sm:p-4 text-center">
+                    <p className="text-lg sm:text-2xl font-bold text-gray-600">{filteredUsers?.filter(u => u.role === 'standard_admin').length || 0}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">Staff</p>
                   </CardContent>
                 </Card>
               </div>
@@ -541,41 +553,42 @@ export default function AdminPanel() {
             <Card>
               <CardContent className="p-0">
                 {usersLoading ? (
-                  <p className="p-6 text-gray-500">Loading users...</p>
+                  <p className="p-4 sm:p-6 text-gray-500">Loading users...</p>
                 ) : filteredUsers?.length === 0 ? (
-                  <p className="p-6 text-gray-500">
-                    {isPrivilegeAdmin ? "No staff members found. Add one to get started." : "No users found."}
+                  <p className="p-4 sm:p-6 text-gray-500 text-sm">
+                    {isPrivilegeAdmin ? "No staff found. Add one to get started." : "No users found."}
                   </p>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left p-4 font-medium text-gray-600">User</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Username</th>
-                        <th className="text-left p-4 font-medium text-gray-600">Role</th>
-                        {isSuperAdmin && <th className="text-left p-4 font-medium text-gray-600">Organization</th>}
-                        <th className="text-left p-4 font-medium text-gray-600">Location</th>
-                        <th className="text-right p-4 font-medium text-gray-600">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers?.map((u) => (
-                        <tr key={u.id} className="border-t" data-testid={`row-user-${u.id}`}>
-                          <td className="p-4">
-                            <div>
-                              <p className="font-medium">{u.firstName} {u.lastName}</p>
-                              <p className="text-sm text-gray-500">{u.email}</p>
-                            </div>
-                          </td>
-                          <td className="p-4 text-gray-600">{u.username}</td>
-                          <td className="p-4">
-                            <Badge className={`${getRoleBadgeColor(u.role)} text-white`}>
-                              {u.role === 'superadmin' ? 'Super Admin' : u.role === 'privilege_admin' ? 'Privilege Admin' : 'Standard Admin'}
-                            </Badge>
-                          </td>
-                          {isSuperAdmin && <td className="p-4 text-gray-600">{getOUName(u.ouId)}</td>}
-                          <td className="p-4 text-gray-600">{getLocationName(u.locationId)}</td>
-                          <td className="p-4 text-right flex justify-end gap-1">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[400px]">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">User</th>
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden sm:table-cell">Username</th>
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Role</th>
+                          {isSuperAdmin && <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Org</th>}
+                          <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Location</th>
+                          <th className="text-right p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredUsers?.map((u) => (
+                          <tr key={u.id} className="border-t" data-testid={`row-user-${u.id}`}>
+                            <td className="p-2 sm:p-4">
+                              <div>
+                                <p className="font-medium text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">{u.firstName} {u.lastName}</p>
+                                <p className="text-xs text-gray-500 truncate max-w-[100px] sm:max-w-none">{u.email}</p>
+                              </div>
+                            </td>
+                            <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell">{u.username}</td>
+                            <td className="p-2 sm:p-4">
+                              <Badge className={`${getRoleBadgeColor(u.role)} text-white text-xs`}>
+                                {u.role === 'superadmin' ? 'Super' : u.role === 'privilege_admin' ? 'Priv' : 'Std'}
+                              </Badge>
+                            </td>
+                            {isSuperAdmin && <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell truncate max-w-[80px]">{getOUName(u.ouId)}</td>}
+                            <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell truncate max-w-[80px]">{getLocationName(u.locationId)}</td>
+                            <td className="p-2 sm:p-4 text-right flex justify-end gap-1">
                             {u.role === 'standard_admin' && (isPrivilegeAdmin || isSuperAdmin) && (
                               <Button 
                                 variant="ghost" 
@@ -609,6 +622,7 @@ export default function AdminPanel() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </CardContent>
             </Card>
