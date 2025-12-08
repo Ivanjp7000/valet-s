@@ -59,7 +59,7 @@ function GuestOutCard({ ticket, onBack }: { ticket: ValetTicket; onBack: () => v
   );
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void }) {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void }) {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
 
   useEffect(() => {
@@ -104,6 +104,14 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit }: { ticket: ValetTicke
           )}
         </div>
         <div className="flex flex-col gap-1">
+          <Button 
+            size="sm" 
+            variant="ghost"
+            className="h-6 w-6 p-0"
+            onClick={onView}
+          >
+            <Eye size={14} className="text-gray-500" />
+          </Button>
           <Button 
             size="sm" 
             variant="ghost"
@@ -577,6 +585,7 @@ export default function StaffDashboard() {
                         ticket={ticket} 
                         onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
                         onEdit={() => setEditTicketData(ticket)}
+                        onView={() => setViewTicket(ticket)}
                       />
                     ))}
                     {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -741,6 +750,14 @@ export default function StaffDashboard() {
                             </p>
                           </div>
                           <div className="flex items-start gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setViewTicket(ticket)}
+                            >
+                              <Eye size={16} className="text-gray-500" />
+                            </Button>
                             <Button 
                               size="sm" 
                               variant="ghost"
@@ -1251,12 +1268,21 @@ export default function StaffDashboard() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-sm font-medium text-gray-700">Guest Name</label>
                     <Input
                       value={editTicketData.guestName || ''}
                       onChange={(e) => setEditTicketData({ ...editTicketData, guestName: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Room Number</label>
+                    <Input
+                      value={editTicketData.roomNumber || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, roomNumber: e.target.value })}
+                      placeholder="Optional"
                       className="mt-1"
                     />
                   </div>
@@ -1324,6 +1350,7 @@ export default function StaffDashboard() {
                       ticketNumber: editTicketData.ticketNumber,
                       status: editTicketData.status,
                       guestName: editTicketData.guestName,
+                      roomNumber: editTicketData.roomNumber,
                       licensePlate: editTicketData.licensePlate,
                       carMake: editTicketData.carMake,
                       carModel: editTicketData.carModel,
