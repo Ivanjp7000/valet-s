@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
-import { UnifiedRetrievalBox } from "@/components/active-retrieval-progress";
+import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/active-retrieval-progress";
 import { CircularTimer } from "@/components/circular-timer";
 import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List } from "lucide-react";
 import { Link } from "wouter";
@@ -321,24 +321,25 @@ export default function StaffDashboard() {
                   <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
                     <Car size={14} /> Being Retrieved ({activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0})
                   </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).map((ticket) => (
-                      <div key={ticket.id} className="flex items-center justify-between bg-gray-50 rounded p-2">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(ticket.status)}
+                      <div key={ticket.id} className="bg-gray-50 rounded p-2 space-y-2">
+                        <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+                          <div className="flex gap-1">
+                            {ticket.status === 'retrieving' && (
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
+                            )}
+                            {ticket.status === 'transit' && (
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
+                            )}
+                            {ticket.status === 'ready' && (
+                              <Button size="sm" className="h-6 px-2 text-xs bg-green-600" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}>Done</Button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-1">
-                          {ticket.status === 'retrieving' && (
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
-                          )}
-                          {ticket.status === 'transit' && (
-                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
-                          )}
-                          {ticket.status === 'ready' && (
-                            <Button size="sm" className="h-7 px-2 text-xs bg-green-600" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}>Done</Button>
-                          )}
-                        </div>
+                        {/* Mini progress indicator with icons and timer */}
+                        <CompactRetrievalProgress ticket={ticket} />
                       </div>
                     ))}
                     {activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length === 0 && (

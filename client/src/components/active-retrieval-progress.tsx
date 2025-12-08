@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Car, Truck, CheckCircle, Clock } from "lucide-react";
+import { Car, CheckCircle, Clock } from "lucide-react";
 import type { ValetTicket } from "@shared/schema";
 
 interface ActiveRetrievalProgressProps {
@@ -13,7 +13,7 @@ const STAGE_DURATION_MS = 5 * 60 * 1000; // 5 minutes per stage
 
 const stages = [
   { id: 1, name: "Retrieving", icon: Car, color: "blue" },
-  { id: 2, name: "In Transit", icon: Truck, color: "yellow" },
+  { id: 2, name: "In Transit", icon: Car, color: "yellow" },
   { id: 3, name: "Ready", icon: CheckCircle, color: "green" },
 ];
 
@@ -144,6 +144,82 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// Compact version for mobile view
+export function CompactRetrievalProgress({ ticket }: { ticket: ValetTicket }) {
+  const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATION_MS);
+  const [currentStageIndex, setCurrentStageIndex] = useState<number>(0);
+
+  useEffect(() => {
+    let stageIndex = 0;
+    if (ticket.status === "retrieving") stageIndex = 0;
+    else if (ticket.status === "transit") stageIndex = 1;
+    else if (ticket.status === "ready") stageIndex = 2;
+    else return;
+
+    setCurrentStageIndex(stageIndex);
+
+    const stageStarted = ticket.stageStartedAt ? new Date(ticket.stageStartedAt).getTime() : Date.now();
+    const elapsed = Date.now() - stageStarted;
+    const remaining = Math.max(0, STAGE_DURATION_MS - elapsed);
+    setTimeRemaining(remaining);
+  }, [ticket.status, ticket.stageStartedAt]);
+
+  useEffect(() => {
+    if (ticket.status !== "retrieving" && ticket.status !== "transit" && ticket.status !== "ready") {
+      return;
+    }
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => Math.max(0, prev - 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [ticket.status, ticket.ticketNumber]);
+
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  if (ticket.status !== "retrieving" && ticket.status !== "transit" && ticket.status !== "ready") {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Compact 3-stage icons */}
+      <div className="flex items-center gap-0.5">
+        {stages.map((stage, index) => {
+          const StageIcon = stage.icon;
+          const isActive = index === currentStageIndex;
+          const isCompleted = index < currentStageIndex;
+
+          return (
+            <div key={stage.id} className="flex items-center">
+              {index > 0 && (
+                <div className={`w-2 h-0.5 ${isCompleted || isActive ? 'bg-regis-gold' : 'bg-gray-300'}`} />
+              )}
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                  isActive
+                    ? "bg-regis-gold text-regis-navy animate-pulse"
+                    : isCompleted
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200 text-gray-400"
+                }`}
+              >
+                <StageIcon size={10} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* Timer */}
+      <span className="text-xs font-mono font-bold text-regis-navy ml-1">{formatTime(timeRemaining)}</span>
     </div>
   );
 }
