@@ -1320,7 +1320,7 @@ export default function StaffDashboard() {
 
         {/* Edit User Modal */}
         <Dialog open={!!editUserData} onOpenChange={() => setEditUserData(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Edit size={20} />
