@@ -14,7 +14,7 @@ import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/active-retrieval-progress";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -202,6 +202,10 @@ export default function StaffDashboard() {
     lastName: "",
     role: "standard",
   });
+  
+  // Edit user state
+  const [editUserData, setEditUserData] = useState<UserType | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   
   // Ticket management modals state
   const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
@@ -1027,11 +1031,25 @@ export default function StaffDashboard() {
                           <div>
                             <p className="font-medium">{staffUser.firstName} {staffUser.lastName}</p>
                             <p className="text-sm text-gray-600">{staffUser.email}</p>
-                            <p className="text-xs text-gray-500 capitalize">{staffUser.role}</p>
+                            <p className="text-xs text-gray-500 capitalize">{staffUser.role?.replace('_', ' ')}</p>
                           </div>
-                          <Badge variant={staffUser.role === 'superadmin' ? 'default' : 'secondary'}>
-                            {staffUser.role}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditUserData(staffUser);
+                                setShowPassword(false);
+                              }}
+                              data-testid={`button-edit-user-${staffUser.id}`}
+                            >
+                              <Edit size={14} className="mr-1" />
+                              Edit
+                            </Button>
+                            <Badge variant={staffUser.role === 'superadmin' ? 'default' : 'secondary'}>
+                              {staffUser.role?.replace('_', ' ')}
+                            </Badge>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1233,6 +1251,77 @@ export default function StaffDashboard() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Modal */}
+        <Dialog open={!!editUserData} onOpenChange={() => setEditUserData(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Edit size={20} />
+                Edit User
+              </DialogTitle>
+            </DialogHeader>
+            {editUserData && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <Input
+                    type="email"
+                    value={editUserData.email || ''}
+                    readOnly
+                    className="mt-1 bg-gray-50"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">First Name</label>
+                    <Input
+                      value={editUserData.firstName || ''}
+                      readOnly
+                      className="mt-1 bg-gray-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Last Name</label>
+                    <Input
+                      value={editUserData.lastName || ''}
+                      readOnly
+                      className="mt-1 bg-gray-50"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Role</label>
+                  <Input
+                    value={editUserData.role?.replace('_', ' ') || ''}
+                    readOnly
+                    className="mt-1 bg-gray-50 capitalize"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Password Status</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge variant={editUserData.password ? 'default' : 'destructive'}>
+                      {editUserData.password ? 'Password Set' : 'No Password'}
+                    </Badge>
+                  </div>
+                </div>
+                {editUserData.mustChangePassword && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                    <p className="text-sm text-yellow-800">
+                      This user must change their password on next login.
+                    </p>
+                  </div>
+                )}
+                <div className="flex justify-end pt-4 border-t">
+                  <Button variant="outline" onClick={() => setEditUserData(null)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 
