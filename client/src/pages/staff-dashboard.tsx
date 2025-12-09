@@ -489,24 +489,24 @@ export default function StaffDashboard() {
             <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-4">
               <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                 <Car size={14} className="sm:w-4 sm:h-4" />
-                <span className="hidden xs:inline sm:inline">Dashboard</span>
+                <span>Dashboard</span>
               </TabsTrigger>
               {user?.role === 'superadmin' && (
                 <TabsTrigger value="users" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                   <Users size={14} className="sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline sm:inline">Users</span>
+                  <span>Users</span>
                 </TabsTrigger>
               )}
               {user?.role === 'superadmin' && (
                 <TabsTrigger value="tickets" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                   <TicketIcon size={14} className="sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline sm:inline">Tickets</span>
+                  <span>Tickets</span>
                 </TabsTrigger>
               )}
               {user?.role === 'superadmin' && (
                 <TabsTrigger value="settings" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                   <Settings size={14} className="sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline sm:inline">Settings</span>
+                  <span>Settings</span>
                 </TabsTrigger>
               )}
             </TabsList>
@@ -858,7 +858,7 @@ export default function StaffDashboard() {
             )}
 
             {/* In House - Collapsible */}
-            <Card className={compactView ? "hidden sm:block" : ""}>
+            <Card>
               <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
                 <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                   <div className="flex items-center gap-2">
@@ -947,7 +947,7 @@ export default function StaffDashboard() {
             </Card>
 
             {/* Checked Out - Departed - Collapsible */}
-            <Card className={compactView ? "hidden sm:block" : ""}>
+            <Card>
               <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedExpanded(!departedExpanded)}>
                 <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
                   <div className="flex items-center gap-2">
@@ -1006,8 +1006,8 @@ export default function StaffDashboard() {
               )}
             </Card>
 
-            {/* Quick Actions - hidden on mobile compact view */}
-            <Card className={compactView ? "hidden sm:block" : ""}>
+            {/* Quick Status Updates */}
+            <Card>
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Quick Status Updates</CardTitle>
               </CardHeader>
