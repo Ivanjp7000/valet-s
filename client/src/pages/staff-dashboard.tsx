@@ -207,6 +207,14 @@ export default function StaffDashboard() {
   const [editUserData, setEditUserData] = useState<UserType | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   
+  // Password change modal state
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  
   // Ticket management modals state
   const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
   const [editTicketData, setEditTicketData] = useState<ValetTicket | null>(null);
@@ -280,6 +288,33 @@ export default function StaffDashboard() {
       toast({ title: "Error", description: "Failed to add user", variant: "destructive" });
     },
   });
+
+  // Password change mutation
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
+      await apiRequest("POST", "/api/auth/change-password", data);
+    },
+    onSuccess: () => {
+      setShowPasswordChangeModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Success", description: "Password changed successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to change password", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Check if user must change password on mount
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowPasswordChangeModal(true);
+    }
+  }, [user?.mustChangePassword]);
 
   // Update ticket details mutation
   const updateTicketMutation = useMutation({
@@ -1322,6 +1357,104 @@ export default function StaffDashboard() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Password Change Modal - Required for users with mustChangePassword */}
+        <Dialog 
+          open={showPasswordChangeModal} 
+          onOpenChange={(open) => {
+            if (!user?.mustChangePassword) {
+              setShowPasswordChangeModal(open);
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-yellow-600" />
+                Password Change Required
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {user?.mustChangePassword && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                  <p className="text-sm text-yellow-800">
+                    You must change your password before continuing. This is required for first-time login.
+                  </p>
+                </div>
+              )}
+              {user?.password && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Current Password</label>
+                  <Input
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    placeholder="Enter current password"
+                    className="mt-1"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-gray-700">New Password</label>
+                <Input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  placeholder="Enter new password (min 6 characters)"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Confirm New Password</label>
+                <Input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  placeholder="Confirm new password"
+                  className="mt-1"
+                />
+              </div>
+              {passwordData.newPassword && passwordData.confirmPassword && 
+               passwordData.newPassword !== passwordData.confirmPassword && (
+                <p className="text-sm text-red-600">Passwords do not match</p>
+              )}
+              <div className="flex space-x-2 pt-4">
+                <Button
+                  onClick={() => {
+                    if (passwordData.newPassword !== passwordData.confirmPassword) {
+                      toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
+                      return;
+                    }
+                    if (passwordData.newPassword.length < 6) {
+                      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+                      return;
+                    }
+                    changePasswordMutation.mutate({
+                      currentPassword: passwordData.currentPassword,
+                      newPassword: passwordData.newPassword
+                    });
+                  }}
+                  disabled={changePasswordMutation.isPending || !passwordData.newPassword || !passwordData.confirmPassword}
+                  className="flex-1 bg-regis-navy hover:bg-blue-900"
+                >
+                  {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+                </Button>
+                {!user?.mustChangePassword && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPasswordChangeModal(false);
+                      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 
