@@ -723,6 +723,39 @@ export default function StaffDashboard() {
                     </div>
                   )}
                 </div>
+
+                {/* Staff Quick Access - Super Admin Only (Mobile Compact View) */}
+                {user?.role === 'superadmin' && (
+                  <div className="bg-white border-2 border-yellow-200 rounded-lg p-3">
+                    <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
+                      <Crown size={14} className="text-regis-gold" /> Staff Quick Access
+                    </h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {allUsers?.filter(u => u.id !== user?.id).map((staffUser) => (
+                        <div key={staffUser.id} className="bg-yellow-50 rounded p-2 flex items-center justify-between">
+                          <div>
+                            <span className="font-medium text-sm">{staffUser.firstName} {staffUser.lastName}</span>
+                            <p className="text-xs text-gray-500 capitalize">{staffUser.role?.replace('_', ' ')}</p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => {
+                              setEditUserData(staffUser);
+                              setResetPasswordData({ newPassword: '', confirmPassword: '', forceChange: true });
+                            }}
+                          >
+                            Reset PW
+                          </Button>
+                        </div>
+                      ))}
+                      {(!allUsers || allUsers.filter(u => u.id !== user?.id).length === 0) && (
+                        <p className="text-xs text-gray-400 text-center py-2">No other staff users</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               /* Full View (existing layout) */
@@ -857,8 +890,8 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* In House - Collapsible */}
-            <Card>
+            {/* In House - Collapsible (hidden on mobile when compact view is on) */}
+            <Card className={compactView ? "hidden sm:block" : ""}>
               <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
                 <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                   <div className="flex items-center gap-2">
@@ -946,8 +979,8 @@ export default function StaffDashboard() {
               )}
             </Card>
 
-            {/* Checked Out - Departed - Collapsible */}
-            <Card>
+            {/* Checked Out - Departed - Collapsible (hidden on mobile when compact view is on) */}
+            <Card className={compactView ? "hidden sm:block" : ""}>
               <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedExpanded(!departedExpanded)}>
                 <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
                   <div className="flex items-center gap-2">
@@ -1006,8 +1039,8 @@ export default function StaffDashboard() {
               )}
             </Card>
 
-            {/* Quick Status Updates */}
-            <Card>
+            {/* Quick Status Updates (hidden on mobile when compact view is on) */}
+            <Card className={compactView ? "hidden sm:block" : ""}>
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-base sm:text-lg">Quick Status Updates</CardTitle>
               </CardHeader>
