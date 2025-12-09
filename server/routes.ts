@@ -374,6 +374,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reset password endpoint (Super Admin only)
+  app.post('/api/admin/users/:userId/reset-password', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { newPassword, forceChange } = req.body;
+      
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Hash new password and update
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await storage.updateUser(userId, { 
+        password: hashedPassword, 
+        mustChangePassword: forceChange !== false // Default to true
+      });
+
+      res.json({ success: true, message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
   // ===== ORGANIZATIONAL UNIT ROUTES (Super Admin Only) =====
   app.get('/api/ous', isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {

@@ -215,6 +215,13 @@ export default function StaffDashboard() {
     confirmPassword: ''
   });
   
+  // Reset password state (for Super Admin)
+  const [resetPasswordData, setResetPasswordData] = useState({
+    newPassword: '',
+    confirmPassword: '',
+    forceChange: true
+  });
+  
   // Ticket management modals state
   const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
   const [editTicketData, setEditTicketData] = useState<ValetTicket | null>(null);
@@ -304,6 +311,28 @@ export default function StaffDashboard() {
       toast({ 
         title: "Error", 
         description: error?.message || "Failed to change password", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Reset password mutation (Super Admin)
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: { userId: string; newPassword: string; forceChange: boolean }) => {
+      await apiRequest("POST", `/api/admin/users/${data.userId}/reset-password`, {
+        newPassword: data.newPassword,
+        forceChange: data.forceChange
+      });
+    },
+    onSuccess: () => {
+      setResetPasswordData({ newPassword: '', confirmPassword: '', forceChange: true });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Password reset successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to reset password", 
         variant: "destructive" 
       });
     },
@@ -1350,8 +1379,81 @@ export default function StaffDashboard() {
                     </p>
                   </div>
                 )}
+                
+                {/* Reset Password Section - Super Admin Only */}
+                {user?.role === 'superadmin' && (
+                  <div className="border-t pt-4 mt-4">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                      <Crown size={16} className="text-regis-gold" />
+                      Reset User Password
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">New Password</label>
+                        <Input
+                          type="password"
+                          value={resetPasswordData.newPassword}
+                          onChange={(e) => setResetPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                          placeholder="Enter new password (min 6 characters)"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Confirm Password</label>
+                        <Input
+                          type="password"
+                          value={resetPasswordData.confirmPassword}
+                          onChange={(e) => setResetPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Confirm new password"
+                          className="mt-1"
+                        />
+                      </div>
+                      {resetPasswordData.newPassword && resetPasswordData.confirmPassword && 
+                       resetPasswordData.newPassword !== resetPasswordData.confirmPassword && (
+                        <p className="text-sm text-red-600">Passwords do not match</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="forceChange"
+                          checked={resetPasswordData.forceChange}
+                          onChange={(e) => setResetPasswordData(prev => ({ ...prev, forceChange: e.target.checked }))}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label htmlFor="forceChange" className="text-sm text-gray-700">
+                          Force password change on next login
+                        </label>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+                            toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
+                            return;
+                          }
+                          if (resetPasswordData.newPassword.length < 6) {
+                            toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+                            return;
+                          }
+                          resetPasswordMutation.mutate({
+                            userId: editUserData.id,
+                            newPassword: resetPasswordData.newPassword,
+                            forceChange: resetPasswordData.forceChange
+                          });
+                        }}
+                        disabled={resetPasswordMutation.isPending || !resetPasswordData.newPassword || !resetPasswordData.confirmPassword}
+                        className="w-full bg-regis-navy hover:bg-blue-900"
+                      >
+                        {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex justify-end pt-4 border-t">
-                  <Button variant="outline" onClick={() => setEditUserData(null)}>
+                  <Button variant="outline" onClick={() => {
+                    setEditUserData(null);
+                    setResetPasswordData({ newPassword: '', confirmPassword: '', forceChange: true });
+                  }}>
                     Close
                   </Button>
                 </div>
