@@ -850,6 +850,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         finalRole = 'standard_admin'; // Can only create standard admins
       }
 
+      // Set mustChangePassword for Standard Admin and Privilege Admin users
+      const mustChangePassword = finalRole !== 'superadmin';
+      
       const newUser = await storage.createUser({
         email,
         firstName,
@@ -857,6 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: finalRole,
         ouId: finalOuId || null,
         locationId: locationId || null,
+        mustChangePassword,
       });
       res.json(newUser);
     } catch (error) {
