@@ -80,7 +80,7 @@ export default function Home() {
             data-testid="button-toggle-compact-view"
           >
             {compactView ? <Maximize2 size={14} className="mr-1" /> : <Minimize2 size={14} className="mr-1" />}
-            {compactView ? "Expand" : "Compact"}
+            {compactView ? "Extended View" : "Standard View"}
           </Button>
         </div>
 
