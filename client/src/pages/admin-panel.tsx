@@ -268,7 +268,18 @@ export default function AdminPanel() {
     switch (role) {
       case 'superadmin': return 'bg-purple-600';
       case 'privilege_admin': return 'bg-blue-600';
+      case 'standard_user': return 'bg-green-600';
       default: return 'bg-gray-600';
+    }
+  };
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'superadmin': return 'Super Admin';
+      case 'privilege_admin': return 'Priv Admin';
+      case 'standard_admin': return 'Std Admin';
+      case 'standard_user': return 'Std User';
+      default: return role;
     }
   };
 
@@ -624,7 +635,7 @@ export default function AdminPanel() {
                             <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden sm:table-cell">{u.username}</td>
                             <td className="p-2 sm:p-4">
                               <Badge className={`${getRoleBadgeColor(u.role)} text-white text-xs`}>
-                                {u.role === 'superadmin' ? 'Super' : u.role === 'privilege_admin' ? 'Priv' : 'Std'}
+                                {getRoleLabel(u.role)}
                               </Badge>
                             </td>
                             {isSuperAdmin && <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell truncate max-w-[80px]">{getOUName(u.ouId)}</td>}
