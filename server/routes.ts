@@ -615,14 +615,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
       
+      // Determine OU assignment based on role
+      // Super Admins don't belong to any OU (ouId should be null)
+      const finalRole = role || 'standard_admin';
+      const finalOuId = finalRole === 'superadmin' ? null : (ouId || currentUser.ouId);
+      
       const newUser = await storage.createUser({
         username,
         password: hashedPassword,
         email,
         firstName,
         lastName,
-        role: role || 'standard_admin',
-        ouId: ouId || currentUser.ouId,
+        role: finalRole,
+        ouId: finalOuId,
         locationId: locationId || null,
         createdBy: currentUser.id,
       });
