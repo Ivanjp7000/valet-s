@@ -140,6 +140,7 @@ export default function AdminPanel() {
     mutationFn: async (userData: typeof newUser) => await apiRequest("POST", "/api/users", userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setShowAddUser(false);
       setNewUser({ username: "", password: "", email: "", firstName: "", lastName: "", role: "standard_admin", ouId: "", locationId: "" });
       toast({ title: "Success", description: "User created successfully" });
@@ -165,6 +166,7 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setEditingUser(null);
       setEditUserPassword("");
       setShowEditPassword(false);
@@ -213,6 +215,7 @@ export default function AdminPanel() {
     mutationFn: async (id: string) => await apiRequest("DELETE", `/api/users/${id}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: "Success", description: "User deleted successfully" });
     },
     onError: (error) => handleError(error, "Failed to delete user"),
