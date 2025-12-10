@@ -337,11 +337,6 @@ export default function AdminPanel() {
               </Link>
               <a 
                 href="/api/logout"
-                onClick={(e) => {
-                  e.preventDefault();
-                  queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
-                  window.location.href = "/api/logout";
-                }}
                 className="flex items-center text-blue-200 hover:text-white p-2" 
                 data-testid="link-logout"
               >

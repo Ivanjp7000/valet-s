@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,11 +66,6 @@ export default function Home() {
           </div>
           <a 
             href="/api/logout"
-            onClick={(e) => {
-              e.preventDefault();
-              queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
-              window.location.href = "/api/logout";
-            }}
             className="flex items-center text-blue-200 hover:text-white" 
             data-testid="link-logout"
           >
