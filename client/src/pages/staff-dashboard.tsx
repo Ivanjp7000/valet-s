@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, User as UserType } from "@shared/schema";
 
-function GuestOutCard({ ticket, onBack }: { ticket: ValetTicket; onBack: () => void }) {
+function GuestOutCard({ ticket, onBack, canEdit = true }: { ticket: ValetTicket; onBack: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -48,18 +48,20 @@ function GuestOutCard({ ticket, onBack }: { ticket: ValetTicket; onBack: () => v
         </div>
         <span className="text-xs font-mono font-bold text-blue-700">{mins}:{secs.toString().padStart(2, '0')}</span>
       </div>
-      <Button 
-        size="sm" 
-        className="h-6 px-3 text-xs bg-green-600 hover:bg-green-700 text-white w-full"
-        onClick={onBack}
-      >
-        Back
-      </Button>
+      {canEdit && (
+        <Button 
+          size="sm" 
+          className="h-6 px-3 text-xs bg-green-600 hover:bg-green-700 text-white w-full"
+          onClick={onBack}
+        >
+          Back
+        </Button>
+      )}
     </div>
   );
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void }) {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; canEdit?: boolean }) {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
 
   useEffect(() => {
@@ -112,28 +114,32 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView }: { ticket: Va
           >
             <Eye size={14} className="text-gray-500" />
           </Button>
-          <Button 
-            size="sm" 
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            onClick={onEdit}
-          >
-            <Edit size={14} className="text-gray-500" />
-          </Button>
+          {canEdit && (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              className="h-6 w-6 p-0"
+              onClick={onEdit}
+            >
+              <Edit size={14} className="text-gray-500" />
+            </Button>
+          )}
         </div>
       </div>
-      <Button 
-        size="sm" 
-        className="h-7 w-full text-xs bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
-        onClick={onRetrieve}
-      >
-        <Play size={12} className="mr-1" />Retrieve
-      </Button>
+      {canEdit && (
+        <Button 
+          size="sm" 
+          className="h-7 w-full text-xs bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+          onClick={onRetrieve}
+        >
+          <Play size={12} className="mr-1" />Retrieve
+        </Button>
+      )}
     </div>
   );
 }
 
-function GuestOutCardFull({ ticket, onBack }: { ticket: ValetTicket; onBack: () => void }) {
+function GuestOutCardFull({ ticket, onBack, canEdit = true }: { ticket: ValetTicket; onBack: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -170,13 +176,15 @@ function GuestOutCardFull({ ticket, onBack }: { ticket: ValetTicket; onBack: () 
       <div className="text-sm text-gray-600 mb-3">
         <p><strong>Guest:</strong> {ticket.guestName}</p>
       </div>
-      <Button 
-        size="sm" 
-        className="w-full bg-green-600 hover:bg-green-700 text-white"
-        onClick={onBack}
-      >
-        Back
-      </Button>
+      {canEdit && (
+        <Button 
+          size="sm" 
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+          onClick={onBack}
+        >
+          Back
+        </Button>
+      )}
     </div>
   );
 }
@@ -185,6 +193,9 @@ export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Standard User has read-only access - cannot create/edit/delete
+  const canEdit = user?.role !== 'standard_user';
   const [editingTicket, setEditingTicket] = useState<ValetTicket | null>(null);
   const [showCarDetails, setShowCarDetails] = useState<string | null>(null);
   const [carFormData, setCarFormData] = useState({
@@ -526,15 +537,17 @@ export default function StaffDashboard() {
                 {compactView ? <LayoutGrid size={16} /> : <List size={16} />}
                 {compactView ? "Extended View" : "Standard View"}
               </Button>
-              <Button 
-                onClick={() => setShowTicketWizard(true)}
-                size="sm"
-                className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
-                data-testid="button-new-valet-ticket"
-              >
-                <Plus size={16} className="mr-1 sm:mr-2" />
-                New Valet Ticket
-              </Button>
+              {canEdit && (
+                <Button 
+                  onClick={() => setShowTicketWizard(true)}
+                  size="sm"
+                  className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+                  data-testid="button-new-valet-ticket"
+                >
+                  <Plus size={16} className="mr-1 sm:mr-2" />
+                  New Valet Ticket
+                </Button>
+              )}
             </div>
 
             {/* Compact View for Mobile */}
@@ -574,22 +587,24 @@ export default function StaffDashboard() {
                             <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button 
-                            size="sm" 
-                            className="h-6 px-2 text-xs bg-gray-600 hover:bg-gray-700 text-white flex-1"
-                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
-                          >
-                            Departed
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white flex-1"
-                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
-                          >
-                            Coming Back
-                          </Button>
-                        </div>
+                        {canEdit && (
+                          <div className="flex gap-1">
+                            <Button 
+                              size="sm" 
+                              className="h-6 px-2 text-xs bg-gray-600 hover:bg-gray-700 text-white flex-1"
+                              onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
+                            >
+                              Departed
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                              onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
+                            >
+                              Coming Back
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                     {activeTickets?.filter(t => t.status === 'ready').length === 0 && (
@@ -608,14 +623,16 @@ export default function StaffDashboard() {
                       <div key={ticket.id} className="bg-gray-50 rounded p-2 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
-                          <div className="flex gap-1">
-                            {ticket.status === 'retrieving' && (
-                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
-                            )}
-                            {ticket.status === 'transit' && (
-                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
-                            )}
-                          </div>
+                          {canEdit && (
+                            <div className="flex gap-1">
+                              {ticket.status === 'retrieving' && (
+                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
+                              )}
+                              {ticket.status === 'transit' && (
+                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <CompactRetrievalProgress ticket={ticket} />
                       </div>
@@ -636,7 +653,8 @@ export default function StaffDashboard() {
                       <GuestOutCard 
                         key={ticket.id} 
                         ticket={ticket} 
-                        onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)} 
+                        onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                        canEdit={canEdit}
                       />
                     ))}
                     {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 && (
@@ -665,6 +683,7 @@ export default function StaffDashboard() {
                           onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
                           onEdit={() => setEditTicketData(ticket)}
                           onView={() => setViewTicket(ticket)}
+                          canEdit={canEdit}
                         />
                       ))}
                       {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -793,22 +812,24 @@ export default function StaffDashboard() {
                             <div className="text-sm text-gray-600 mb-3">
                               <p><strong>Guest:</strong> {ticket.guestName}</p>
                             </div>
-                            <div className="flex gap-2">
-                              <Button 
-                                size="sm" 
-                                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
-                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
-                              >
-                                Departed
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
-                              >
-                                Coming Back
-                              </Button>
-                            </div>
+                            {canEdit && (
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
+                                  onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
+                                >
+                                  Departed
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                  onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
+                                >
+                                  Coming Back
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -880,7 +901,8 @@ export default function StaffDashboard() {
                           <GuestOutCardFull 
                             key={ticket.id} 
                             ticket={ticket} 
-                            onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)} 
+                            onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                            canEdit={canEdit}
                           />
                         ))}
                       </div>
@@ -925,14 +947,16 @@ export default function StaffDashboard() {
                               >
                                 <Eye size={16} className="text-gray-500" />
                               </Button>
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                onClick={() => setEditTicketData(ticket)}
-                              >
-                                <Edit size={16} className="text-gray-500" />
-                              </Button>
+                              {canEdit && (
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => setEditTicketData(ticket)}
+                                >
+                                  <Edit size={16} className="text-gray-500" />
+                                </Button>
+                              )}
                               <CircularTimer 
                                 createdAt={ticket.createdAt || new Date()} 
                                 maxHours={24}
@@ -953,18 +977,20 @@ export default function StaffDashboard() {
                             )}
                           </div>
 
-                          <Button
-                            size="sm"
-                            className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
-                            onClick={() => updateStatusMutation.mutate({ 
-                              ticketNumber: ticket.ticketNumber, 
-                              status: 'retrieving' 
-                            })}
-                            data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
-                          >
-                            <Play size={14} className="mr-1" />
-                            Retrieve
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              size="sm"
+                              className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
+                              onClick={() => updateStatusMutation.mutate({ 
+                                ticketNumber: ticket.ticketNumber, 
+                                status: 'retrieving' 
+                              })}
+                              data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
+                            >
+                              <Play size={14} className="mr-1" />
+                              Retrieve
+                            </Button>
+                          )}
                         </div>
                       ))}
                       {activeTickets?.filter(t => t.status === 'active').length === 0 && (

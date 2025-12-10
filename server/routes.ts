@@ -202,16 +202,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
-  // Helper to get user's scoped location IDs (for Standard Admins with location restrictions)
+  // Read-only access - allows Standard Users to VIEW data but not modify
+  const requireReadAccess = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    
+    const user = await storage.getUser(userId);
+    if (!user || !['superadmin', 'privilege_admin', 'standard_admin', 'standard_user'].includes(user.role)) {
+      return res.status(403).json({ message: "Access required" });
+    }
+    req.currentUser = user;
+    next();
+  };
+
+  // Helper to get user's scoped location IDs (for Standard Admins/Users with location restrictions)
   const getUserScopedLocationIds = async (user: any): Promise<string[] | undefined> => {
-    if (user.role !== 'standard_admin') return undefined;
+    if (!['standard_admin', 'standard_user'].includes(user.role)) return undefined;
     const scopes = await storage.getUserLocationScopes(user.id);
     if (scopes.length === 0) return undefined; // No restrictions, see full OU
     return scopes.map(s => s.locationId);
   };
 
-  // Protected routes (Staff/Admin only) - requires standard_admin or higher
-  app.get('/api/staff/tickets', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+  // Protected routes (Staff/Admin only) - read access for all staff including standard_user
+  app.get('/api/staff/tickets', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser;
       const scopedLocationIds = await getUserScopedLocationIds(user);
@@ -346,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/staff/stats', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+  app.get('/api/staff/stats', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser;
       const scopedLocationIds = await getUserScopedLocationIds(user);
@@ -450,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== PHYSICAL LOCATION ROUTES (Privilege Admin and above) =====
-  app.get('/api/locations', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+  app.get('/api/locations', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser;
       // Super Admin sees all, others see their OU's locations
@@ -570,9 +583,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const users = await storage.getAllUsers();
         res.json(users);
       } else {
-        // Privilege Admin sees only standard admins in their OU
+        // Privilege Admin sees standard admins and standard users in their OU
         const users = await storage.getUsersByOU(user.ouId!);
-        const filteredUsers = users.filter(u => u.role === 'standard_admin');
+        const filteredUsers = users.filter(u => ['standard_admin', 'standard_user'].includes(u.role));
         res.json(filteredUsers);
       }
     } catch (error) {
@@ -589,9 +602,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate role assignment permissions
       if (currentUser.role === 'privilege_admin') {
-        // Privilege Admin can only create standard_admin users
-        if (role && role !== 'standard_admin') {
-          return res.status(403).json({ message: "You can only create standard admin accounts" });
+        // Privilege Admin can only create standard_admin or standard_user accounts
+        if (role && !['standard_admin', 'standard_user'].includes(role)) {
+          return res.status(403).json({ message: "You can only create standard admin or standard user accounts" });
         }
         // Must assign to their OU
         if (ouId && ouId !== currentUser.ouId) {
@@ -636,19 +649,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!targetUser) return res.status(404).json({ message: "User not found" });
       
-      // Privilege Admin can only modify standard_admin in their OU
+      // Privilege Admin can only modify standard_admin or standard_user in their OU
       if (currentUser.role === 'privilege_admin') {
-        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
-          return res.status(403).json({ message: "You can only modify standard admins in your OU" });
+        if (!['standard_admin', 'standard_user'].includes(targetUser.role) || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only modify standard admins or standard users in your OU" });
         }
       }
       
       const { password, role, ouId, locationId, ...safeUpdateData } = req.body;
       
-      // Privilege Admin cannot change role or OU assignment
+      // Privilege Admin cannot change role to higher levels or change OU assignment
       if (currentUser.role === 'privilege_admin') {
-        if (role && role !== 'standard_admin') {
-          return res.status(403).json({ message: "You cannot change user roles" });
+        if (role && !['standard_admin', 'standard_user'].includes(role)) {
+          return res.status(403).json({ message: "You can only assign standard admin or standard user roles" });
         }
         if (ouId && ouId !== currentUser.ouId) {
           return res.status(403).json({ message: "You cannot move users to a different OU" });
@@ -692,10 +705,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!targetUser) return res.status(404).json({ message: "User not found" });
       
-      // Privilege Admin can only delete standard_admin in their OU
+      // Privilege Admin can only delete standard_admin or standard_user in their OU
       if (currentUser.role === 'privilege_admin') {
-        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
-          return res.status(403).json({ message: "You can only delete standard admins in your OU" });
+        if (!['standard_admin', 'standard_user'].includes(targetUser.role) || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only delete standard admins or standard users in your OU" });
         }
       }
       
@@ -722,9 +735,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!targetUser) return res.status(404).json({ message: "User not found" });
       
-      // Privilege Admin can only view scopes for standard_admin in their OU
+      // Privilege Admin can only view scopes for standard_admin or standard_user in their OU
       if (currentUser.role === 'privilege_admin') {
-        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+        if (!['standard_admin', 'standard_user'].includes(targetUser.role) || targetUser.ouId !== currentUser.ouId) {
           return res.status(403).json({ message: "Access denied" });
         }
       }
@@ -737,7 +750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add location scope to a user (Privilege Admin assigns Standard Admin to specific locations)
+  // Add location scope to a user (Privilege Admin assigns Standard Admin/User to specific locations)
   app.post('/api/users/:userId/location-scopes', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
     try {
       const { userId } = req.params;
@@ -751,10 +764,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const targetUser = await storage.getUser(userId);
       if (!targetUser) return res.status(404).json({ message: "User not found" });
       
-      // Privilege Admin can only assign scopes to standard_admin in their OU
+      // Privilege Admin can only assign scopes to standard_admin or standard_user in their OU
       if (currentUser.role === 'privilege_admin') {
-        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
-          return res.status(403).json({ message: "You can only assign location scopes to standard admins in your OU" });
+        if (!['standard_admin', 'standard_user'].includes(targetUser.role) || targetUser.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "You can only assign location scopes to standard admins or users in your OU" });
         }
       }
       
@@ -783,9 +796,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const targetUser = await storage.getUser(userId);
       if (!targetUser) return res.status(404).json({ message: "User not found" });
       
-      // Privilege Admin can only remove scopes from standard_admin in their OU
+      // Privilege Admin can only remove scopes from standard_admin or standard_user in their OU
       if (currentUser.role === 'privilege_admin') {
-        if (targetUser.role !== 'standard_admin' || targetUser.ouId !== currentUser.ouId) {
+        if (!['standard_admin', 'standard_user'].includes(targetUser.role) || targetUser.ouId !== currentUser.ouId) {
           return res.status(403).json({ message: "Access denied" });
         }
       }
@@ -814,10 +827,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         res.json(usersWithScopes);
       } else if (currentUser.ouId) {
-        // Privilege Admin: Get standard admins in their OU with scopes
+        // Privilege Admin: Get standard admins and standard users in their OU with scopes
         const result = await storage.getUsersWithLocationScopes(currentUser.ouId);
         const filteredResult = result
-          .filter(r => r.user.role === 'standard_admin')
+          .filter(r => ['standard_admin', 'standard_user'].includes(r.user.role))
           .map(r => ({ ...r.user, locationScopes: r.scopes }));
         res.json(filteredResult);
       } else {
@@ -911,13 +924,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      // Privilege Admin can only create standard_admin users in their OU
+      // Privilege Admin can create standard_admin or standard_user in their OU
       let finalOuId = ouId;
       let finalRole = role || "standard_admin";
       
       if (user.role !== 'superadmin') {
         finalOuId = user.ouId; // Force to their OU
-        finalRole = 'standard_admin'; // Can only create standard admins
+        // Privilege Admin can only create standard_admin or standard_user
+        if (!['standard_admin', 'standard_user'].includes(finalRole)) {
+          finalRole = 'standard_admin';
+        }
       }
 
       // Set mustChangePassword for Standard Admin and Privilege Admin users
@@ -939,7 +955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/tickets", isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+  app.get("/api/admin/tickets", isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser;
       const scopedLocationIds = await getUserScopedLocationIds(user);

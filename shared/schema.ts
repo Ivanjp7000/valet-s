@@ -62,7 +62,7 @@ export const userLocationScopes = pgTable("user_location_scopes", {
 
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-// Roles: 'superadmin', 'privilege_admin', 'standard_admin'
+// Roles: 'superadmin', 'privilege_admin', 'standard_admin', 'standard_user'
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   username: varchar("username").unique(),
@@ -71,7 +71,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: varchar("role").default("standard_admin").notNull(), // 'superadmin', 'privilege_admin', 'standard_admin'
+  role: varchar("role").default("standard_admin").notNull(), // 'superadmin', 'privilege_admin', 'standard_admin', 'standard_user'
   ouId: varchar("ou_id").references(() => organizationalUnits.id), // Which OU this user belongs to
   locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this user works at
   createdBy: varchar("created_by"), // ID of user who created this account
@@ -172,7 +172,7 @@ export type InsertSystemSetting = typeof systemSettings.$inferInsert;
 export type SystemSetting = typeof systemSettings.$inferSelect;
 
 // Role type
-export type UserRole = 'superadmin' | 'privilege_admin' | 'standard_admin';
+export type UserRole = 'superadmin' | 'privilege_admin' | 'standard_admin' | 'standard_user';
 
 // Zod schemas
 export const insertOUSchema = createInsertSchema(organizationalUnits).pick({

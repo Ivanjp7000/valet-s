@@ -32,6 +32,7 @@ export default function Home() {
       case 'superadmin': return 'Super Admin';
       case 'privilege_admin': return 'Privilege Admin';
       case 'standard_admin': return 'Standard Admin';
+      case 'standard_user': return 'Standard User';
       default: return role;
     }
   };
@@ -40,6 +41,7 @@ export default function Home() {
     switch (role) {
       case 'superadmin': return 'bg-purple-600';
       case 'privilege_admin': return 'bg-blue-600';
+      case 'standard_user': return 'bg-green-600';
       default: return 'bg-gray-600';
     }
   };

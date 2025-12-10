@@ -959,14 +959,23 @@ export default function AdminPanel() {
                     <SelectItem value="superadmin">Super Admin</SelectItem>
                     <SelectItem value="privilege_admin">Privilege Admin</SelectItem>
                     <SelectItem value="standard_admin">Standard Admin</SelectItem>
+                    <SelectItem value="standard_user">Standard User (Read Only)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             )}
             {isPrivilegeAdmin && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Role</p>
-                <p className="font-medium text-regis-navy">Standard Admin (Staff)</p>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Role</label>
+                <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard_admin">Standard Admin (Staff)</SelectItem>
+                    <SelectItem value="standard_user">Standard User (Read Only)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {isSuperAdmin && newUser.role !== 'superadmin' && (
@@ -1068,16 +1077,23 @@ export default function AdminPanel() {
                       <SelectItem value="superadmin">Super Admin</SelectItem>
                       <SelectItem value="privilege_admin">Privilege Admin</SelectItem>
                       <SelectItem value="standard_admin">Standard Admin</SelectItem>
+                      <SelectItem value="standard_user">Standard User (Read Only)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               )}
               {isPrivilegeAdmin && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Role</p>
-                  <p className="font-medium text-regis-navy">
-                    {editingUser.role === 'privilege_admin' ? 'Privilege Admin' : 'Standard Admin'}
-                  </p>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Role</label>
+                  <Select value={editingUser.role} onValueChange={(value: any) => setEditingUser({ ...editingUser, role: value })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard_admin">Standard Admin (Staff)</SelectItem>
+                      <SelectItem value="standard_user">Standard User (Read Only)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
               {isSuperAdmin && editingUser.role !== 'superadmin' && (
