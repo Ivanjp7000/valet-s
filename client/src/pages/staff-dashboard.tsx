@@ -1133,16 +1133,7 @@ export default function StaffDashboard() {
           {/* User Management Tab */}
           {user?.role === 'superadmin' && (
             <TabsContent value="users" className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-regis-navy">User Management</h2>
-                <Button
-                  onClick={() => setShowAddUser(true)}
-                  className="bg-regis-navy hover:bg-blue-900 text-white"
-                >
-                  <Plus size={16} className="mr-2" />
-                  Add Staff User
-                </Button>
-              </div>
+              <h2 className="text-xl font-semibold text-regis-navy">User Management</h2>
 
               <Card>
                 <CardContent className="p-6">
