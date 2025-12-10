@@ -482,7 +482,10 @@ export default function StaffDashboard() {
               </Button>
             </Link>
             <Button
-              onClick={() => window.location.href = '/api/logout'}
+              onClick={() => {
+                queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
+                window.location.href = '/api/logout';
+              }}
               variant="outline"
               size="sm"
               className="text-regis-navy border-regis-navy hover:bg-regis-navy hover:text-white px-2 sm:px-3"

@@ -335,7 +335,16 @@ export default function AdminPanel() {
                   <span className="hidden sm:inline ml-2 text-white">Home</span>
                 </Button>
               </Link>
-              <a href="/api/logout" className="flex items-center text-blue-200 hover:text-white p-2" data-testid="link-logout">
+              <a 
+                href="/api/logout"
+                onClick={(e) => {
+                  e.preventDefault();
+                  queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
+                  window.location.href = "/api/logout";
+                }}
+                className="flex items-center text-blue-200 hover:text-white p-2" 
+                data-testid="link-logout"
+              >
                 <LogOut size={16} />
                 <span className="hidden sm:inline ml-2">Logout</span>
               </a>
