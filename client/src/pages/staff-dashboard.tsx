@@ -1128,49 +1128,6 @@ export default function StaffDashboard() {
               </CardContent>
             </Card>
 
-            {/* Staff Quick Access - Super Admin Only (in Dashboard) */}
-            {user?.role === 'superadmin' && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Crown size={18} className="text-regis-gold" />
-                    Staff Quick Access
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-2">
-                  {usersLoading ? (
-                    <div className="text-center py-4">Loading staff...</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {allUsers?.filter(u => u.id !== user?.id).map((staffUser) => (
-                        <div key={staffUser.id} className="border border-gray-200 rounded-lg p-3 flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-sm">{staffUser.firstName} {staffUser.lastName}</p>
-                            <p className="text-xs text-gray-500 capitalize">{staffUser.role?.replace('_', ' ')}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditUserData(staffUser);
-                              setResetPasswordData({ newPassword: '', confirmPassword: '', forceChange: true });
-                            }}
-                            className="text-xs"
-                            data-testid={`button-quick-edit-user-${staffUser.id}`}
-                          >
-                            <Edit size={12} className="mr-1" />
-                            Reset Password
-                          </Button>
-                        </div>
-                      ))}
-                      {(!allUsers || allUsers.filter(u => u.id !== user?.id).length === 0) && (
-                        <p className="text-sm text-gray-500 text-center py-2">No other staff users</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* User Management Tab */}
