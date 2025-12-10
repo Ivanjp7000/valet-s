@@ -636,6 +636,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error?.code === '23505' && error?.constraint === 'users_username_key') {
         return res.status(400).json({ message: "Username already exists. Please choose a different username." });
       }
+      // Check for duplicate email constraint violation
+      if (error?.code === '23505' && error?.constraint === 'users_email_unique') {
+        return res.status(400).json({ message: "Email already exists. Please use a different email address." });
+      }
       res.status(400).json({ message: "Failed to create user" });
     }
   });
