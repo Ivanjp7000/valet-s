@@ -73,7 +73,9 @@ export default function AdminPanel() {
       setTimeout(() => { window.location.href = "/api/login"; }, 500);
       return;
     }
-    toast({ title: "Error", description: defaultMsg, variant: "destructive" });
+    // Try to extract detailed error message from response
+    const errorMsg = error?.response?.data?.message || defaultMsg;
+    toast({ title: "Error", description: errorMsg, variant: "destructive" });
   };
 
   const createOUMutation = useMutation({
