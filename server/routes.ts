@@ -419,7 +419,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== ORGANIZATIONAL UNIT ROUTES (Super Admin Only) =====
   app.get('/api/ous', isAuthenticated, async (req, res) => {
     try {
-      const authUser = req.user as User;
+      const sessionUser = req.user as any;
+      const userId = sessionUser?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Get full user from database to access role and ouId
+      const authUser = await storage.getUser(userId);
+      if (!authUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
       // Super Admin sees all OUs
       if (authUser.role === 'superadmin') {
         const ous = await storage.getAllOUs();
