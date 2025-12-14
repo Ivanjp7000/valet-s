@@ -599,7 +599,7 @@ export default function AdminPanel() {
                 </Card>
                 <Card>
                   <CardContent className="p-2 sm:p-4 text-center">
-                    <p className="text-lg sm:text-2xl font-bold text-gray-600">{filteredUsers?.filter(u => u.role === 'standard_admin').length || 0}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-gray-600">{filteredUsers?.filter(u => u.role === 'standard_admin' || u.role === 'standard_user').length || 0}</p>
                     <p className="text-xs sm:text-sm text-gray-600">Staff</p>
                   </CardContent>
                 </Card>

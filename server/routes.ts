@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema } from "@shared/schema";
+import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
@@ -417,10 +417,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== ORGANIZATIONAL UNIT ROUTES (Super Admin Only) =====
-  app.get('/api/ous', isAuthenticated, requireSuperAdmin, async (req, res) => {
+  app.get('/api/ous', isAuthenticated, async (req, res) => {
     try {
-      const ous = await storage.getAllOUs();
-      res.json(ous);
+      const authUser = req.user as User;
+      // Super Admin sees all OUs
+      if (authUser.role === 'superadmin') {
+        const ous = await storage.getAllOUs();
+        return res.json(ous);
+      }
+      // Privilege Admin and others see only their own OU
+      if (authUser.ouId) {
+        const ou = await storage.getOU(authUser.ouId);
+        return res.json(ou ? [ou] : []);
+      }
+      res.json([]);
     } catch (error) {
       console.error("Error fetching OUs:", error);
       res.status(500).json({ message: "Failed to fetch organizational units" });
