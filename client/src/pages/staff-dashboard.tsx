@@ -556,14 +556,6 @@ export default function StaffDashboard() {
               <div className="space-y-3 sm:hidden">
                 {/* Compact Stats Row */}
                 <div className="flex gap-2">
-                  <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
-                    <p className="text-xs text-gray-500">Done</p>
-                  </div>
-                  <div className="flex-1 bg-purple-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-purple-600">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
-                    <p className="text-xs text-gray-500">Avg</p>
-                  </div>
                   <div className="flex-1 bg-blue-50 rounded-lg p-2 text-center">
                     <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
                     <p className="text-xs text-gray-500">In House</p>
@@ -571,6 +563,14 @@ export default function StaffDashboard() {
                   <div className="flex-1 bg-orange-50 rounded-lg p-2 text-center">
                     <p className="text-lg font-bold text-orange-600">{activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0}</p>
                     <p className="text-xs text-gray-500">Retrieving</p>
+                  </div>
+                  <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
+                    <p className="text-xs text-gray-500">Done</p>
+                  </div>
+                  <div className="flex-1 bg-purple-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-purple-600">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
+                    <p className="text-xs text-gray-500">Avg</p>
                   </div>
                 </div>
 
