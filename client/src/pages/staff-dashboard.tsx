@@ -780,6 +780,103 @@ export default function StaffDashboard() {
             ) : (
               /* Full View (existing layout) */
               <>
+                {/* In House - Full View (Mobile Extended Only - Desktop has its own section below) */}
+                <Card className="shadow-lg border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50/30 mb-4 sm:hidden">
+                  <CardHeader className="p-4 sm:p-6 pb-2 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
+                    <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                      <div className="flex items-center gap-2 text-regis-navy">
+                        <Clock size={20} />
+                        In House
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-regis-navy text-white text-lg px-4 py-1">
+                          {activeTickets?.filter(t => t.status === 'active').length || 0}
+                        </Badge>
+                        <ChevronDown size={20} className={`transition-transform ${inHouseExpanded ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  {inHouseExpanded && (
+                    <CardContent className="p-4 sm:p-6 pt-2">
+                      {ticketsLoading ? (
+                        <div className="text-center py-6 sm:py-8">Loading tickets...</div>
+                      ) : activeTickets?.filter(t => t.status === 'active').length === 0 ? (
+                        <div className="text-center py-6 text-gray-400">
+                          <Clock size={36} className="mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">No vehicles in house</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                            <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                              <div className="flex justify-between items-start mb-2 sm:mb-3">
+                                <div>
+                                  <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {ticket.carMake} {ticket.carModel}
+                                  </p>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0"
+                                    onClick={() => setViewTicket(ticket)}
+                                  >
+                                    <Eye size={16} className="text-gray-500" />
+                                  </Button>
+                                  {canEdit && (
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0"
+                                      onClick={() => setEditTicketData(ticket)}
+                                    >
+                                      <Edit size={16} className="text-gray-500" />
+                                    </Button>
+                                  )}
+                                  <CircularTimer 
+                                    createdAt={ticket.createdAt || new Date()} 
+                                    maxHours={24}
+                                    size={40}
+                                    strokeWidth={3}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                                <p><strong>Guest:</strong> {ticket.guestName}</p>
+                                {ticket.roomNumber && (
+                                  <p><strong>Room:</strong> {ticket.roomNumber}</p>
+                                )}
+                                <p><strong>Color:</strong> {ticket.carColor}</p>
+                                {ticket.parkingLocation && (
+                                  <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
+                                )}
+                              </div>
+
+                              {canEdit && (
+                                <Button
+                                  size="sm"
+                                  className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
+                                  onClick={() => updateStatusMutation.mutate({ 
+                                    ticketNumber: ticket.ticketNumber, 
+                                    status: 'retrieving' 
+                                  })}
+                                  data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
+                                >
+                                  <Play size={14} className="mr-1" />
+                                  Retrieve
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  )}
+                </Card>
+
                 {/* Ready for Collection - Full View */}
                 <Card className="shadow-lg border-2 border-green-200 bg-gradient-to-br from-white to-green-50/30 mb-4">
                   <CardHeader className="p-4 sm:p-6 pb-2">
@@ -853,28 +950,6 @@ export default function StaffDashboard() {
                     />
                   </div>
 
-                  {/* Stats Summary */}
-                  <div className="space-y-4">
-                    <Card className="shadow-sm">
-                      <CardContent className="p-4 sm:p-6 text-center">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2 sm:mb-3">
-                          <Check className="text-gray-600" size={18} />
-                        </div>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">Completed Today</p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="shadow-sm">
-                      <CardContent className="p-4 sm:p-6 text-center">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2 sm:mb-3">
-                          <Timer className="text-purple-600" size={18} />
-                        </div>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">Avg. Time</p>
-                      </CardContent>
-                    </Card>
-                  </div>
                 </div>
 
                 {/* Guest will Return - Full View */}
@@ -913,8 +988,8 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* In House - Collapsible (hidden on mobile when compact view is on) */}
-            <Card className={compactView ? "hidden sm:block" : ""}>
+            {/* In House - Desktop Version (hidden on mobile, always shows on desktop) */}
+            <Card className="hidden sm:block">
               <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
                 <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                   <div className="flex items-center gap-2">
@@ -986,7 +1061,7 @@ export default function StaffDashboard() {
                                 ticketNumber: ticket.ticketNumber, 
                                 status: 'retrieving' 
                               })}
-                              data-testid={`button-start-retrieval-${ticket.ticketNumber}`}
+                              data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
                             >
                               <Play size={14} className="mr-1" />
                               Retrieve
@@ -1066,68 +1141,27 @@ export default function StaffDashboard() {
               )}
             </Card>
 
-            {/* Quick Status Updates (hidden on mobile when compact view is on) */}
-            <Card className={compactView ? "hidden sm:block" : ""}>
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Quick Status Updates</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0">
-                {ticketsLoading ? (
-                  <div className="text-center py-6 sm:py-8">Loading tickets...</div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {activeTickets?.filter(t => t.status === 'retrieving' || t.status === 'transit' || t.status === 'ready').map((ticket) => (
-                      <div key={ticket.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg gap-2">
-                        <div className="flex items-center space-x-2 sm:space-x-3">
-                          {getStatusIcon(ticket.status)}
-                          <div>
-                            <p className="font-medium text-sm">#{ticket.ticketNumber}</p>
-                            <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
-                          </div>
-                        </div>
-                        <div className="flex space-x-1 sm:space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 sm:flex-none text-xs h-8"
-                            onClick={() => updateStatusMutation.mutate({ 
-                              ticketNumber: ticket.ticketNumber, 
-                              status: 'transit' 
-                            })}
-                            disabled={ticket.status !== 'retrieving'}
-                          >
-                            Transit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 sm:flex-none text-xs h-8"
-                            onClick={() => updateStatusMutation.mutate({ 
-                              ticketNumber: ticket.ticketNumber, 
-                              status: 'ready' 
-                            })}
-                            disabled={ticket.status !== 'transit'}
-                          >
-                            Ready
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1 sm:flex-none text-xs h-8 bg-green-600 hover:bg-green-700"
-                            onClick={() => updateStatusMutation.mutate({ 
-                              ticketNumber: ticket.ticketNumber, 
-                              status: 'completed' 
-                            })}
-                            disabled={ticket.status !== 'ready'}
-                          >
-                            Complete
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+            {/* Stats Summary - At bottom (hidden on mobile when compact view is on) */}
+            <div className={`grid grid-cols-2 gap-4 mt-4 ${compactView ? "hidden sm:grid" : ""}`}>
+              <Card className="shadow-sm">
+                <CardContent className="p-4 text-center">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <Check className="text-gray-600" size={18} />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  <p className="text-xl font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
+                  <p className="text-xs text-gray-600">Completed Today</p>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm">
+                <CardContent className="p-4 text-center">
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <Timer className="text-purple-600" size={18} />
+                  </div>
+                  <p className="text-xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
+                  <p className="text-xs text-gray-600">Avg. Time</p>
+                </CardContent>
+              </Card>
+            </div>
 
           </TabsContent>
 
