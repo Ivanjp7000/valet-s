@@ -20,6 +20,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, User as UserType } from "@shared/schema";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 function GuestOutCard({ ticket, onBack, canEdit = true }: { ticket: ValetTicket; onBack: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -1778,97 +1779,187 @@ export default function StaffDashboard() {
                 <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button 
                     variant="outline" 
-                    onClick={() => {
+                    onClick={async () => {
                       const ticket = viewTicket;
-                      const labelHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Ticket #${ticket.ticketNumber}</title>
-  <style>
-    @page { 
-      size: 50mm 70mm; 
-      margin: 0; 
-    }
-    @media print {
-      html, body {
-        width: 50mm !important;
-        height: 70mm !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-    }
-    html, body { 
-      width: 50mm; 
-      height: 70mm; 
-      margin: 0; 
-      padding: 0; 
-    }
-    body { 
-      font-family: Arial, Helvetica, sans-serif; 
-      display: flex; 
-      flex-direction: column; 
-      justify-content: space-between; 
-      box-sizing: border-box; 
-      padding: 3mm 3mm 2mm 3mm; 
-    }
-    h1 { font-size: 12pt; font-weight: 700; text-align: center; margin: 0; }
-    h2 { font-size: 8pt; text-align: center; margin: 0 0 4pt; }
-    .ticket-number { font-size: 26pt; font-weight: 700; text-align: center; margin: 4pt 0; }
-    .section { font-size: 10pt; line-height: 1.15; }
-    .section strong { display: block; font-size: 9pt; margin-bottom: 1pt; }
-    .location { font-size: 11pt; font-weight: 700; text-align: center; background: #e5e5e5; padding: 3pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .footer { font-size: 7pt; text-align: center; border-top: 0.5pt solid #000; padding-top: 2pt; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>ST. REGIS OSAKA</h1>
-    <h2>VALET PARKING</h2>
-  </header>
-  <div class="ticket-number">#${ticket.ticketNumber}</div>
-  <section class="section">
-    <div><strong>${ticket.guestName || 'Guest'}</strong></div>
-    ${ticket.roomNumber ? `<div>Room: ${ticket.roomNumber}</div>` : ''}
-  </section>
-  <section class="section">
-    <strong>Vehicle</strong>
-    <div>${[ticket.carMake, ticket.carModel].filter(Boolean).join(' ')}</div>
-    <div>Color: ${ticket.carColor || 'N/A'}</div>
-    <div>Plate: ${ticket.licensePlate || 'N/A'}</div>
-  </section>
-  ${ticket.parkingLocation ? `<div class="location">LOC: ${ticket.parkingLocation}</div>` : ''}
-  <footer class="footer">${ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : ''}</footer>
-</body>
-</html>`;
-                      
-                      const iframe = document.createElement('iframe');
-                      iframe.style.position = 'fixed';
-                      iframe.style.width = '0';
-                      iframe.style.height = '0';
-                      iframe.style.border = '0';
-                      iframe.style.visibility = 'hidden';
-                      document.body.appendChild(iframe);
-                      
-                      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-                      if (!doc) return;
-                      doc.open();
-                      doc.write(labelHtml);
-                      doc.close();
-                      
-                      const finish = () => {
-                        iframe.contentWindow?.focus();
-                        iframe.contentWindow?.print();
-                        setTimeout(() => {
-                          if (document.body.contains(iframe)) {
-                            document.body.removeChild(iframe);
-                          }
-                        }, 1000);
-                      };
-                      iframe.onload = finish;
-                      setTimeout(finish, 150);
+                      try {
+                        // Create PDF with exact 50mm x 70mm dimensions
+                        // 1 mm = 2.834645669 points
+                        const widthPt = 50 * 2.834645669;  // 141.73 pt
+                        const heightPt = 70 * 2.834645669; // 198.43 pt
+                        
+                        const pdfDoc = await PDFDocument.create();
+                        const page = pdfDoc.addPage([widthPt, heightPt]);
+                        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+                        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+                        
+                        const { height } = page.getSize();
+                        let y = height - 12;
+                        
+                        // Header - ST. REGIS OSAKA
+                        const hotelText = "ST. REGIS OSAKA";
+                        const hotelWidth = fontBold.widthOfTextAtSize(hotelText, 10);
+                        page.drawText(hotelText, {
+                          x: (widthPt - hotelWidth) / 2,
+                          y: y,
+                          size: 10,
+                          font: fontBold,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 10;
+                        
+                        // VALET PARKING
+                        const valetText = "VALET PARKING";
+                        const valetWidth = font.widthOfTextAtSize(valetText, 7);
+                        page.drawText(valetText, {
+                          x: (widthPt - valetWidth) / 2,
+                          y: y,
+                          size: 7,
+                          font: font,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 6;
+                        
+                        // Divider line
+                        page.drawLine({
+                          start: { x: 8, y: y },
+                          end: { x: widthPt - 8, y: y },
+                          thickness: 0.5,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 18;
+                        
+                        // Ticket number - BIG
+                        const ticketText = `#${ticket.ticketNumber}`;
+                        const ticketWidth = fontBold.widthOfTextAtSize(ticketText, 22);
+                        page.drawText(ticketText, {
+                          x: (widthPt - ticketWidth) / 2,
+                          y: y,
+                          size: 22,
+                          font: fontBold,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 18;
+                        
+                        // Guest name
+                        const guestName = ticket.guestName || 'Guest';
+                        page.drawText(guestName, {
+                          x: 8,
+                          y: y,
+                          size: 9,
+                          font: fontBold,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 10;
+                        
+                        // Room number
+                        if (ticket.roomNumber) {
+                          page.drawText(`Room: ${ticket.roomNumber}`, {
+                            x: 8,
+                            y: y,
+                            size: 8,
+                            font: font,
+                            color: rgb(0, 0, 0),
+                          });
+                          y -= 10;
+                        }
+                        
+                        // Vehicle section
+                        y -= 4;
+                        page.drawText("Vehicle:", {
+                          x: 8,
+                          y: y,
+                          size: 7,
+                          font: fontBold,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 9;
+                        
+                        const carInfo = [ticket.carMake, ticket.carModel].filter(Boolean).join(' ');
+                        if (carInfo) {
+                          page.drawText(carInfo, {
+                            x: 8,
+                            y: y,
+                            size: 8,
+                            font: font,
+                            color: rgb(0, 0, 0),
+                          });
+                          y -= 9;
+                        }
+                        
+                        page.drawText(`Color: ${ticket.carColor || 'N/A'}`, {
+                          x: 8,
+                          y: y,
+                          size: 8,
+                          font: font,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 9;
+                        
+                        page.drawText(`Plate: ${ticket.licensePlate || 'N/A'}`, {
+                          x: 8,
+                          y: y,
+                          size: 8,
+                          font: font,
+                          color: rgb(0, 0, 0),
+                        });
+                        y -= 12;
+                        
+                        // Location box
+                        if (ticket.parkingLocation) {
+                          page.drawRectangle({
+                            x: 8,
+                            y: y - 2,
+                            width: widthPt - 16,
+                            height: 14,
+                            color: rgb(0.9, 0.9, 0.9),
+                          });
+                          const locText = `LOC: ${ticket.parkingLocation}`;
+                          const locWidth = fontBold.widthOfTextAtSize(locText, 9);
+                          page.drawText(locText, {
+                            x: (widthPt - locWidth) / 2,
+                            y: y + 2,
+                            size: 9,
+                            font: fontBold,
+                            color: rgb(0, 0, 0),
+                          });
+                          y -= 16;
+                        }
+                        
+                        // Footer with date
+                        page.drawLine({
+                          start: { x: 8, y: 18 },
+                          end: { x: widthPt - 8, y: 18 },
+                          thickness: 0.5,
+                          color: rgb(0, 0, 0),
+                        });
+                        
+                        const dateText = ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : '';
+                        const dateWidth = font.widthOfTextAtSize(dateText, 6);
+                        page.drawText(dateText, {
+                          x: (widthPt - dateWidth) / 2,
+                          y: 8,
+                          size: 6,
+                          font: font,
+                          color: rgb(0, 0, 0),
+                        });
+                        
+                        // Generate PDF and open for printing
+                        const pdfBytes = await pdfDoc.save();
+                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        // Open PDF in new tab for printing
+                        const printWindow = window.open(url, '_blank');
+                        if (printWindow) {
+                          printWindow.onload = () => {
+                            setTimeout(() => {
+                              printWindow.print();
+                            }, 500);
+                          };
+                        }
+                      } catch (error) {
+                        console.error('PDF generation error:', error);
+                      }
                     }}
                     className="flex items-center gap-2"
                     data-testid="button-print-ticket"
