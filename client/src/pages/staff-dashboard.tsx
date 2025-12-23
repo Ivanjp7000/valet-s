@@ -1836,13 +1836,17 @@ export default function StaffDashboard() {
                         </body>
                         </html>
                       `;
-                      const printWindow = window.open('', '_blank');
+                      const printWindow = window.open('', '_blank', 'width=200,height=320');
                       if (printWindow) {
+                        printWindow.document.open();
                         printWindow.document.write(printContent);
                         printWindow.document.close();
+                        printWindow.focus();
                         setTimeout(() => {
                           printWindow.print();
-                        }, 250);
+                        }, 500);
+                      } else {
+                        alert('Please allow popups to print tickets');
                       }
                     }}
                     className="flex items-center gap-2"
