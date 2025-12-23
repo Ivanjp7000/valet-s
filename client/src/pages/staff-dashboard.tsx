@@ -1787,57 +1787,51 @@ export default function StaffDashboard() {
                           <meta name="viewport" content="width=device-width, initial-scale=1.0">
                           <title>Ticket #${viewTicket.ticketNumber}</title>
                           <style>
-                            @page { size: 80mm 50mm; margin: 0; }
+                            @page { size: 50mm 80mm; margin: 0; }
+                            @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
                             * { margin: 0; padding: 0; box-sizing: border-box; }
-                            html, body { width: 80mm; height: 50mm; margin: 0; padding: 0; overflow: hidden; }
-                            .label {
-                              width: 50mm;
-                              height: 80mm;
-                              transform: rotate(90deg) translateY(-50mm);
-                              transform-origin: top left;
-                              padding: 5mm 4mm 4mm 4mm;
+                            html, body { width: 50mm; height: 80mm; margin: 0; overflow: hidden; }
+                            body { 
+                              padding: 5mm 4mm 3mm 4mm;
                               font-family: Arial, sans-serif;
                               background: #fff;
                               color: #000;
                               display: flex;
                               flex-direction: column;
                               justify-content: space-between;
-                              gap: 1mm;
                               overflow: hidden;
                               page-break-inside: avoid;
                             }
-                            .header { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 1.5mm; }
-                            .hotel { font-size: 3.5mm; font-weight: 700; line-height: 1.1; white-space: nowrap; letter-spacing: 0.2mm; }
-                            .valet { font-size: 2.8mm; line-height: 1.1; }
-                            .ticket-num { text-align: center; font-size: 9mm; font-weight: bold; letter-spacing: 0.5mm; line-height: 1; padding: 1mm 0; }
-                            .guest { font-size: 3.2mm; line-height: 1.15; }
+                            .header { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 1mm; }
+                            .hotel { font-size: 3.5mm; font-weight: 700; line-height: 1.1; white-space: nowrap; }
+                            .valet { font-size: 2.5mm; line-height: 1.1; }
+                            .ticket-num { text-align: center; font-size: 8mm; font-weight: bold; letter-spacing: 0.3mm; line-height: 1; }
+                            .guest { font-size: 3mm; line-height: 1.15; }
                             .guest-name { font-weight: bold; }
-                            .vehicle { font-size: 3mm; border-top: 0.3mm solid #000; padding-top: 1.5mm; line-height: 1.15; }
-                            .location { font-size: 3.5mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 1.5mm; }
-                            .footer { font-size: 2.5mm; text-align: center; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.1; min-height: 4mm; }
+                            .vehicle { font-size: 2.8mm; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.15; }
+                            .location { font-size: 3.2mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 1mm; }
+                            .footer { font-size: 2.2mm; text-align: center; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.1; }
                           </style>
                         </head>
                         <body>
-                          <div class="label">
-                            <div class="header">
-                              <div class="hotel">ST. REGIS OSAKA</div>
-                              <div class="valet">VALET PARKING</div>
-                            </div>
-                            <div class="ticket-num">#${viewTicket.ticketNumber}</div>
-                            <div class="guest">
-                              <div class="guest-name">${viewTicket.guestName || 'Guest'}</div>
-                              ${viewTicket.roomNumber ? '<div>Room: ' + viewTicket.roomNumber + '</div>' : ''}
-                            </div>
-                            <div class="vehicle">
-                              <div><strong>Vehicle:</strong></div>
-                              <div>${viewTicket.carMake || ''} ${viewTicket.carModel || ''}</div>
-                              <div>Color: ${viewTicket.carColor || 'N/A'}</div>
-                              <div>Plate: ${viewTicket.licensePlate || 'N/A'}</div>
-                            </div>
-                            ${viewTicket.parkingLocation ? '<div class="location">LOC: ' + viewTicket.parkingLocation + '</div>' : ''}
-                            <div class="footer">
-                              ${viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() + ' ' + new Date(viewTicket.createdAt).toLocaleTimeString() : ''}
-                            </div>
+                          <div class="header">
+                            <div class="hotel">ST. REGIS OSAKA</div>
+                            <div class="valet">VALET PARKING</div>
+                          </div>
+                          <div class="ticket-num">#${viewTicket.ticketNumber}</div>
+                          <div class="guest">
+                            <div class="guest-name">${viewTicket.guestName || 'Guest'}</div>
+                            ${viewTicket.roomNumber ? '<div>Room: ' + viewTicket.roomNumber + '</div>' : ''}
+                          </div>
+                          <div class="vehicle">
+                            <div><strong>Vehicle:</strong></div>
+                            <div>${viewTicket.carMake || ''} ${viewTicket.carModel || ''}</div>
+                            <div>Color: ${viewTicket.carColor || 'N/A'}</div>
+                            <div>Plate: ${viewTicket.licensePlate || 'N/A'}</div>
+                          </div>
+                          ${viewTicket.parkingLocation ? '<div class="location">LOC: ' + viewTicket.parkingLocation + '</div>' : ''}
+                          <div class="footer">
+                            ${viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() + ' ' + new Date(viewTicket.createdAt).toLocaleTimeString() : ''}
                           </div>
                         </body>
                         </html>
