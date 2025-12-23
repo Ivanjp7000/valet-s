@@ -164,6 +164,14 @@
     margin: 0;
   }
   
+  html, body {
+    width: 50mm;
+    height: 80mm;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  
   body * {
     visibility: hidden;
   }
@@ -174,16 +182,19 @@
   }
   
   .print-ticket-label {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
     width: 50mm;
     height: 80mm;
-    padding: 3mm;
+    padding: 2mm;
     box-sizing: border-box;
     background: white;
     color: black;
     font-family: Arial, sans-serif;
+    overflow: hidden;
+    page-break-after: avoid;
+    page-break-inside: avoid;
   }
   
   .no-print {
@@ -194,10 +205,4 @@
 /* Printable ticket label component */
 .print-ticket-label {
   display: none;
-}
-
-@media print {
-  .print-ticket-label {
-    display: block !important;
-  }
 }

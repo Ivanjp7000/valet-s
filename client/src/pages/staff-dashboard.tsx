@@ -1794,26 +1794,26 @@ export default function StaffDashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Printable Ticket Label for Phomemo (50mm x 80mm) */}
+        {/* Printable Ticket Label for Phomemo (50mm x 80mm) - 125% larger */}
         {viewTicket && (
           <div className="print-ticket-label">
             <div style={{ textAlign: 'center', borderBottom: '2px solid black', paddingBottom: '2mm', marginBottom: '2mm' }}>
-              <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>ST. REGIS OSAKA</div>
-              <div style={{ fontSize: '6pt' }}>VALET PARKING</div>
+              <div style={{ fontSize: '10pt', fontWeight: 'bold' }}>ST. REGIS OSAKA</div>
+              <div style={{ fontSize: '7.5pt' }}>VALET PARKING</div>
             </div>
             
             <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
-              <div style={{ fontSize: '24pt', fontWeight: 'bold', letterSpacing: '2px' }}>
+              <div style={{ fontSize: '30pt', fontWeight: 'bold', letterSpacing: '2px' }}>
                 #{viewTicket.ticketNumber}
               </div>
             </div>
             
-            <div style={{ fontSize: '8pt', marginBottom: '2mm' }}>
+            <div style={{ fontSize: '10pt', marginBottom: '2mm' }}>
               <div style={{ fontWeight: 'bold' }}>{viewTicket.guestName || 'Guest'}</div>
               {viewTicket.roomNumber && <div>Room: {viewTicket.roomNumber}</div>}
             </div>
             
-            <div style={{ fontSize: '7pt', marginBottom: '2mm', borderTop: '1px solid black', paddingTop: '2mm' }}>
+            <div style={{ fontSize: '9pt', marginBottom: '2mm', borderTop: '1px solid black', paddingTop: '2mm' }}>
               <div><strong>Vehicle:</strong></div>
               <div>{viewTicket.carMake} {viewTicket.carModel}</div>
               <div>Color: {viewTicket.carColor || 'N/A'}</div>
@@ -1821,14 +1821,13 @@ export default function StaffDashboard() {
             </div>
             
             {viewTicket.parkingLocation && (
-              <div style={{ fontSize: '9pt', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f0f0f0', padding: '2mm', marginBottom: '2mm' }}>
+              <div style={{ fontSize: '11pt', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f0f0f0', padding: '2mm', marginBottom: '2mm' }}>
                 LOC: {viewTicket.parkingLocation}
               </div>
             )}
             
-            <div style={{ fontSize: '6pt', textAlign: 'center', borderTop: '1px solid black', paddingTop: '2mm' }}>
-              <div>{viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() : ''}</div>
-              <div>{viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleTimeString() : ''}</div>
+            <div style={{ fontSize: '7.5pt', textAlign: 'center', borderTop: '1px solid black', paddingTop: '2mm' }}>
+              <div>{viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() : ''} {viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleTimeString() : ''}</div>
             </div>
           </div>
         )}
