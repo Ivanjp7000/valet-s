@@ -1778,7 +1778,68 @@ export default function StaffDashboard() {
                 <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button 
                     variant="outline" 
-                    onClick={() => window.print()}
+                    onClick={() => {
+                      const printContent = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                          <meta charset="UTF-8">
+                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                          <title>Ticket #${viewTicket.ticketNumber}</title>
+                          <style>
+                            @page { size: 50mm 80mm; margin: 0; }
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body { 
+                              width: 50mm; 
+                              height: 80mm; 
+                              padding: 3mm;
+                              font-family: Arial, sans-serif;
+                              background: white;
+                              color: black;
+                            }
+                            .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 2mm; margin-bottom: 2mm; }
+                            .hotel { font-size: 10pt; font-weight: bold; }
+                            .valet { font-size: 7pt; }
+                            .ticket-num { text-align: center; font-size: 28pt; font-weight: bold; margin: 3mm 0; letter-spacing: 1px; }
+                            .guest { font-size: 10pt; margin-bottom: 2mm; }
+                            .guest-name { font-weight: bold; }
+                            .vehicle { font-size: 9pt; border-top: 1px solid black; padding-top: 2mm; margin-bottom: 2mm; }
+                            .location { font-size: 11pt; font-weight: bold; text-align: center; background: #eee; padding: 2mm; margin-bottom: 2mm; }
+                            .footer { font-size: 7pt; text-align: center; border-top: 1px solid black; padding-top: 2mm; }
+                          </style>
+                        </head>
+                        <body>
+                          <div class="header">
+                            <div class="hotel">ST. REGIS OSAKA</div>
+                            <div class="valet">VALET PARKING</div>
+                          </div>
+                          <div class="ticket-num">#${viewTicket.ticketNumber}</div>
+                          <div class="guest">
+                            <div class="guest-name">${viewTicket.guestName || 'Guest'}</div>
+                            ${viewTicket.roomNumber ? '<div>Room: ' + viewTicket.roomNumber + '</div>' : ''}
+                          </div>
+                          <div class="vehicle">
+                            <div><strong>Vehicle:</strong></div>
+                            <div>${viewTicket.carMake || ''} ${viewTicket.carModel || ''}</div>
+                            <div>Color: ${viewTicket.carColor || 'N/A'}</div>
+                            <div>Plate: ${viewTicket.licensePlate || 'N/A'}</div>
+                          </div>
+                          ${viewTicket.parkingLocation ? '<div class="location">LOC: ' + viewTicket.parkingLocation + '</div>' : ''}
+                          <div class="footer">
+                            ${viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() + ' ' + new Date(viewTicket.createdAt).toLocaleTimeString() : ''}
+                          </div>
+                        </body>
+                        </html>
+                      `;
+                      const printWindow = window.open('', '_blank');
+                      if (printWindow) {
+                        printWindow.document.write(printContent);
+                        printWindow.document.close();
+                        setTimeout(() => {
+                          printWindow.print();
+                        }, 250);
+                      }
+                    }}
                     className="flex items-center gap-2"
                     data-testid="button-print-ticket"
                   >
@@ -1793,44 +1854,6 @@ export default function StaffDashboard() {
             )}
           </DialogContent>
         </Dialog>
-
-        {/* Printable Ticket Label for Phomemo (50mm x 80mm) - 125% larger */}
-        {viewTicket && (
-          <div className="print-ticket-label">
-            <div style={{ textAlign: 'center', borderBottom: '2px solid black', paddingBottom: '2mm', marginBottom: '2mm' }}>
-              <div style={{ fontSize: '10pt', fontWeight: 'bold' }}>ST. REGIS OSAKA</div>
-              <div style={{ fontSize: '7.5pt' }}>VALET PARKING</div>
-            </div>
-            
-            <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
-              <div style={{ fontSize: '30pt', fontWeight: 'bold', letterSpacing: '2px' }}>
-                #{viewTicket.ticketNumber}
-              </div>
-            </div>
-            
-            <div style={{ fontSize: '10pt', marginBottom: '2mm' }}>
-              <div style={{ fontWeight: 'bold' }}>{viewTicket.guestName || 'Guest'}</div>
-              {viewTicket.roomNumber && <div>Room: {viewTicket.roomNumber}</div>}
-            </div>
-            
-            <div style={{ fontSize: '9pt', marginBottom: '2mm', borderTop: '1px solid black', paddingTop: '2mm' }}>
-              <div><strong>Vehicle:</strong></div>
-              <div>{viewTicket.carMake} {viewTicket.carModel}</div>
-              <div>Color: {viewTicket.carColor || 'N/A'}</div>
-              <div>Plate: {viewTicket.licensePlate || 'N/A'}</div>
-            </div>
-            
-            {viewTicket.parkingLocation && (
-              <div style={{ fontSize: '11pt', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f0f0f0', padding: '2mm', marginBottom: '2mm' }}>
-                LOC: {viewTicket.parkingLocation}
-              </div>
-            )}
-            
-            <div style={{ fontSize: '7.5pt', textAlign: 'center', borderTop: '1px solid black', paddingTop: '2mm' }}>
-              <div>{viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() : ''} {viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleTimeString() : ''}</div>
-            </div>
-          </div>
-        )}
 
         {/* Edit Ticket Modal */}
         <Dialog open={!!editTicketData} onOpenChange={() => setEditTicketData(null)}>
