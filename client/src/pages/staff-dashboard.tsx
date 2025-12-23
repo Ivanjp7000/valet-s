@@ -1792,20 +1792,23 @@ export default function StaffDashboard() {
                             body { 
                               width: 50mm; 
                               height: 80mm; 
-                              padding: 3mm;
+                              padding: 6mm 4mm 4mm 4mm;
                               font-family: Arial, sans-serif;
                               background: white;
                               color: black;
+                              display: flex;
+                              flex-direction: column;
+                              justify-content: space-between;
                             }
-                            .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 2mm; margin-bottom: 2mm; }
-                            .hotel { font-size: 10pt; font-weight: bold; }
-                            .valet { font-size: 7pt; }
-                            .ticket-num { text-align: center; font-size: 28pt; font-weight: bold; margin: 3mm 0; letter-spacing: 1px; }
-                            .guest { font-size: 10pt; margin-bottom: 2mm; }
+                            .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 3mm; }
+                            .hotel { font-size: 14pt; font-weight: bold; line-height: 1.2; }
+                            .valet { font-size: 10pt; line-height: 1.2; }
+                            .ticket-num { text-align: center; font-size: 42pt; font-weight: bold; letter-spacing: 1px; line-height: 1; padding: 2mm 0; }
+                            .guest { font-size: 13pt; line-height: 1.3; }
                             .guest-name { font-weight: bold; }
-                            .vehicle { font-size: 9pt; border-top: 1px solid black; padding-top: 2mm; margin-bottom: 2mm; }
-                            .location { font-size: 11pt; font-weight: bold; text-align: center; background: #eee; padding: 2mm; margin-bottom: 2mm; }
-                            .footer { font-size: 7pt; text-align: center; border-top: 1px solid black; padding-top: 2mm; }
+                            .vehicle { font-size: 12pt; border-top: 1px solid black; padding-top: 2mm; line-height: 1.3; }
+                            .location { font-size: 14pt; font-weight: bold; text-align: center; background: #ddd; padding: 3mm; }
+                            .footer { font-size: 10pt; text-align: center; border-top: 1px solid black; padding-top: 2mm; line-height: 1.2; }
                           </style>
                         </head>
                         <body>
