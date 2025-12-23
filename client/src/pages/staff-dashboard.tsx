@@ -1779,126 +1779,9 @@ export default function StaffDashboard() {
                   <Button 
                     variant="outline" 
                     onClick={() => {
-                      const printContent = `
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                          <meta charset="UTF-8">
-                          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                          <title>Ticket #${viewTicket.ticketNumber}</title>
-                          <style>
-                            @page { size: 50mm 80mm; margin: 0; }
-                            @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-                            * { margin: 0; padding: 0; box-sizing: border-box; }
-                            html, body { width: 50mm; height: 80mm; margin: 0; overflow: hidden; }
-                            body { 
-                              padding: 5mm 4mm 3mm 4mm;
-                              font-family: Arial, sans-serif;
-                              background: #fff;
-                              color: #000;
-                              display: flex;
-                              flex-direction: column;
-                              justify-content: space-between;
-                              overflow: hidden;
-                              page-break-inside: avoid;
-                            }
-                            .header { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 1mm; }
-                            .hotel { font-size: 3.5mm; font-weight: 700; line-height: 1.1; white-space: nowrap; }
-                            .valet { font-size: 2.5mm; line-height: 1.1; }
-                            .ticket-num { text-align: center; font-size: 8mm; font-weight: bold; letter-spacing: 0.3mm; line-height: 1; }
-                            .guest { font-size: 3mm; line-height: 1.15; }
-                            .guest-name { font-weight: bold; }
-                            .vehicle { font-size: 2.8mm; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.15; }
-                            .location { font-size: 3.2mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 1mm; }
-                            .footer { font-size: 2.2mm; text-align: center; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.1; }
-                          </style>
-                        </head>
-                        <body>
-                          <div class="header">
-                            <div class="hotel">ST. REGIS OSAKA</div>
-                            <div class="valet">VALET PARKING</div>
-                          </div>
-                          <div class="ticket-num">#${viewTicket.ticketNumber}</div>
-                          <div class="guest">
-                            <div class="guest-name">${viewTicket.guestName || 'Guest'}</div>
-                            ${viewTicket.roomNumber ? '<div>Room: ' + viewTicket.roomNumber + '</div>' : ''}
-                          </div>
-                          <div class="vehicle">
-                            <div><strong>Vehicle:</strong></div>
-                            <div>${viewTicket.carMake || ''} ${viewTicket.carModel || ''}</div>
-                            <div>Color: ${viewTicket.carColor || 'N/A'}</div>
-                            <div>Plate: ${viewTicket.licensePlate || 'N/A'}</div>
-                          </div>
-                          ${viewTicket.parkingLocation ? '<div class="location">LOC: ' + viewTicket.parkingLocation + '</div>' : ''}
-                          <div class="footer">
-                            ${viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() + ' ' + new Date(viewTicket.createdAt).toLocaleTimeString() : ''}
-                          </div>
-                        </body>
-                        </html>
-                      `;
-                      const printDiv = document.createElement('div');
-                      printDiv.id = 'print-ticket-label';
-                      printDiv.innerHTML = `
-                        <style>
-                          @media print {
-                            body > *:not(#print-ticket-label) { display: none !important; }
-                            #print-ticket-label { display: block !important; }
-                          }
-                          @media screen {
-                            #print-ticket-label { display: none; }
-                          }
-                          @page { size: 50mm 80mm; margin: 0; }
-                          #print-ticket-label {
-                            width: 50mm;
-                            height: 80mm;
-                            padding: 5mm 4mm 3mm 4mm;
-                            font-family: Arial, sans-serif;
-                            background: #fff;
-                            color: #000;
-                            display: flex;
-                            flex-direction: column;
-                            justify-content: space-between;
-                            box-sizing: border-box;
-                          }
-                          #print-ticket-label .header { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 1mm; }
-                          #print-ticket-label .hotel { font-size: 3.5mm; font-weight: 700; line-height: 1.1; }
-                          #print-ticket-label .valet { font-size: 2.5mm; line-height: 1.1; }
-                          #print-ticket-label .ticket-num { text-align: center; font-size: 8mm; font-weight: bold; line-height: 1; }
-                          #print-ticket-label .guest { font-size: 3mm; line-height: 1.15; }
-                          #print-ticket-label .guest-name { font-weight: bold; }
-                          #print-ticket-label .vehicle { font-size: 2.8mm; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.15; }
-                          #print-ticket-label .location { font-size: 3.2mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 1mm; }
-                          #print-ticket-label .footer { font-size: 2.2mm; text-align: center; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.1; }
-                        </style>
-                        <div class="header">
-                          <div class="hotel">ST. REGIS OSAKA</div>
-                          <div class="valet">VALET PARKING</div>
-                        </div>
-                        <div class="ticket-num">#${viewTicket.ticketNumber}</div>
-                        <div class="guest">
-                          <div class="guest-name">${viewTicket.guestName || 'Guest'}</div>
-                          ${viewTicket.roomNumber ? '<div>Room: ' + viewTicket.roomNumber + '</div>' : ''}
-                        </div>
-                        <div class="vehicle">
-                          <div><strong>Vehicle:</strong></div>
-                          <div>${viewTicket.carMake || ''} ${viewTicket.carModel || ''}</div>
-                          <div>Color: ${viewTicket.carColor || 'N/A'}</div>
-                          <div>Plate: ${viewTicket.licensePlate || 'N/A'}</div>
-                        </div>
-                        ${viewTicket.parkingLocation ? '<div class="location">LOC: ' + viewTicket.parkingLocation + '</div>' : ''}
-                        <div class="footer">
-                          ${viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() + ' ' + new Date(viewTicket.createdAt).toLocaleTimeString() : ''}
-                        </div>
-                      `;
-                      document.body.appendChild(printDiv);
                       window.print();
-                      setTimeout(() => {
-                        if (document.body.contains(printDiv)) {
-                          document.body.removeChild(printDiv);
-                        }
-                      }, 500);
                     }}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 print-ticket-btn"
                     data-testid="button-print-ticket"
                   >
                     <Printer size={16} />
@@ -1907,6 +1790,33 @@ export default function StaffDashboard() {
                   <Button variant="outline" onClick={() => setViewTicket(null)}>
                     Close
                   </Button>
+                </div>
+
+                {/* Hidden print label - only visible when printing */}
+                <div className="print-label">
+                  <div className="print-header">
+                    <div className="print-hotel">ST. REGIS OSAKA</div>
+                    <div className="print-valet">VALET PARKING</div>
+                  </div>
+                  <div className="print-ticket-num">#{viewTicket.ticketNumber}</div>
+                  <div className="print-guest">
+                    <div className="print-guest-name">{viewTicket.guestName || 'Guest'}</div>
+                    {viewTicket.roomNumber && <div>Room: {viewTicket.roomNumber}</div>}
+                  </div>
+                  <div className="print-vehicle">
+                    <div><strong>Vehicle:</strong></div>
+                    <div>{viewTicket.carMake || ''} {viewTicket.carModel || ''}</div>
+                    <div>Color: {viewTicket.carColor || 'N/A'}</div>
+                    <div>Plate: {viewTicket.licensePlate || 'N/A'}</div>
+                  </div>
+                  {viewTicket.parkingLocation && (
+                    <div className="print-location">LOC: {viewTicket.parkingLocation}</div>
+                  )}
+                  <div className="print-footer">
+                    {viewTicket.createdAt 
+                      ? `${new Date(viewTicket.createdAt).toLocaleDateString()} ${new Date(viewTicket.createdAt).toLocaleTimeString()}`
+                      : ''}
+                  </div>
                 </div>
               </div>
             )}

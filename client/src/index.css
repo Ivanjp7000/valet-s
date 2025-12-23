@@ -157,3 +157,105 @@
   animation: bounce 2s infinite;
 }
 
+/* Print styles for thermal label printing */
+@media print {
+  @page {
+    size: 50mm 80mm;
+    margin: 0;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-label,
+  .print-label * {
+    visibility: visible;
+  }
+  
+  .print-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50mm;
+    height: 80mm;
+    padding: 5mm 4mm 3mm 4mm;
+    background: white;
+    color: black;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+  }
+  
+  .print-label .print-header {
+    text-align: center;
+    border-bottom: 0.4mm solid black;
+    padding-bottom: 1mm;
+  }
+  
+  .print-label .print-hotel {
+    font-size: 3.5mm;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  
+  .print-label .print-valet {
+    font-size: 2.5mm;
+    line-height: 1.1;
+  }
+  
+  .print-label .print-ticket-num {
+    text-align: center;
+    font-size: 8mm;
+    font-weight: bold;
+    line-height: 1;
+  }
+  
+  .print-label .print-guest {
+    font-size: 3mm;
+    line-height: 1.15;
+  }
+  
+  .print-label .print-guest-name {
+    font-weight: bold;
+  }
+  
+  .print-label .print-vehicle {
+    font-size: 2.8mm;
+    border-top: 0.3mm solid black;
+    padding-top: 1mm;
+    line-height: 1.15;
+  }
+  
+  .print-label .print-location {
+    font-size: 3.2mm;
+    font-weight: bold;
+    text-align: center;
+    background: #e5e5e5;
+    padding: 1mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .print-label .print-footer {
+    font-size: 2.2mm;
+    text-align: center;
+    border-top: 0.3mm solid black;
+    padding-top: 1mm;
+    line-height: 1.1;
+  }
+}
+
+/* Hide print label on screen */
+.print-label {
+  display: none;
+}
+
+@media print {
+  .print-label {
+    display: flex !important;
+  }
+}
+
