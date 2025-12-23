@@ -164,29 +164,35 @@
     margin: 0;
   }
   
-  body * {
-    visibility: hidden;
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 50mm !important;
+    height: 80mm !important;
+    overflow: hidden !important;
   }
   
-  .print-label,
-  .print-label * {
-    visibility: visible;
+  body > *:not(.print-label) {
+    display: none !important;
   }
   
   .print-label {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 50mm;
-    height: 80mm;
-    padding: 5mm 4mm 3mm 4mm;
-    background: white;
-    color: black;
-    font-family: Arial, sans-serif;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-sizing: border-box;
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 50mm !important;
+    height: 80mm !important;
+    padding: 5mm 4mm 3mm 4mm !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-family: Arial, sans-serif !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
   }
   
   .print-label .print-header {
@@ -251,11 +257,5 @@
 /* Hide print label on screen */
 .print-label {
   display: none;
-}
-
-@media print {
-  .print-label {
-    display: flex !important;
-  }
 }
 
