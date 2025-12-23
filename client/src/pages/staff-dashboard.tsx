@@ -1836,31 +1836,67 @@ export default function StaffDashboard() {
                         </body>
                         </html>
                       `;
-                      const iframe = document.createElement('iframe');
-                      iframe.style.position = 'fixed';
-                      iframe.style.right = '0';
-                      iframe.style.bottom = '0';
-                      iframe.style.width = '0';
-                      iframe.style.height = '0';
-                      iframe.style.border = '0';
-                      iframe.srcdoc = printContent;
-                      document.body.appendChild(iframe);
-
-                      iframe.onload = () => {
-                        const frameWindow = iframe.contentWindow;
-                        if (!frameWindow) {
-                          alert('Unable to open print preview');
-                          document.body.removeChild(iframe);
-                          return;
-                        }
-                        frameWindow.focus();
-                        frameWindow.print();
-                        setTimeout(() => {
-                          if (document.body.contains(iframe)) {
-                            document.body.removeChild(iframe);
+                      const printDiv = document.createElement('div');
+                      printDiv.id = 'print-ticket-label';
+                      printDiv.innerHTML = `
+                        <style>
+                          @media print {
+                            body > *:not(#print-ticket-label) { display: none !important; }
+                            #print-ticket-label { display: block !important; }
                           }
-                        }, 1000);
-                      };
+                          @media screen {
+                            #print-ticket-label { display: none; }
+                          }
+                          @page { size: 50mm 80mm; margin: 0; }
+                          #print-ticket-label {
+                            width: 50mm;
+                            height: 80mm;
+                            padding: 5mm 4mm 3mm 4mm;
+                            font-family: Arial, sans-serif;
+                            background: #fff;
+                            color: #000;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            box-sizing: border-box;
+                          }
+                          #print-ticket-label .header { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 1mm; }
+                          #print-ticket-label .hotel { font-size: 3.5mm; font-weight: 700; line-height: 1.1; }
+                          #print-ticket-label .valet { font-size: 2.5mm; line-height: 1.1; }
+                          #print-ticket-label .ticket-num { text-align: center; font-size: 8mm; font-weight: bold; line-height: 1; }
+                          #print-ticket-label .guest { font-size: 3mm; line-height: 1.15; }
+                          #print-ticket-label .guest-name { font-weight: bold; }
+                          #print-ticket-label .vehicle { font-size: 2.8mm; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.15; }
+                          #print-ticket-label .location { font-size: 3.2mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 1mm; }
+                          #print-ticket-label .footer { font-size: 2.2mm; text-align: center; border-top: 0.3mm solid #000; padding-top: 1mm; line-height: 1.1; }
+                        </style>
+                        <div class="header">
+                          <div class="hotel">ST. REGIS OSAKA</div>
+                          <div class="valet">VALET PARKING</div>
+                        </div>
+                        <div class="ticket-num">#${viewTicket.ticketNumber}</div>
+                        <div class="guest">
+                          <div class="guest-name">${viewTicket.guestName || 'Guest'}</div>
+                          ${viewTicket.roomNumber ? '<div>Room: ' + viewTicket.roomNumber + '</div>' : ''}
+                        </div>
+                        <div class="vehicle">
+                          <div><strong>Vehicle:</strong></div>
+                          <div>${viewTicket.carMake || ''} ${viewTicket.carModel || ''}</div>
+                          <div>Color: ${viewTicket.carColor || 'N/A'}</div>
+                          <div>Plate: ${viewTicket.licensePlate || 'N/A'}</div>
+                        </div>
+                        ${viewTicket.parkingLocation ? '<div class="location">LOC: ' + viewTicket.parkingLocation + '</div>' : ''}
+                        <div class="footer">
+                          ${viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() + ' ' + new Date(viewTicket.createdAt).toLocaleTimeString() : ''}
+                        </div>
+                      `;
+                      document.body.appendChild(printDiv);
+                      window.print();
+                      setTimeout(() => {
+                        if (document.body.contains(printDiv)) {
+                          document.body.removeChild(printDiv);
+                        }
+                      }, 500);
                     }}
                     className="flex items-center gap-2"
                     data-testid="button-print-ticket"
