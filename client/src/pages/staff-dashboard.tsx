@@ -1787,26 +1787,22 @@ export default function StaffDashboard() {
   <title>Ticket #${ticket.ticketNumber}</title>
   <style>
     @page { 
-      size: 2in 3.15in; 
+      size: 50mm 70mm; 
       margin: 0; 
     }
     @media print {
       html, body {
-        width: 2in !important;
-        height: 3.15in !important;
+        width: 50mm !important;
+        height: 70mm !important;
         margin: 0 !important;
         padding: 0 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
-      body {
-        transform: scale(1) !important;
-        transform-origin: top left !important;
-      }
     }
     html, body { 
-      width: 2in; 
-      height: 3.15in; 
+      width: 50mm; 
+      height: 70mm; 
       margin: 0; 
       padding: 0; 
     }
@@ -1816,15 +1812,15 @@ export default function StaffDashboard() {
       flex-direction: column; 
       justify-content: space-between; 
       box-sizing: border-box; 
-      padding: 0.2in 0.15in 0.12in 0.15in; 
+      padding: 3mm 3mm 2mm 3mm; 
     }
-    h1 { font-size: 14pt; font-weight: 700; text-align: center; margin: 0; }
-    h2 { font-size: 10pt; text-align: center; margin: 0 0 8pt; }
-    .ticket-number { font-size: 32pt; font-weight: 700; text-align: center; margin: 8pt 0; }
-    .section { font-size: 12pt; line-height: 1.2; }
-    .section strong { display: block; font-size: 11pt; margin-bottom: 2pt; }
-    .location { font-size: 13pt; font-weight: 700; text-align: center; background: #e5e5e5; padding: 4pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .footer { font-size: 9pt; text-align: center; border-top: 1pt solid #000; padding-top: 4pt; }
+    h1 { font-size: 12pt; font-weight: 700; text-align: center; margin: 0; }
+    h2 { font-size: 8pt; text-align: center; margin: 0 0 4pt; }
+    .ticket-number { font-size: 26pt; font-weight: 700; text-align: center; margin: 4pt 0; }
+    .section { font-size: 10pt; line-height: 1.15; }
+    .section strong { display: block; font-size: 9pt; margin-bottom: 1pt; }
+    .location { font-size: 11pt; font-weight: 700; text-align: center; background: #e5e5e5; padding: 3pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .footer { font-size: 7pt; text-align: center; border-top: 0.5pt solid #000; padding-top: 2pt; }
   </style>
 </head>
 <body>
