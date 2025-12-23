@@ -1789,26 +1789,27 @@ export default function StaffDashboard() {
                           <style>
                             @page { size: 50mm 80mm; margin: 0; }
                             * { margin: 0; padding: 0; box-sizing: border-box; }
-                            html, body { width: 50mm; height: 80mm; margin: 0; }
+                            html, body { width: 50mm; height: 80mm; margin: 0; overflow: hidden; }
                             body { 
-                              padding: 8mm 5mm 6mm 5mm;
+                              padding: 6mm 4mm 4mm 4mm;
                               font-family: Arial, sans-serif;
                               background: #fff;
                               color: #000;
                               display: flex;
                               flex-direction: column;
                               justify-content: space-between;
-                              gap: 2.5mm;
+                              gap: 1mm;
+                              page-break-inside: avoid;
                             }
-                            .header { text-align: center; border-bottom: 0.5mm solid #000; padding-bottom: 2mm; }
-                            .hotel { font-size: 5mm; font-weight: 700; line-height: 1.15; }
-                            .valet { font-size: 3.6mm; line-height: 1.15; }
-                            .ticket-num { text-align: center; font-size: 12mm; font-weight: bold; letter-spacing: 0.8mm; line-height: 1; padding: 2mm 0; }
-                            .guest { font-size: 4.2mm; line-height: 1.25; }
+                            .header { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 1.5mm; }
+                            .hotel { font-size: 4mm; font-weight: 700; line-height: 1.1; }
+                            .valet { font-size: 3mm; line-height: 1.1; }
+                            .ticket-num { text-align: center; font-size: 10mm; font-weight: bold; letter-spacing: 0.5mm; line-height: 1; padding: 1.5mm 0; }
+                            .guest { font-size: 3.5mm; line-height: 1.2; }
                             .guest-name { font-weight: bold; }
-                            .vehicle { font-size: 3.8mm; border-top: 0.4mm solid #000; padding-top: 2mm; line-height: 1.25; }
-                            .location { font-size: 4.8mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 3mm 2mm; }
-                            .footer { font-size: 3.4mm; text-align: center; border-top: 0.4mm solid #000; padding-top: 2mm; line-height: 1.2; }
+                            .vehicle { font-size: 3.2mm; border-top: 0.3mm solid #000; padding-top: 1.5mm; line-height: 1.2; }
+                            .location { font-size: 4mm; font-weight: bold; text-align: center; background: #e5e5e5; padding: 2mm; }
+                            .footer { font-size: 2.8mm; text-align: center; border-top: 0.3mm solid #000; padding-top: 1.5mm; line-height: 1.1; }
                           </style>
                         </head>
                         <body>
