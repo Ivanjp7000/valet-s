@@ -14,7 +14,7 @@ import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/active-retrieval-progress";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown, Printer } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1775,7 +1775,16 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-4 border-t">
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2"
+                    data-testid="button-print-ticket"
+                  >
+                    <Printer size={16} />
+                    Print
+                  </Button>
                   <Button variant="outline" onClick={() => setViewTicket(null)}>
                     Close
                   </Button>
@@ -1784,6 +1793,45 @@ export default function StaffDashboard() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Printable Ticket Label for Phomemo (50mm x 80mm) */}
+        {viewTicket && (
+          <div className="print-ticket-label">
+            <div style={{ textAlign: 'center', borderBottom: '2px solid black', paddingBottom: '2mm', marginBottom: '2mm' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 'bold' }}>ST. REGIS OSAKA</div>
+              <div style={{ fontSize: '6pt' }}>VALET PARKING</div>
+            </div>
+            
+            <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
+              <div style={{ fontSize: '24pt', fontWeight: 'bold', letterSpacing: '2px' }}>
+                #{viewTicket.ticketNumber}
+              </div>
+            </div>
+            
+            <div style={{ fontSize: '8pt', marginBottom: '2mm' }}>
+              <div style={{ fontWeight: 'bold' }}>{viewTicket.guestName || 'Guest'}</div>
+              {viewTicket.roomNumber && <div>Room: {viewTicket.roomNumber}</div>}
+            </div>
+            
+            <div style={{ fontSize: '7pt', marginBottom: '2mm', borderTop: '1px solid black', paddingTop: '2mm' }}>
+              <div><strong>Vehicle:</strong></div>
+              <div>{viewTicket.carMake} {viewTicket.carModel}</div>
+              <div>Color: {viewTicket.carColor || 'N/A'}</div>
+              <div>Plate: {viewTicket.licensePlate || 'N/A'}</div>
+            </div>
+            
+            {viewTicket.parkingLocation && (
+              <div style={{ fontSize: '9pt', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f0f0f0', padding: '2mm', marginBottom: '2mm' }}>
+                LOC: {viewTicket.parkingLocation}
+              </div>
+            )}
+            
+            <div style={{ fontSize: '6pt', textAlign: 'center', borderTop: '1px solid black', paddingTop: '2mm' }}>
+              <div>{viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleDateString() : ''}</div>
+              <div>{viewTicket.createdAt ? new Date(viewTicket.createdAt).toLocaleTimeString() : ''}</div>
+            </div>
+          </div>
+        )}
 
         {/* Edit Ticket Modal */}
         <Dialog open={!!editTicketData} onOpenChange={() => setEditTicketData(null)}>

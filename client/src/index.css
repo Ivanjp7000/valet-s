@@ -156,3 +156,48 @@
 .animate-bounce-gentle {
   animation: bounce 2s infinite;
 }
+
+/* Print styles for Phomemo label printer (50mm x 80mm labels) */
+@media print {
+  @page {
+    size: 50mm 80mm;
+    margin: 0;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-ticket-label,
+  .print-ticket-label * {
+    visibility: visible;
+  }
+  
+  .print-ticket-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 50mm;
+    height: 80mm;
+    padding: 3mm;
+    box-sizing: border-box;
+    background: white;
+    color: black;
+    font-family: Arial, sans-serif;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Printable ticket label component */
+.print-ticket-label {
+  display: none;
+}
+
+@media print {
+  .print-ticket-label {
+    display: block !important;
+  }
+}
