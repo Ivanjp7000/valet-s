@@ -1836,18 +1836,31 @@ export default function StaffDashboard() {
                         </body>
                         </html>
                       `;
-                      const printWindow = window.open('', '_blank', 'width=200,height=320');
-                      if (printWindow) {
-                        printWindow.document.open();
-                        printWindow.document.write(printContent);
-                        printWindow.document.close();
-                        printWindow.focus();
+                      const iframe = document.createElement('iframe');
+                      iframe.style.position = 'fixed';
+                      iframe.style.right = '0';
+                      iframe.style.bottom = '0';
+                      iframe.style.width = '0';
+                      iframe.style.height = '0';
+                      iframe.style.border = '0';
+                      iframe.srcdoc = printContent;
+                      document.body.appendChild(iframe);
+
+                      iframe.onload = () => {
+                        const frameWindow = iframe.contentWindow;
+                        if (!frameWindow) {
+                          alert('Unable to open print preview');
+                          document.body.removeChild(iframe);
+                          return;
+                        }
+                        frameWindow.focus();
+                        frameWindow.print();
                         setTimeout(() => {
-                          printWindow.print();
-                        }, 500);
-                      } else {
-                        alert('Please allow popups to print tickets');
-                      }
+                          if (document.body.contains(iframe)) {
+                            document.body.removeChild(iframe);
+                          }
+                        }, 1000);
+                      };
                     }}
                     className="flex items-center gap-2"
                     data-testid="button-print-ticket"
