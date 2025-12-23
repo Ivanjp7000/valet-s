@@ -20,7 +20,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, User as UserType } from "@shared/schema";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
 function GuestOutCard({ ticket, onBack, canEdit = true }: { ticket: ValetTicket; onBack: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -1782,179 +1782,124 @@ export default function StaffDashboard() {
                     onClick={async () => {
                       const ticket = viewTicket;
                       try {
-                        // Create PDF with exact 50mm x 70mm dimensions
-                        // 1 mm = 2.834645669 points
-                        const widthPt = 50 * 2.834645669;  // 141.73 pt
-                        const heightPt = 70 * 2.834645669; // 198.43 pt
+                        // Convert mm to points (72 points per inch, 25.4 mm per inch)
+                        const mm = (value: number) => (value * 72) / 25.4;
+                        
+                        // Label dimensions - 50mm x 70mm
+                        const labelWidthMm = 50;
+                        const labelHeightMm = 70;
+                        const widthPt = mm(labelWidthMm);
+                        const heightPt = mm(labelHeightMm);
                         
                         const pdfDoc = await PDFDocument.create();
                         const page = pdfDoc.addPage([widthPt, heightPt]);
+                        
+                        // Set all page boxes to ensure correct dimensions
+                        page.setMediaBox(0, 0, widthPt, heightPt);
+                        page.setCropBox(0, 0, widthPt, heightPt);
+                        page.setBleedBox(0, 0, widthPt, heightPt);
+                        
                         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-                        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+                        const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
                         
-                        // Use larger fonts and spacing to fill the entire label
-                        const margin = 8;
-                        const topMargin = 8;
-                        const bottomMargin = 12;
+                        // Cursor starts at top of page minus top margin
+                        let cursorY = heightPt - mm(3);
                         
-                        let y = heightPt - topMargin;
+                        // Helper function to draw text and move cursor
+                        const drawText = (options: { 
+                          text: string; 
+                          size: number; 
+                          face?: PDFFont; 
+                          align?: "left" | "center"; 
+                          gapMm?: number;
+                        }) => {
+                          const { text, size, face = font, align = "left", gapMm = 1.5 } = options;
+                          cursorY -= size; // Move cursor down by font size
+                          const textWidth = face.widthOfTextAtSize(text, size);
+                          const textX = align === "center" ? (widthPt - textWidth) / 2 : mm(4);
+                          page.drawText(text, { 
+                            x: textX, 
+                            y: cursorY, 
+                            size, 
+                            font: face, 
+                            color: rgb(0, 0, 0) 
+                          });
+                          cursorY -= mm(gapMm); // Add gap after text
+                        };
                         
-                        // Header - ST. REGIS OSAKA (larger)
-                        const hotelText = "ST. REGIS OSAKA";
-                        const hotelSize = 14;
-                        const hotelWidth = fontBold.widthOfTextAtSize(hotelText, hotelSize);
-                        page.drawText(hotelText, {
-                          x: (widthPt - hotelWidth) / 2,
-                          y: y - hotelSize,
-                          size: hotelSize,
-                          font: fontBold,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= hotelSize + 4;
-                        
-                        // VALET PARKING
-                        const valetText = "VALET PARKING";
-                        const valetSize = 10;
-                        const valetWidth = font.widthOfTextAtSize(valetText, valetSize);
-                        page.drawText(valetText, {
-                          x: (widthPt - valetWidth) / 2,
-                          y: y - valetSize,
-                          size: valetSize,
-                          font: font,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= valetSize + 6;
+                        // Header
+                        drawText({ text: "ST. REGIS OSAKA", size: 14, face: bold, align: "center" });
+                        drawText({ text: "VALET PARKING", size: 10, align: "center" });
                         
                         // Divider line
-                        page.drawLine({
-                          start: { x: margin, y: y },
-                          end: { x: widthPt - margin, y: y },
-                          thickness: 1,
-                          color: rgb(0, 0, 0),
+                        page.drawLine({ 
+                          start: { x: mm(4), y: cursorY }, 
+                          end: { x: widthPt - mm(4), y: cursorY }, 
+                          thickness: 1, 
+                          color: rgb(0, 0, 0) 
                         });
-                        y -= 16;
+                        cursorY -= mm(5);
                         
-                        // Ticket number - VERY BIG
-                        const ticketText = `#${ticket.ticketNumber}`;
-                        const ticketSize = 36;
-                        const ticketWidth = fontBold.widthOfTextAtSize(ticketText, ticketSize);
-                        page.drawText(ticketText, {
-                          x: (widthPt - ticketWidth) / 2,
-                          y: y - ticketSize,
-                          size: ticketSize,
-                          font: fontBold,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= ticketSize + 12;
+                        // Ticket number - large
+                        drawText({ text: `#${ticket.ticketNumber}`, size: 32, face: bold, align: "center", gapMm: 4 });
                         
-                        // Guest name (larger)
-                        const guestName = ticket.guestName || 'Guest';
-                        const guestSize = 14;
-                        page.drawText(guestName, {
-                          x: margin,
-                          y: y - guestSize,
-                          size: guestSize,
-                          font: fontBold,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= guestSize + 6;
-                        
-                        // Room number
+                        // Guest info
+                        drawText({ text: ticket.guestName || "Guest", size: 14, face: bold });
                         if (ticket.roomNumber) {
-                          const roomSize = 12;
-                          page.drawText(`Room: ${ticket.roomNumber}`, {
-                            x: margin,
-                            y: y - roomSize,
-                            size: roomSize,
-                            font: font,
-                            color: rgb(0, 0, 0),
-                          });
-                          y -= roomSize + 6;
+                          drawText({ text: `Room: ${ticket.roomNumber}`, size: 11 });
                         }
                         
                         // Vehicle section
-                        const vehicleHeaderSize = 11;
-                        page.drawText("Vehicle:", {
-                          x: margin,
-                          y: y - vehicleHeaderSize,
-                          size: vehicleHeaderSize,
-                          font: fontBold,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= vehicleHeaderSize + 4;
-                        
+                        drawText({ text: "Vehicle", size: 11, face: bold, gapMm: 0.5 });
                         const carInfo = [ticket.carMake, ticket.carModel].filter(Boolean).join(' ');
-                        const detailSize = 11;
                         if (carInfo) {
-                          page.drawText(carInfo, {
-                            x: margin,
-                            y: y - detailSize,
-                            size: detailSize,
-                            font: font,
-                            color: rgb(0, 0, 0),
-                          });
-                          y -= detailSize + 3;
+                          drawText({ text: carInfo, size: 11 });
                         }
+                        drawText({ text: `Color: ${ticket.carColor || 'N/A'}`, size: 11 });
+                        drawText({ text: `Plate: ${ticket.licensePlate || 'N/A'}`, size: 11 });
                         
-                        page.drawText(`Color: ${ticket.carColor || 'N/A'}`, {
-                          x: margin,
-                          y: y - detailSize,
-                          size: detailSize,
-                          font: font,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= detailSize + 3;
-                        
-                        page.drawText(`Plate: ${ticket.licensePlate || 'N/A'}`, {
-                          x: margin,
-                          y: y - detailSize,
-                          size: detailSize,
-                          font: font,
-                          color: rgb(0, 0, 0),
-                        });
-                        y -= detailSize + 8;
-                        
-                        // Location box (larger)
+                        // Location box
                         if (ticket.parkingLocation) {
-                          const locBoxHeight = 20;
-                          page.drawRectangle({
-                            x: margin,
-                            y: y - locBoxHeight,
-                            width: widthPt - (margin * 2),
-                            height: locBoxHeight,
-                            color: rgb(0.9, 0.9, 0.9),
+                          const boxHeight = mm(10);
+                          cursorY -= boxHeight;
+                          page.drawRectangle({ 
+                            x: mm(4), 
+                            y: cursorY, 
+                            width: widthPt - mm(8), 
+                            height: boxHeight, 
+                            color: rgb(0.9, 0.9, 0.9) 
                           });
                           const locText = `LOC: ${ticket.parkingLocation}`;
-                          const locSize = 13;
-                          const locWidth = fontBold.widthOfTextAtSize(locText, locSize);
-                          page.drawText(locText, {
-                            x: (widthPt - locWidth) / 2,
-                            y: y - locBoxHeight + 5,
-                            size: locSize,
-                            font: fontBold,
-                            color: rgb(0, 0, 0),
+                          const locWidth = bold.widthOfTextAtSize(locText, 13);
+                          page.drawText(locText, { 
+                            x: (widthPt - locWidth) / 2, 
+                            y: cursorY + mm(3), 
+                            size: 13, 
+                            font: bold,
+                            color: rgb(0, 0, 0)
                           });
-                          y -= locBoxHeight + 6;
+                          cursorY -= mm(2);
                         }
                         
-                        // Footer with date at bottom
-                        page.drawLine({
-                          start: { x: margin, y: bottomMargin + 12 },
-                          end: { x: widthPt - margin, y: bottomMargin + 12 },
-                          thickness: 0.5,
-                          color: rgb(0, 0, 0),
+                        // Footer - always at bottom
+                        page.drawLine({ 
+                          start: { x: mm(4), y: mm(6) }, 
+                          end: { x: widthPt - mm(4), y: mm(6) }, 
+                          thickness: 0.5, 
+                          color: rgb(0, 0, 0) 
                         });
                         
-                        const dateText = ticket.createdAt ? new Date(ticket.createdAt).toLocaleString() : '';
-                        const dateSize = 8;
-                        const dateWidth = font.widthOfTextAtSize(dateText, dateSize);
-                        page.drawText(dateText, {
-                          x: (widthPt - dateWidth) / 2,
-                          y: bottomMargin,
-                          size: dateSize,
-                          font: font,
-                          color: rgb(0, 0, 0),
-                        });
+                        if (ticket.createdAt) {
+                          const dateText = new Date(ticket.createdAt).toLocaleString();
+                          const dateWidth = font.widthOfTextAtSize(dateText, 8);
+                          page.drawText(dateText, { 
+                            x: (widthPt - dateWidth) / 2, 
+                            y: mm(2), 
+                            size: 8, 
+                            font,
+                            color: rgb(0, 0, 0)
+                          });
+                        }
                         
                         // Generate PDF and open for printing
                         const pdfBytes = await pdfDoc.save();
@@ -1962,14 +1907,7 @@ export default function StaffDashboard() {
                         const url = URL.createObjectURL(blob);
                         
                         // Open PDF in new tab for printing
-                        const printWindow = window.open(url, '_blank');
-                        if (printWindow) {
-                          printWindow.onload = () => {
-                            setTimeout(() => {
-                              printWindow.print();
-                            }, 500);
-                          };
-                        }
+                        window.open(url, '_blank');
                       } catch (error) {
                         console.error('PDF generation error:', error);
                       }

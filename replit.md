@@ -100,6 +100,17 @@ Preferred communication style: Simple, everyday language.
 - **Framer Motion**: Animation library for smooth UI transitions
 - **Tesseract.js**: OCR library for ticket number scanning from camera
 - **Date-fns**: Date manipulation and formatting utilities
+- **pdf-lib**: Client-side PDF generation for thermal label printing
+
+## Thermal Label Printing
+- **Printer**: Phomemo thermal printer (50mm x 70mm labels)
+- **Technology**: Client-side PDF generation using pdf-lib
+- **Implementation**: Generates PDF with exact page dimensions (50mm x 70mm) and opens in new tab for printing
+- **Key considerations**: 
+  - Uses MediaBox, CropBox, BleedBox for printer compatibility
+  - Cursor-based layout fills entire label from top to bottom
+  - Footer positioned at fixed bottom margin
+  - Requires printer paper size to match label dimensions (50x70mm)
 
 ## Development Tools
 - **Vite**: Frontend build tool with HMR and development server
