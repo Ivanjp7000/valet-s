@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, getSession } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User } from "@shared/schema";
 import { z } from "zod";
@@ -148,7 +148,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
-      res.json(ticket);
+      // Return only status fields - no PII for public endpoint
+      res.json({
+        ticketNumber: ticket.ticketNumber,
+        status: ticket.status,
+        createdAt: ticket.createdAt,
+        updatedAt: ticket.updatedAt,
+      });
     } catch (error) {
       console.error("Error fetching ticket:", error);
       res.status(500).json({ message: "Failed to fetch ticket" });
@@ -985,7 +991,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/tickets", isAuthenticated, requireReadAccess, async (req: any, res) => {
+  app.get("/api/admin/tickets", isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const user = req.currentUser;
       const scopedLocationIds = await getUserScopedLocationIds(user);
@@ -1215,19 +1221,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const clients = new Set<WebSocket>();
+  const sessionParser = getSession();
 
-  wss.on('connection', (ws) => {
-    clients.add(ws);
-    console.log('Client connected to WebSocket');
+  wss.on('connection', (ws, request: any) => {
+    // Validate session before accepting the WebSocket connection
+    sessionParser(request, {} as any, () => {
+      const localUserId = request.session?.user?.claims?.sub;
+      const passportUserId = request.session?.passport?.user?.claims?.sub;
 
-    ws.on('close', () => {
-      clients.delete(ws);
-      console.log('Client disconnected from WebSocket');
-    });
+      if (!localUserId && !passportUserId) {
+        ws.close(1008, 'Unauthorized');
+        return;
+      }
 
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-      clients.delete(ws);
+      clients.add(ws);
+      console.log('Authenticated client connected to WebSocket');
+
+      ws.on('close', () => {
+        clients.delete(ws);
+        console.log('Client disconnected from WebSocket');
+      });
+
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+        clients.delete(ws);
+      });
     });
   });
 

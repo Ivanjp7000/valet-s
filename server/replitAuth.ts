@@ -57,9 +57,20 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  // Check if this user should be superadmin based on email or ID
-  const isAdmin = claims["email"] === "ivan@xen-jp.com" || claims["sub"] === "15452703";
-  
+  // Check if this user should be superadmin based on env-configured emails/IDs
+  const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map(e => e.trim())
+    .filter(Boolean);
+  const superAdminIds = (process.env.SUPER_ADMIN_IDS ?? "")
+    .split(",")
+    .map(id => id.trim())
+    .filter(Boolean);
+
+  const isAdmin =
+    superAdminEmails.includes(claims["email"]) ||
+    superAdminIds.includes(claims["sub"]);
+
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
