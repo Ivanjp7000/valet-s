@@ -47,6 +47,7 @@ const COLOR_STYLES: Record<string, { bg: string; text: string; border: string }>
   'Black': { bg: 'bg-black', text: 'text-white', border: 'border-black' },
   'White': { bg: 'bg-white', text: 'text-gray-800', border: 'border-gray-300' },
   'Silver': { bg: 'bg-gray-300', text: 'text-gray-800', border: 'border-gray-400' },
+  'Grey': { bg: 'bg-gray-500', text: 'text-white', border: 'border-gray-600' },
   'Gray': { bg: 'bg-gray-500', text: 'text-white', border: 'border-gray-600' },
   'Red': { bg: 'bg-red-600', text: 'text-white', border: 'border-red-700' },
   'Blue': { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' },
@@ -103,6 +104,37 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const handleRemoveBrand = (brand: string) => {
     saveBrands(quickBrands.filter(b => b !== brand));
+  };
+
+  const DEFAULT_COLORS = ['Black', 'Silver', 'White', 'Grey', 'Red', 'Blue', 'Green', 'Brown'];
+
+  const [quickColors, setQuickColors] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('valet-quick-colors');
+      return saved ? JSON.parse(saved) : DEFAULT_COLORS;
+    } catch {
+      return DEFAULT_COLORS;
+    }
+  });
+  const [editingColors, setEditingColors] = useState(false);
+  const [newColorInput, setNewColorInput] = useState("");
+
+  const saveColors = (colors: string[]) => {
+    setQuickColors(colors);
+    localStorage.setItem('valet-quick-colors', JSON.stringify(colors));
+  };
+
+  const handleAddColor = () => {
+    const trimmed = newColorInput.trim();
+    if (!trimmed || quickColors.map(c => c.toLowerCase()).includes(trimmed.toLowerCase())) return;
+    const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    saveColors([...quickColors, capitalized]);
+    setNewColorInput("");
+  };
+
+  const handleRemoveColor = (color: string) => {
+    saveColors(quickColors.filter(c => c !== color));
+    if (formData.carColor === color) setFormData({ ...formData, carColor: "" });
   };
 
   const [formData, setFormData] = useState<TicketFormData>({
@@ -375,7 +407,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700">Model / Name</label>
+            <label className="text-sm font-medium text-gray-700">Model</label>
             <Input
               value={formData.carModel}
               onChange={(e) => setFormData({ ...formData, carModel: e.target.value })}
@@ -386,27 +418,82 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700">Color</label>
-            <div className="grid grid-cols-5 gap-2 mt-2">
-              {CAR_COLORS.map((color) => {
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">Color</label>
+              {!editingColors && (
+                <button
+                  type="button"
+                  onClick={() => setEditingColors(true)}
+                  className="flex items-center gap-1 text-xs font-medium border border-red-300 bg-red-50 text-red-500 hover:bg-red-100 hover:border-red-400 rounded-md px-2 py-1 transition-colors"
+                >
+                  <Plus size={12} />
+                  Edit
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {quickColors.map((color) => {
                 const colorStyle = COLOR_STYLES[color] || COLOR_STYLES['Other'];
                 const isSelected = formData.carColor === color;
                 return (
-                  <button
-                    key={color}
-                    onClick={() => setFormData({ ...formData, carColor: color })}
-                    className={`p-2 rounded-lg border-2 text-xs font-medium transition-all ${colorStyle.bg} ${colorStyle.text} ${
-                      isSelected 
-                        ? "ring-2 ring-regis-gold ring-offset-2 scale-105" 
-                        : `${colorStyle.border} hover:scale-105`
-                    }`}
-                    data-testid={`color-${color}`}
-                  >
-                    {color}
-                  </button>
+                  <div key={color} className="relative">
+                    {editingColors ? (
+                      <span className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border-2 ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border}`}>
+                        {color}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveColor(color)}
+                          className="ml-0.5 opacity-70 hover:opacity-100 transition-opacity"
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, carColor: color })}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border} ${
+                          isSelected ? "ring-2 ring-regis-gold ring-offset-2 scale-105" : "hover:scale-105"
+                        }`}
+                        data-testid={`color-${color}`}
+                      >
+                        {color}
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
+
+            {editingColors && (
+              <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newColorInput}
+                    onChange={(e) => setNewColorInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddColor()}
+                    placeholder="Type a color name and press Add"
+                    className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:border-regis-gold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddColor}
+                    disabled={!newColorInput.trim()}
+                    className="px-3 py-1.5 text-xs font-medium bg-regis-navy text-white rounded-md hover:bg-blue-900 disabled:opacity-40 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setEditingColors(false); setNewColorInput(""); }}
+                  className="w-full text-xs font-medium text-regis-gold hover:text-yellow-600 py-1 transition-colors"
+                >
+                  Done Editing
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
