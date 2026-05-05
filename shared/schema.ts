@@ -251,7 +251,7 @@ export const CAR_MAKES = [
   'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Isuzu', 'Jaguar', 
   'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Lincoln', 
   'Lotus', 'Maserati', 'Mazda', 'McLaren', 'Mercedes-Benz', 'Mini', 
-  'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Ram', 'Renault',
+  'Mini Cooper', 'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Ram', 'Renault',
   'Rolls-Royce', 'Saab', 'Subaru', 'Suzuki', 'Tesla', 'Toyota', 
   'Volkswagen', 'Volvo'
 ] as const;

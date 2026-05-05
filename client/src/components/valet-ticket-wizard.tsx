@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +68,15 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const [showPreview, setShowPreview] = useState(false);
   const [carMakeSearch, setCarMakeSearch] = useState("");
   const [showCarMakeDropdown, setShowCarMakeDropdown] = useState(false);
+  const [showBrandGrid, setShowBrandGrid] = useState(false);
+
+  const QUICK_BRANDS = [
+    'Toyota', 'Lexus', 'Honda', 'Nissan', 'Mazda', 'Subaru',
+    'Mitsubishi', 'Suzuki', 'Daihatsu', 'Mercedes-Benz', 'BMW', 'Audi',
+    'Volkswagen', 'Porsche', 'Ferrari', 'Lamborghini', 'Maserati', 'Alfa Romeo',
+    'Peugeot', 'Renault', 'Citroën', 'Rolls-Royce', 'Bentley', 'Aston Martin',
+    'Jaguar', 'Land Rover', 'Lotus', 'McLaren', 'Mini Cooper', 'Volvo',
+  ];
 
   const [formData, setFormData] = useState<TicketFormData>({
     visitorType: "",
@@ -228,7 +237,40 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Vehicle Details</h3>
         <div className="space-y-3">
           <div className="relative">
-            <label className="text-sm font-medium text-gray-700">Car Make</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium text-gray-700">Car Make</label>
+              <button
+                type="button"
+                onClick={() => setShowBrandGrid(!showBrandGrid)}
+                className="flex items-center gap-1 text-xs font-medium text-regis-gold hover:text-yellow-600 border border-regis-gold hover:border-yellow-600 rounded-md px-2 py-1 transition-colors"
+              >
+                {showBrandGrid ? <ChevronUp size={12} /> : <Plus size={12} />}
+                {showBrandGrid ? "Hide Brands" : "Add Brand"}
+              </button>
+            </div>
+            {showBrandGrid && (
+              <div className="flex flex-wrap gap-2 mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {QUICK_BRANDS.map((brand) => (
+                  <button
+                    key={brand}
+                    type="button"
+                    onClick={() => {
+                      setFormData({ ...formData, carMake: brand });
+                      setCarMakeSearch(brand);
+                      setShowCarMakeDropdown(false);
+                      setShowBrandGrid(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                      formData.carMake === brand
+                        ? "bg-regis-gold border-regis-gold text-white"
+                        : "bg-white border-gray-300 text-gray-700 hover:border-regis-gold hover:text-regis-gold"
+                    }`}
+                  >
+                    {brand}
+                  </button>
+                ))}
+              </div>
+            )}
             <Input
               value={carMakeSearch}
               onChange={(e) => {
