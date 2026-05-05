@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useOCR } from "@/hooks/useOCR";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,7 @@ interface TicketFormData {
   carModel: string;
   carColor: string;
   platePhotoUrl: string;
+  licensePlate: string;
   guestName: string;
   roomNumber: string;
   ticketNumber: string;
@@ -137,6 +139,9 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     if (formData.carColor === color) setFormData({ ...formData, carColor: "" });
   };
 
+  const { recognizeText } = useOCR();
+  const [isOcrRunning, setIsOcrRunning] = useState(false);
+
   const [formData, setFormData] = useState<TicketFormData>({
     visitorType: "",
     visitorSubType: "",
@@ -144,6 +149,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     carModel: "",
     carColor: "",
     platePhotoUrl: "",
+    licensePlate: "",
     guestName: "",
     roomNumber: "",
     ticketNumber: "",
@@ -173,6 +179,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         carModel: data.carModel,
         carColor: data.carColor,
         platePhotoUrl: data.platePhotoUrl || null,
+        licensePlate: data.licensePlate || null,
         createdByUserId: user?.id,
         createdByName: staffName,
         locationId: user?.locationId || null,
@@ -203,6 +210,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       carModel: "",
       carColor: "",
       platePhotoUrl: "",
+      licensePlate: "",
       guestName: "",
       roomNumber: "",
       ticketNumber: "",
@@ -215,7 +223,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     (formData.visitorType !== "restaurant" || formData.visitorSubType) &&
     formData.carMake && formData.carModel && formData.carColor;
 
-  const canProceedStep2 = formData.guestName.trim().length > 0 && formData.platePhotoUrl.length > 0;
+  const canProceedStep2 = formData.guestName.trim().length > 0 && formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
 
   const canProceedStep3 = formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber);
 
@@ -512,10 +520,13 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 alt="License plate" 
                 className="max-h-32 mx-auto rounded"
               />
+              {isOcrRunning && (
+                <p className="text-sm text-regis-navy animate-pulse">Reading plate number...</p>
+              )}
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => setFormData({ ...formData, platePhotoUrl: "" })}
+                onClick={() => setFormData({ ...formData, platePhotoUrl: "", licensePlate: "" })}
               >
                 Remove Photo
               </Button>
@@ -533,12 +544,23 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                     input.type = 'file';
                     input.accept = 'image/*';
                     input.capture = 'environment';
-                    input.onchange = (e) => {
+                    input.onchange = async (e) => {
                       const file = (e.target as HTMLInputElement).files?.[0];
                       if (file) {
                         const reader = new FileReader();
-                        reader.onload = (e) => {
-                          setFormData({ ...formData, platePhotoUrl: e.target?.result as string });
+                        reader.onload = async (ev) => {
+                          const dataUrl = ev.target?.result as string;
+                          setFormData(prev => ({ ...prev, platePhotoUrl: dataUrl, licensePlate: "" }));
+                          setIsOcrRunning(true);
+                          try {
+                            const rawText = await recognizeText(dataUrl);
+                            const cleaned = rawText.replace(/\s+/g, ' ').trim();
+                            setFormData(prev => ({ ...prev, licensePlate: cleaned }));
+                          } catch {
+                            // OCR failed — leave field empty for manual entry
+                          } finally {
+                            setIsOcrRunning(false);
+                          }
                         };
                         reader.readAsDataURL(file);
                       }
@@ -555,6 +577,25 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             </div>
           )}
         </div>
+
+        {formData.platePhotoUrl && (
+          <div className="mt-4 space-y-1">
+            <label className="text-sm font-medium text-gray-700">
+              Plate Number <span className="text-gray-400 font-normal">(confirm or correct)</span>
+            </label>
+            <Input
+              value={formData.licensePlate}
+              onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value })}
+              placeholder={isOcrRunning ? "Reading..." : "e.g. 品川 500 あ 1234"}
+              disabled={isOcrRunning}
+              className="text-center font-mono text-lg tracking-widest"
+              data-testid="input-license-plate"
+            />
+            {!isOcrRunning && formData.licensePlate.trim().length === 0 && (
+              <p className="text-xs text-red-500">* Plate number is required to proceed</p>
+            )}
+          </div>
+        )}
       </div>
 
       <div>
@@ -601,12 +642,12 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
               <Input
                 value={formData.ticketNumber}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 5);
                   setFormData({ ...formData, ticketNumber: value });
                 }}
-                placeholder="Enter ticket number (e.g., 12345 or 123456)"
+                placeholder="Enter 5-digit ticket number (e.g., 12345)"
                 className="mt-1 text-center text-2xl font-bold tracking-widest"
-                maxLength={6}
+                maxLength={5}
                 data-testid="input-ticket-number"
               />
               {formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
@@ -687,14 +728,19 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
         </div>
 
-        {formData.platePhotoUrl && (
+        {(formData.licensePlate || formData.platePhotoUrl) && (
           <div className="bg-gray-50 p-3 rounded-lg">
             <span className="text-gray-500 text-sm">Registration Plate</span>
-            <img 
-              src={formData.platePhotoUrl} 
-              alt="License plate" 
-              className="max-h-24 mt-2 rounded"
-            />
+            {formData.licensePlate && (
+              <p className="font-mono font-bold text-lg mt-1 tracking-widest">{formData.licensePlate}</p>
+            )}
+            {formData.platePhotoUrl && (
+              <img 
+                src={formData.platePhotoUrl} 
+                alt="License plate" 
+                className="max-h-24 mt-2 rounded"
+              />
+            )}
           </div>
         )}
 

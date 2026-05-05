@@ -58,7 +58,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
       
       try {
         const text = await recognizeText(canvas);
-        const ticketMatch = text.match(/\b\d{5,6}\b/);
+        const ticketMatch = text.match(/\b\d{5}\b/);
         
         if (ticketMatch) {
           onScanComplete(ticketMatch[0]);
@@ -75,7 +75,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
   };
 
   const handleManualSubmit = () => {
-    if (manualInput.length >= 5 && manualInput.length <= 6) {
+    if (manualInput.length === 5) {
       onScanComplete(manualInput);
     }
   };
@@ -129,7 +129,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
             <Input
               type="text"
               placeholder="Enter ticket number"
-              maxLength={6}
+              maxLength={5}
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value.replace(/\D/g, ''))}
               className="flex-1 text-center"

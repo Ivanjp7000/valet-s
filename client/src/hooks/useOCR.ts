@@ -6,9 +6,9 @@ export function useOCR() {
     try {
       const result = await Tesseract.recognize(
         imageSource,
-        'eng',
+        'jpn+eng',
         {
-          logger: (m) => console.log(m), // Optional: log progress
+          logger: (m) => console.log(m),
         }
       );
       
