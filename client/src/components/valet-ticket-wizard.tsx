@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, ScanLine
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -141,6 +141,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const { recognizeText } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
+  const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
 
   const [formData, setFormData] = useState<TicketFormData>({
     visitorType: "",
@@ -639,21 +640,73 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <div className="space-y-3">
             <div>
               <label className="text-sm font-medium text-gray-700">Ticket Number *</label>
-              <Input
-                value={formData.ticketNumber}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 5);
-                  setFormData({ ...formData, ticketNumber: value });
-                }}
-                placeholder="Enter 5-digit ticket number (e.g., 12345)"
-                className="mt-1 text-center text-2xl font-bold tracking-widest"
-                maxLength={5}
-                data-testid="input-ticket-number"
-              />
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={formData.ticketNumber}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                    setFormData({ ...formData, ticketNumber: value });
+                  }}
+                  placeholder="12345"
+                  className="text-center text-2xl font-bold tracking-widest"
+                  maxLength={5}
+                  disabled={isTicketOcrRunning}
+                  data-testid="input-ticket-number"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
+                  disabled={isTicketOcrRunning}
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.capture = 'environment';
+                    input.onchange = async (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = async (ev) => {
+                        const dataUrl = ev.target?.result as string;
+                        setIsTicketOcrRunning(true);
+                        try {
+                          const rawText = await recognizeText(dataUrl);
+                          const match = rawText.match(/\b\d{5}\b/);
+                          if (match) {
+                            setFormData(prev => ({ ...prev, ticketNumber: match[0] }));
+                          } else {
+                            toast({ title: "No ticket number found", description: "Please enter it manually.", variant: "destructive" });
+                          }
+                        } catch {
+                          toast({ title: "Scan failed", description: "Please enter the number manually.", variant: "destructive" });
+                        } finally {
+                          setIsTicketOcrRunning(false);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    };
+                    input.click();
+                  }}
+                  data-testid="button-scan-ticket-number"
+                >
+                  {isTicketOcrRunning ? (
+                    <span className="text-xs">Reading...</span>
+                  ) : (
+                    <>
+                      <ScanLine className="w-4 h-4 mr-1" />
+                      Scan
+                    </>
+                  )}
+                </Button>
+              </div>
               {formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
                 <p className="text-sm text-orange-600 mt-1">
                   Enter {5 - formData.ticketNumber.length} more digit(s)
                 </p>
+              )}
+              {isTicketOcrRunning && (
+                <p className="text-sm text-regis-navy animate-pulse mt-1">Reading ticket number from image...</p>
               )}
             </div>
           </div>
