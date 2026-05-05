@@ -278,46 +278,57 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             {showBrandGrid && (
               <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="flex flex-wrap gap-2">
-                  {quickBrands.map((brand) => (
-                    <div key={brand} className="relative">
-                      {editingBrands ? (
-                        <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border bg-white border-gray-300 text-gray-700">
-                          {brand}
+                  {quickBrands.map((brand, idx) => {
+                    const palette = [
+                      "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100",
+                      "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
+                      "bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100",
+                      "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100",
+                      "bg-pink-50 border-pink-200 text-pink-700 hover:bg-pink-100",
+                      "bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100",
+                    ];
+                    const color = palette[idx % palette.length];
+                    return (
+                      <div key={brand} className="relative">
+                        {editingBrands ? (
+                          <span className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border ${color}`}>
+                            {brand}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBrand(brand)}
+                              className="ml-0.5 text-red-400 hover:text-red-600 transition-colors"
+                            >
+                              <X size={11} />
+                            </button>
+                          </span>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => handleRemoveBrand(brand)}
-                            className="ml-0.5 text-red-400 hover:text-red-600 transition-colors"
+                            onClick={() => {
+                              setFormData({ ...formData, carMake: brand });
+                              setCarMakeSearch(brand);
+                              setShowCarMakeDropdown(false);
+                              setShowBrandGrid(false);
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                              formData.carMake === brand
+                                ? "bg-regis-gold border-regis-gold text-white shadow-sm"
+                                : color
+                            }`}
                           >
-                            <X size={11} />
+                            {brand}
                           </button>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData({ ...formData, carMake: brand });
-                            setCarMakeSearch(brand);
-                            setShowCarMakeDropdown(false);
-                            setShowBrandGrid(false);
-                          }}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                            formData.carMake === brand
-                              ? "bg-regis-gold border-regis-gold text-white"
-                              : "bg-white border-gray-300 text-gray-700 hover:border-regis-gold hover:text-regis-gold"
-                          }`}
-                        >
-                          {brand}
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    );
+                  })}
 
                   {/* Edit toggle button at the end */}
                   {!editingBrands && (
                     <button
                       type="button"
                       onClick={() => setEditingBrands(true)}
-                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-dashed border-gray-400 text-gray-500 hover:border-regis-navy hover:text-regis-navy transition-colors"
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-red-300 bg-red-50 text-red-500 hover:bg-red-100 hover:border-red-400 transition-colors"
                     >
                       Edit
                     </button>
@@ -356,38 +367,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 )}
               </div>
             )}
-            <Input
-              value={carMakeSearch}
-              onChange={(e) => {
-                setCarMakeSearch(e.target.value);
-                setShowCarMakeDropdown(true);
-                if (e.target.value.length < 2) {
-                  setFormData({ ...formData, carMake: "" });
-                }
-              }}
-              onFocus={() => setShowCarMakeDropdown(true)}
-              placeholder="Type at least 2 letters (e.g., Hon, Fer, BMW)"
-              className="mt-1"
-              data-testid="input-car-make"
-            />
-            {showCarMakeDropdown && filteredCarMakes.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {filteredCarMakes.map((make) => (
-                  <button
-                    key={make}
-                    onClick={() => {
-                      setFormData({ ...formData, carMake: make });
-                      setCarMakeSearch(make);
-                      setShowCarMakeDropdown(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    data-testid={`car-make-option-${make}`}
-                  >
-                    {make}
-                    {formData.carMake === make && <Check size={16} className="text-regis-gold" />}
-                  </button>
-                ))}
-              </div>
+            {formData.carMake && (
+              <p className="mt-1 text-xs text-gray-500">
+                Selected: <span className="font-medium text-regis-navy">{formData.carMake}</span>
+              </p>
             )}
           </div>
 
