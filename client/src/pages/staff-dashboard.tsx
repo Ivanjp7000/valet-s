@@ -936,23 +936,6 @@ export default function StaffDashboard() {
                   </CardContent>
                 </Card>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {/* Unified Active Retrieval Box */}
-                  <div className="lg:col-span-2">
-                    <UnifiedRetrievalBox 
-                      tickets={activeTickets || []} 
-                      onStageComplete={(ticketNumber, nextStage) => {
-                        const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
-                        const newStatus = statusMap[nextStage];
-                        if (newStatus) {
-                          updateStatusMutation.mutate({ ticketNumber, status: newStatus });
-                        }
-                      }}
-                    />
-                  </div>
-
-                </div>
-
                 {/* Guest will Return - Full View */}
                 <Card className="shadow-lg border-2 border-blue-200 bg-gradient-to-br from-white to-blue-50/30 mt-4">
                   <CardHeader className="p-4 sm:p-6 pb-2">
@@ -988,6 +971,18 @@ export default function StaffDashboard() {
                 </Card>
               </>
             )}
+
+            {/* Active Retrievals - Always visible for ALL users, roles, and screen sizes */}
+            <UnifiedRetrievalBox
+              tickets={activeTickets || []}
+              onStageComplete={(ticketNumber, nextStage) => {
+                const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
+                const newStatus = statusMap[nextStage];
+                if (newStatus) {
+                  updateStatusMutation.mutate({ ticketNumber, status: newStatus });
+                }
+              }}
+            />
 
             {/* In House - Desktop Version (hidden on mobile, always shows on desktop) */}
             <Card className="hidden sm:block">
