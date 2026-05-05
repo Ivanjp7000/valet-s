@@ -597,16 +597,16 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <h3 className="text-lg font-semibold text-regis-navy mb-3">Valet Ticket Number</h3>
           <div className="space-y-3">
             <div>
-              <label className="text-sm font-medium text-gray-700">5-Digit Ticket Number *</label>
+              <label className="text-sm font-medium text-gray-700">Ticket Number *</label>
               <Input
                 value={formData.ticketNumber}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 6);
                   setFormData({ ...formData, ticketNumber: value });
                 }}
-                placeholder="Enter 5-digit ticket number (e.g., 12345)"
+                placeholder="Enter ticket number (e.g., 12345 or 123456)"
                 className="mt-1 text-center text-2xl font-bold tracking-widest"
-                maxLength={5}
+                maxLength={6}
                 data-testid="input-ticket-number"
               />
               {formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
