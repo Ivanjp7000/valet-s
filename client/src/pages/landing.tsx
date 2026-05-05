@@ -26,10 +26,10 @@ export default function Landing() {
   });
 
   const handleTicketSubmit = async () => {
-    if (ticketNumber.length !== 5) {
+    if (ticketNumber.length < 5 || ticketNumber.length > 6) {
       toast({
         title: "Invalid Ticket",
-        description: "Please enter all 5 digits of your ticket number",
+        description: "Please enter 5 or 6 digits of your ticket number",
         variant: "destructive",
       });
       return;
@@ -64,12 +64,12 @@ export default function Landing() {
 
   const handleDigitChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, '').slice(-1);
-    const digits = ticketNumber.padEnd(5, ' ').split('');
+    const digits = ticketNumber.padEnd(6, ' ').split('');
     digits[index] = digit;
     setTicketNumber(digits.join('').trim());
     
     // Auto-focus next input
-    if (digit && index < 4) {
+    if (digit && index < 5) {
       const nextInput = document.getElementById(`digit-${index + 1}`);
       nextInput?.focus();
     }
@@ -119,9 +119,9 @@ export default function Landing() {
               <span className="text-regis-navy text-xl font-semibold">Or Enter Manually</span>
             </div>
 
-            {/* 5 Digit Boxes */}
-            <div className="flex justify-center gap-3 mb-6">
-              {[0, 1, 2, 3, 4].map((index) => (
+            {/* 6 Digit Boxes */}
+            <div className="flex justify-center gap-2 mb-6">
+              {[0, 1, 2, 3, 4, 5].map((index) => (
                 <input
                   key={index}
                   id={`digit-${index}`}
@@ -131,7 +131,7 @@ export default function Landing() {
                   value={ticketNumber[index] || ''}
                   onChange={(e) => handleDigitChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-14 h-16 text-center text-2xl font-mono font-bold border-2 border-gray-300 rounded-lg focus:border-regis-gold focus:outline-none focus:ring-2 focus:ring-regis-gold/20"
+                  className="w-12 h-14 text-center text-2xl font-mono font-bold border-2 border-gray-300 rounded-lg focus:border-regis-gold focus:outline-none focus:ring-2 focus:ring-regis-gold/20"
                   data-testid={`input-digit-${index}`}
                 />
               ))}
