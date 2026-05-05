@@ -26,10 +26,10 @@ export default function Landing() {
   });
 
   const handleTicketSubmit = async () => {
-    if (ticketNumber.length < 5 || ticketNumber.length > 6) {
+    if (ticketNumber.length !== 5) {
       toast({
         title: "Invalid Ticket",
-        description: "Please enter 5 or 6 digits of your ticket number",
+        description: "Please enter 5 digits of your ticket number",
         variant: "destructive",
       });
       return;
@@ -64,12 +64,12 @@ export default function Landing() {
 
   const handleDigitChange = (index: number, value: string) => {
     const digit = value.replace(/\D/g, '').slice(-1);
-    const digits = ticketNumber.padEnd(6, ' ').split('');
+    const digits = ticketNumber.padEnd(5, ' ').split('');
     digits[index] = digit;
     setTicketNumber(digits.join('').trim());
     
     // Auto-focus next input
-    if (digit && index < 5) {
+    if (digit && index < 4) {
       const nextInput = document.getElementById(`digit-${index + 1}`);
       nextInput?.focus();
     }
@@ -119,9 +119,9 @@ export default function Landing() {
               <span className="text-regis-navy text-xl font-semibold">Or Enter Manually</span>
             </div>
 
-            {/* 6 Digit Boxes */}
+            {/* 5 Digit Boxes */}
             <div className="flex justify-center gap-2 mb-6">
-              {[0, 1, 2, 3, 4, 5].map((index) => (
+              {[0, 1, 2, 3, 4].map((index) => (
                 <input
                   key={index}
                   id={`digit-${index}`}

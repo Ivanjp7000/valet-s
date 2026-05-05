@@ -254,8 +254,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.body;
 
       // Validate required fields
-      if (!ticketNumber || !/^\d{5,6}$/.test(ticketNumber)) {
-        return res.status(400).json({ message: "Invalid ticket number. Must be 5 or 6 digits." });
+      if (!ticketNumber || !/^\d{5}$/.test(ticketNumber)) {
+        return res.status(400).json({ message: "Invalid ticket number. Must be 5 digits." });
       }
       if (!visitorType || !guestName || !carMake || !carModel || !carColor) {
         return res.status(400).json({ message: "Missing required fields" });

@@ -217,7 +217,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const canProceedStep2 = formData.guestName.trim().length > 0 && formData.platePhotoUrl.length > 0;
 
-  const canProceedStep3 = (formData.ticketNumber.length === 5 || formData.ticketNumber.length === 6) && /^\d{5,6}$/.test(formData.ticketNumber);
+  const canProceedStep3 = formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber);
 
   const handleNext = () => {
     if (currentStep < 3) {
