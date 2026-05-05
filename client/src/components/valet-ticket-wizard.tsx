@@ -69,14 +69,41 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const [carMakeSearch, setCarMakeSearch] = useState("");
   const [showCarMakeDropdown, setShowCarMakeDropdown] = useState(false);
   const [showBrandGrid, setShowBrandGrid] = useState(false);
+  const [editingBrands, setEditingBrands] = useState(false);
+  const [newBrandInput, setNewBrandInput] = useState("");
 
-  const QUICK_BRANDS = [
+  const DEFAULT_BRANDS = [
     'Toyota', 'Lexus', 'Honda', 'Nissan', 'Mazda', 'Subaru',
     'Mitsubishi', 'Suzuki', 'Daihatsu', 'Mercedes-Benz', 'BMW', 'Audi',
     'Volkswagen', 'Porsche', 'Ferrari', 'Lamborghini', 'Maserati', 'Alfa Romeo',
     'Peugeot', 'Renault', 'Citroën', 'Rolls-Royce', 'Bentley', 'Aston Martin',
     'Jaguar', 'Land Rover', 'Lotus', 'McLaren', 'Mini Cooper', 'Volvo',
   ];
+
+  const [quickBrands, setQuickBrands] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('valet-quick-brands');
+      return saved ? JSON.parse(saved) : DEFAULT_BRANDS;
+    } catch {
+      return DEFAULT_BRANDS;
+    }
+  });
+
+  const saveBrands = (brands: string[]) => {
+    setQuickBrands(brands);
+    localStorage.setItem('valet-quick-brands', JSON.stringify(brands));
+  };
+
+  const handleAddBrand = () => {
+    const trimmed = newBrandInput.trim();
+    if (!trimmed || quickBrands.includes(trimmed)) return;
+    saveBrands([...quickBrands, trimmed]);
+    setNewBrandInput("");
+  };
+
+  const handleRemoveBrand = (brand: string) => {
+    saveBrands(quickBrands.filter(b => b !== brand));
+  };
 
   const [formData, setFormData] = useState<TicketFormData>({
     visitorType: "",
@@ -249,26 +276,84 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
               </button>
             </div>
             {showBrandGrid && (
-              <div className="flex flex-wrap gap-2 mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                {QUICK_BRANDS.map((brand) => (
-                  <button
-                    key={brand}
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, carMake: brand });
-                      setCarMakeSearch(brand);
-                      setShowCarMakeDropdown(false);
-                      setShowBrandGrid(false);
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                      formData.carMake === brand
-                        ? "bg-regis-gold border-regis-gold text-white"
-                        : "bg-white border-gray-300 text-gray-700 hover:border-regis-gold hover:text-regis-gold"
-                    }`}
-                  >
-                    {brand}
-                  </button>
-                ))}
+              <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex flex-wrap gap-2">
+                  {quickBrands.map((brand) => (
+                    <div key={brand} className="relative">
+                      {editingBrands ? (
+                        <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border bg-white border-gray-300 text-gray-700">
+                          {brand}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveBrand(brand)}
+                            className="ml-0.5 text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            <X size={11} />
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, carMake: brand });
+                            setCarMakeSearch(brand);
+                            setShowCarMakeDropdown(false);
+                            setShowBrandGrid(false);
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                            formData.carMake === brand
+                              ? "bg-regis-gold border-regis-gold text-white"
+                              : "bg-white border-gray-300 text-gray-700 hover:border-regis-gold hover:text-regis-gold"
+                          }`}
+                        >
+                          {brand}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Edit toggle button at the end */}
+                  {!editingBrands && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingBrands(true)}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-dashed border-gray-400 text-gray-500 hover:border-regis-navy hover:text-regis-navy transition-colors"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+
+                {/* Edit mode: add new brand + done */}
+                {editingBrands && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newBrandInput}
+                        onChange={(e) => setNewBrandInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
+                        placeholder="Type a brand name and press Add"
+                        className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:border-regis-gold"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddBrand}
+                        disabled={!newBrandInput.trim()}
+                        className="px-3 py-1.5 text-xs font-medium bg-regis-navy text-white rounded-md hover:bg-blue-900 disabled:opacity-40 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingBrands(false); setNewBrandInput(""); }}
+                      className="w-full text-xs font-medium text-regis-gold hover:text-yellow-600 py-1 transition-colors"
+                    >
+                      Done Editing
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             <Input
