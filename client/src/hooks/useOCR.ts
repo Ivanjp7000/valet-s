@@ -1,8 +1,37 @@
 import { useCallback } from 'react';
 import Tesseract from 'tesseract.js';
 
+/**
+ * Module-level singleton worker.
+ * Created once on first use, reused for every subsequent recognition.
+ * Avoids re-downloading the ~40 MB Japanese language data each call.
+ */
+let workerSingleton: Tesseract.Worker | null = null;
+let workerInitPromise: Promise<Tesseract.Worker> | null = null;
+
+function getWorker(): Promise<Tesseract.Worker> {
+  if (workerSingleton) return Promise.resolve(workerSingleton);
+  if (workerInitPromise) return workerInitPromise;
+
+  workerInitPromise = Tesseract.createWorker('jpn+eng', 1, {
+    logger: (m) => console.log('[Tesseract]', m),
+  }).then((w) => {
+    workerSingleton = w;
+    return w;
+  }).catch((err) => {
+    // Reset so the next call retries
+    workerInitPromise = null;
+    throw err;
+  });
+
+  return workerInitPromise;
+}
+
 export function useOCR() {
-  const recognizeText = useCallback(async (imageSource: HTMLCanvasElement | string): Promise<string> => {
+  /**
+   * General-purpose recognition (original behaviour, kept for other uses).
+   */
+  const recognizeText = useCallback(async (imageSource: Tesseract.ImageLike): Promise<string> => {
     try {
       const result = await Tesseract.recognize(imageSource, 'jpn+eng', {
         logger: (m) => console.log(m),
@@ -16,24 +45,18 @@ export function useOCR() {
 
   /**
    * Plate-optimised recognition:
-   *  - Dedicated Tesseract worker (avoids shared state)
-   *  - PSM 7 = single text line (perfect for a licence plate)
-   *  - jpn+eng so both Japanese and alphanumeric chars are covered
+   * - Reuses the singleton worker (no repeated CDN downloads)
+   * - PSM 7 = single text line, passed directly via worker.recognize opts
+   *   so Tesseract applies it via api.SetVariable before recognition
    */
-  const recognizePlate = useCallback(async (imageSource: HTMLCanvasElement | string): Promise<string> => {
-    let worker: Tesseract.Worker | null = null;
-    try {
-      worker = await Tesseract.createWorker('jpn+eng', 1, {
-        logger: (m) => console.log(m),
-      });
-      await worker.setParameters({
-        tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE as any,
-      });
-      const { data: { text } } = await worker.recognize(imageSource);
-      return text;
-    } finally {
-      if (worker) await worker.terminate();
-    }
+  const recognizePlate = useCallback(async (imageSource: Tesseract.ImageLike): Promise<string> => {
+    const worker = await getWorker();
+    const result = await worker.recognize(imageSource, {
+      // Any option not in Tesseract.js's own reserved list is forwarded to
+      // api.SetVariable() inside the worker — this is how PSM is applied.
+      tessedit_pageseg_mode: '7' as any, // PSM 7 = SINGLE_LINE
+    } as any);
+    return result.data.text;
   }, []);
 
   return { recognizeText, recognizePlate };
