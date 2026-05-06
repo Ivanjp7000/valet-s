@@ -123,10 +123,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
-      // Return only status fields - no PII for public endpoint
       res.json({
         ticketNumber: ticket.ticketNumber,
         status: ticket.status,
+        guestName: ticket.guestName,
+        visitorType: ticket.visitorType,
+        visitorSubType: ticket.visitorSubType,
+        roomNumber: ticket.roomNumber,
         createdAt: ticket.createdAt,
         updatedAt: ticket.updatedAt,
       });

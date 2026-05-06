@@ -1,24 +1,37 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { CameraScanner } from "@/components/camera-scanner";
 import { StatusTracker } from "@/components/status-tracker";
 import { SystemLoginModal } from "@/components/system-login-modal";
 import { FAQModal } from "@/components/faq-modal";
-import { Camera, HelpCircle, Settings, Ticket } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { Camera, HelpCircle, Settings, Ticket, Car, Calendar, User, Building2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Faq } from "@shared/schema";
+import { VISITOR_TYPES } from "@shared/schema";
+import { format } from "date-fns";
+
+interface TicketPreview {
+  ticketNumber: string;
+  status: string;
+  guestName: string;
+  visitorType: string;
+  visitorSubType?: string | null;
+  roomNumber?: string | null;
+  createdAt: string;
+}
 
 export default function Landing() {
   const [ticketNumber, setTicketNumber] = useState("");
   const [showCamera, setShowCamera] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [showSystemLogin, setShowSystemLogin] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState("");
+  const [ticketPreview, setTicketPreview] = useState<TicketPreview | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const { data: faqs } = useQuery<Faq[]>({
@@ -35,6 +48,7 @@ export default function Landing() {
       return;
     }
 
+    setIsLoading(true);
     try {
       const response = await fetch(`/api/tickets/${ticketNumber}`);
       if (!response.ok) {
@@ -45,8 +59,10 @@ export default function Landing() {
         });
         return;
       }
+      const data: TicketPreview = await response.json();
+      setTicketPreview(data);
       setSubmittedTicket(ticketNumber);
-      setShowStatus(true);
+      setShowConfirmation(true);
       setTicketNumber("");
     } catch (error) {
       toast({
@@ -54,6 +70,8 @@ export default function Landing() {
         description: "Failed to look up ticket. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -62,12 +80,141 @@ export default function Landing() {
     setShowCamera(false);
   };
 
+  const handleCancelConfirmation = () => {
+    setShowConfirmation(false);
+    setTicketPreview(null);
+    setSubmittedTicket("");
+  };
+
+  const handleConfirmRetrieval = () => {
+    setShowConfirmation(false);
+    setShowStatus(true);
+  };
+
   if (showStatus) {
     return <StatusTracker ticketNumber={submittedTicket} onBack={() => setShowStatus(false)} />;
   }
 
   if (showCamera) {
     return <CameraScanner onScanComplete={handleScanComplete} onClose={() => setShowCamera(false)} />;
+  }
+
+  // Confirmation Screen
+  if (showConfirmation && ticketPreview) {
+    const arrivedAt = new Date(ticketPreview.createdAt);
+    const visitorLabel = VISITOR_TYPES[ticketPreview.visitorType as keyof typeof VISITOR_TYPES] || ticketPreview.visitorType;
+
+    return (
+      <div className="min-h-screen bg-soft-gray flex flex-col">
+        <div className="bg-white shadow-sm">
+          <div className="max-w-md mx-auto px-6 py-8 text-center">
+            <h1 className="text-3xl font-semibold text-regis-navy mb-2">Valet Service</h1>
+            <p className="text-gray-600 text-sm">Vehicle Retrieval</p>
+          </div>
+        </div>
+
+        <div className="max-w-md mx-auto px-6 py-8 w-full flex-1 flex flex-col justify-center">
+          {/* Welcome Card */}
+          <Card className="shadow-xl border-2 border-regis-gold/20 mb-6">
+            <CardContent className="p-8">
+              {/* Welcome Header */}
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 bg-regis-gold/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Car className="text-regis-gold" size={36} />
+                </div>
+                <h2 className="text-2xl font-bold text-regis-navy mb-1">Welcome Back!</h2>
+                <p className="text-gray-500 text-sm">We found your ticket. Ready to retrieve your vehicle?</p>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100 my-5" />
+
+              {/* Ticket Info */}
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Ticket className="text-regis-navy" size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Ticket Number</p>
+                    <p className="font-bold text-regis-navy text-lg">#{ticketPreview.ticketNumber}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-yellow-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <User className="text-regis-gold" size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Guest Name</p>
+                    <p className="font-semibold text-gray-800">{ticketPreview.guestName}</p>
+                    {ticketPreview.roomNumber && (
+                      <p className="text-xs text-gray-500">Room {ticketPreview.roomNumber}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Building2 className="text-purple-500" size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Venue / Visit Type</p>
+                    <p className="font-semibold text-gray-800">{visitorLabel}</p>
+                    {ticketPreview.visitorSubType && (
+                      <p className="text-xs text-gray-500 capitalize">{ticketPreview.visitorSubType.replace(/_/g, ' ')}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Calendar className="text-green-600" size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Car Arrived</p>
+                    <p className="font-semibold text-gray-800">{format(arrivedAt, "dd MMM yyyy")}</p>
+                    <p className="text-xs text-gray-500">{format(arrivedAt, "hh:mm a")}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100 my-5" />
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <Button
+                  onClick={handleConfirmRetrieval}
+                  className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-bold py-4 h-auto text-base"
+                >
+                  <Car className="mr-2" size={20} />
+                  Retrieve My Car Now
+                </Button>
+                <Button
+                  onClick={handleCancelConfirmation}
+                  variant="outline"
+                  className="w-full py-3 h-auto text-gray-500 border-gray-200"
+                >
+                  <X className="mr-2" size={16} />
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowSystemLogin(true)}
+          className="fixed bottom-4 left-4 w-8 h-8 bg-gray-300 hover:bg-gray-400 opacity-30 hover:opacity-60 transition-all duration-300"
+        >
+          <Settings size={12} className="text-gray-600" />
+        </Button>
+        {showSystemLogin && <SystemLoginModal onClose={() => setShowSystemLogin(false)} />}
+      </div>
+    );
   }
 
   const handleDigitChange = (index: number, value: string) => {
