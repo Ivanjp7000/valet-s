@@ -134,6 +134,44 @@ async function processPlateImage(dataUrl: string): Promise<string> {
   });
 }
 
+/**
+ * Post-processes raw Tesseract output for Japanese licence plates.
+ *
+ * Japanese plate format: [Area kanji] [3-digit class] [hiragana] [4-digit serial]
+ * e.g.  品川 500 あ 1234
+ *
+ * Strategy:
+ * 1. Try to find a pattern matching the plate format and return only that.
+ * 2. If no pattern found, strip characters that cannot appear on a plate and
+ *    return whatever is left — always better than raw garbage.
+ */
+function extractJapanesePlate(raw: string): string {
+  // Normalise: collapse whitespace, remove newlines
+  const text = raw.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+  // ── Pattern match ────────────────────────────────────────────────────────
+  // CJK kanji (area name) + digits (class) + hiragana + digits (serial)
+  const pattern =
+    /([\u4e00-\u9faf\u3400-\u4dbf]{1,4})\s*(\d{2,3})\s*([\u3041-\u3096])\s*(\d{1,4})/;
+  const m = text.match(pattern);
+  if (m) {
+    return `${m[1]} ${m[2]} ${m[3]} ${m[4]}`;
+  }
+
+  // ── Partial match: at least digits + hiragana ────────────────────────────
+  const partial = /([\u4e00-\u9faf\u3400-\u4dbf]{1,4}\s*)?(\d{2,3})\s*([\u3041-\u3096])\s*(\d{1,4})/;
+  const p = text.match(partial);
+  if (p) {
+    const area = p[1] ? p[1].trim() + ' ' : '';
+    return `${area}${p[2]} ${p[3]} ${p[4]}`;
+  }
+
+  // ── Fallback: keep only plate-legal characters ───────────────────────────
+  // CJK kanji | hiragana | digits | spaces | middle-dot
+  const kept = text.replace(/[^\u4e00-\u9faf\u3400-\u4dbf\u3041-\u3096\d\s・]/g, '');
+  return kept.replace(/\s{2,}/g, ' ').trim();
+}
+
 interface ValetTicketWizardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -256,7 +294,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     if (formData.carColor === color) setFormData({ ...formData, carColor: "" });
   };
 
-  const { recognizeText } = useOCR();
+  const { recognizePlate } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
 
@@ -682,8 +720,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                           //    (much sharper than the storage copy — critical for kanji/hiragana)
                           try {
                             const ocrDataUrl = await enhancePlateForOCR(rawDataUrl);
-                            const rawText = await recognizeText(ocrDataUrl);
-                            const cleaned = rawText.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+                            const rawText = await recognizePlate(ocrDataUrl);
+                            const cleaned = extractJapanesePlate(rawText);
                             setFormData(prev => ({ ...prev, licensePlate: cleaned }));
                           } catch (err) {
                             console.error('Plate OCR failed:', err);
