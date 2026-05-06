@@ -972,18 +972,6 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* Active Retrievals - Always visible for ALL users, roles, and screen sizes */}
-            <UnifiedRetrievalBox
-              tickets={activeTickets || []}
-              onStageComplete={(ticketNumber, nextStage) => {
-                const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
-                const newStatus = statusMap[nextStage];
-                if (newStatus) {
-                  updateStatusMutation.mutate({ ticketNumber, status: newStatus });
-                }
-              }}
-            />
-
             {/* In House - Desktop Version (hidden on mobile, always shows on desktop) */}
             <Card className="hidden sm:block">
               <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
@@ -1076,6 +1064,18 @@ export default function StaffDashboard() {
                 </CardContent>
               )}
             </Card>
+
+            {/* Active Retrievals - Always visible for ALL users, roles, and screen sizes */}
+            <UnifiedRetrievalBox
+              tickets={activeTickets || []}
+              onStageComplete={(ticketNumber, nextStage) => {
+                const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
+                const newStatus = statusMap[nextStage];
+                if (newStatus) {
+                  updateStatusMutation.mutate({ ticketNumber, status: newStatus });
+                }
+              }}
+            />
 
             {/* Checked Out - Departed - Collapsible (hidden on mobile when compact view is on) */}
             <Card className={compactView ? "hidden sm:block" : ""}>
