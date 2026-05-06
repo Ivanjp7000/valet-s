@@ -19,37 +19,55 @@ import type { User as UserType } from "@shared/schema";
 
 /**
  * Prepares a plate image specifically for OCR:
- *  - Upscales to at least 1500 px wide (Tesseract needs resolution for kanji/hiragana)
- *  - Converts to greyscale using luminance weights
- *  - Stretches contrast across the full 0-255 range
- *  - Applies a contrast boost via canvas filter
- * Returns a canvas (never stored — only used for recognition).
+ *  1. Crops to the centre band on portrait shots (same logic as processPlateImage)
+ *     so Tesseract only scans the plate region, not the whole car/background.
+ *  2. Upscales the cropped region to at least 1500 px wide.
+ *  3. Converts to greyscale (luminance weights).
+ *  4. Stretches contrast across the full 0-255 range.
+ * Returns a PNG data URL — no toBlob, no canvas-taint risk.
  */
-async function enhancePlateForOCR(dataUrl: string): Promise<HTMLCanvasElement> {
+async function enhancePlateForOCR(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+
+      // --- Step 1: portrait crop (same as processPlateImage) ---
+      let srcX = 0;
+      let srcY = 0;
+      let srcW = nw;
+      let srcH = nh;
+      if (nh > nw * 1.3) {
+        // Portrait: crop top & bottom 25% — plate lives in the middle 50%
+        const cut = Math.round(nh * 0.25);
+        srcY = cut;
+        srcH = nh - cut * 2;
+      }
+
+      // --- Step 2: scale so the cropped region is at least 1500 px wide ---
       const TARGET_WIDTH = 1500;
-      const scale = Math.max(1, TARGET_WIDTH / img.naturalWidth);
-      const w = Math.round(img.naturalWidth * scale);
-      const h = Math.round(img.naturalHeight * scale);
+      const scale = Math.max(1, TARGET_WIDTH / srcW);
+      const destW = Math.round(srcW * scale);
+      const destH = Math.round(srcH * scale);
 
       const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = destW;
+      canvas.height = destH;
       const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, w, h);
+      // Draw only the cropped region, scaled up
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, destW, destH);
 
-      const imageData = ctx.getImageData(0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, destW, destH);
       const d = imageData.data;
 
-      // Greyscale (luminance)
+      // --- Step 3: greyscale (luminance) ---
       for (let i = 0; i < d.length; i += 4) {
         const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
         d[i] = d[i + 1] = d[i + 2] = g;
       }
 
-      // Contrast stretch: find min/max then remap to 0-255
+      // --- Step 4: contrast stretch (min-max → 0-255) then boost ---
       let min = 255, max = 0;
       for (let i = 0; i < d.length; i += 4) {
         if (d[i] < min) min = d[i];
@@ -58,20 +76,12 @@ async function enhancePlateForOCR(dataUrl: string): Promise<HTMLCanvasElement> {
       const range = max - min || 1;
       for (let i = 0; i < d.length; i += 4) {
         const v = Math.round(((d[i] - min) / range) * 255);
-        // Extra contrast push toward black/white
-        const boosted = Math.min(255, Math.max(0, (v - 128) * 1.5 + 128));
+        const boosted = Math.min(255, Math.max(0, (v - 128) * 1.4 + 128));
         d[i] = d[i + 1] = d[i + 2] = boosted;
       }
       ctx.putImageData(imageData, 0, 0);
 
-      // Final sharpness pass via CSS filter on a fresh canvas
-      const out = document.createElement('canvas');
-      out.width = w;
-      out.height = h;
-      const outCtx = out.getContext('2d')!;
-      outCtx.filter = 'contrast(1.3) brightness(1.05)';
-      outCtx.drawImage(canvas, 0, 0);
-      resolve(out);
+      resolve(canvas.toDataURL('image/png'));
     };
     img.onerror = reject;
     img.src = dataUrl;
@@ -665,16 +675,21 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                           setFormData(prev => ({ ...prev, platePhotoUrl: processedUrl, licensePlate: "" }));
                           setIsOcrRunning(true);
 
-                          // 3. Run OCR on a separately-enhanced canvas:
+                          // 3. Run OCR on a separately-enhanced data URL:
                           //    greyscale + contrast stretch + upscaled to 1500 px
                           //    (much sharper than the storage copy — critical for kanji/hiragana)
                           try {
-                            const ocrCanvas = await enhancePlateForOCR(rawDataUrl);
-                            const rawText = await recognizePlate(ocrCanvas);
+                            const ocrDataUrl = await enhancePlateForOCR(rawDataUrl);
+                            const rawText = await recognizePlate(ocrDataUrl);
                             const cleaned = rawText.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
                             setFormData(prev => ({ ...prev, licensePlate: cleaned }));
-                          } catch {
-                            // OCR failed — leave field empty for manual entry
+                          } catch (err) {
+                            console.error('Plate OCR failed:', err);
+                            toast({
+                              title: "Plate scan failed",
+                              description: String(err) || "Could not read the plate — please type it manually.",
+                              variant: "destructive",
+                            });
                           } finally {
                             setIsOcrRunning(false);
                           }
