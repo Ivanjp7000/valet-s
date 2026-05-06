@@ -18,6 +18,67 @@ import {
 import type { User as UserType } from "@shared/schema";
 
 /**
+ * Prepares a plate image specifically for OCR:
+ *  - Upscales to at least 1500 px wide (Tesseract needs resolution for kanji/hiragana)
+ *  - Converts to greyscale using luminance weights
+ *  - Stretches contrast across the full 0-255 range
+ *  - Applies a contrast boost via canvas filter
+ * Returns a canvas (never stored — only used for recognition).
+ */
+async function enhancePlateForOCR(dataUrl: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const TARGET_WIDTH = 1500;
+      const scale = Math.max(1, TARGET_WIDTH / img.naturalWidth);
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+
+      // Greyscale (luminance)
+      for (let i = 0; i < d.length; i += 4) {
+        const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        d[i] = d[i + 1] = d[i + 2] = g;
+      }
+
+      // Contrast stretch: find min/max then remap to 0-255
+      let min = 255, max = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i] < min) min = d[i];
+        if (d[i] > max) max = d[i];
+      }
+      const range = max - min || 1;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = Math.round(((d[i] - min) / range) * 255);
+        // Extra contrast push toward black/white
+        const boosted = Math.min(255, Math.max(0, (v - 128) * 1.5 + 128));
+        d[i] = d[i + 1] = d[i + 2] = boosted;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      // Final sharpness pass via CSS filter on a fresh canvas
+      const out = document.createElement('canvas');
+      out.width = w;
+      out.height = h;
+      const outCtx = out.getContext('2d')!;
+      outCtx.filter = 'contrast(1.3) brightness(1.05)';
+      outCtx.drawImage(canvas, 0, 0);
+      resolve(out);
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Processes a plate photo: crops to the centre band (where the plate lives)
  * and compresses to a very small JPEG. Typical result: 15–50 KB vs 3–8 MB raw.
  */
@@ -183,7 +244,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     if (formData.carColor === color) setFormData({ ...formData, carColor: "" });
   };
 
-  const { recognizeText } = useOCR();
+  const { recognizeText, recognizePlate } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
 
@@ -595,18 +656,22 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                         const reader = new FileReader();
                         reader.onload = async (ev) => {
                           const rawDataUrl = ev.target?.result as string;
-                          // Process: crop to plate zone + compress before storing
+
+                          // 1. Compress for storage (small JPEG, cropped)
                           let processedUrl = rawDataUrl;
-                          try {
-                            processedUrl = await processPlateImage(rawDataUrl);
-                          } catch {
-                            // Fall back to raw if canvas fails
-                          }
+                          try { processedUrl = await processPlateImage(rawDataUrl); } catch {}
+
+                          // 2. Store the compressed version immediately so the preview shows
                           setFormData(prev => ({ ...prev, platePhotoUrl: processedUrl, licensePlate: "" }));
                           setIsOcrRunning(true);
+
+                          // 3. Run OCR on a separately-enhanced canvas:
+                          //    greyscale + contrast stretch + upscaled to 1500 px
+                          //    (much sharper than the storage copy — critical for kanji/hiragana)
                           try {
-                            const rawText = await recognizeText(processedUrl);
-                            const cleaned = rawText.replace(/\s+/g, ' ').trim();
+                            const ocrCanvas = await enhancePlateForOCR(rawDataUrl);
+                            const rawText = await recognizePlate(ocrCanvas);
+                            const cleaned = rawText.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
                             setFormData(prev => ({ ...prev, licensePlate: cleaned }));
                           } catch {
                             // OCR failed — leave field empty for manual entry
