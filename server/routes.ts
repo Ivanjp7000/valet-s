@@ -114,31 +114,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public routes (Customer facing)
-  app.post('/api/tickets', async (req, res) => {
-    try {
-      const { ticketNumber } = insertValetTicketSchema.parse(req.body);
-      
-      // Check if ticket already exists
-      const existingTicket = await storage.getValetTicket(ticketNumber);
-      if (existingTicket) {
-        return res.status(400).json({ message: "Ticket already exists" });
-      }
-
-      const ticket = await storage.createValetTicket({ ticketNumber });
-      
-      // Broadcast to all connected WebSocket clients
-      broadcastToAll({
-        type: 'ticket_created',
-        data: ticket
-      });
-
-      res.json(ticket);
-    } catch (error) {
-      console.error("Error creating ticket:", error);
-      res.status(400).json({ message: "Invalid ticket data" });
-    }
-  });
-
   app.get('/api/tickets/:ticketNumber', async (req, res) => {
     try {
       const { ticketNumber } = req.params;

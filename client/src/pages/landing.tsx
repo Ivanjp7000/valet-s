@@ -36,14 +36,22 @@ export default function Landing() {
     }
 
     try {
-      await apiRequest("POST", "/api/tickets", { ticketNumber });
+      const response = await fetch(`/api/tickets/${ticketNumber}`);
+      if (!response.ok) {
+        toast({
+          title: "Ticket Not Found",
+          description: "No valet ticket found with that number. Please check and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
       setSubmittedTicket(ticketNumber);
       setShowStatus(true);
       setTicketNumber("");
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to submit ticket. Please try again.",
+        description: "Failed to look up ticket. Please try again.",
         variant: "destructive",
       });
     }
