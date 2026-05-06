@@ -575,6 +575,41 @@ export default function StaffDashboard() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
+            {/* ── Persistent Retrieval Requests Banner (poll-based, never missed) ── */}
+            {(() => {
+              const pendingRetrievals = activeTickets?.filter(t => t.status === 'retrieval_requested') ?? [];
+              if (pendingRetrievals.length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  {pendingRetrievals.map(ticket => (
+                    <div key={ticket.ticketNumber} className="flex items-center gap-3 bg-regis-gold/10 border-2 border-regis-gold rounded-xl px-4 py-3 animate-pulse">
+                      <div className="w-9 h-9 bg-regis-gold rounded-full flex items-center justify-center flex-shrink-0">
+                        <Car className="text-regis-navy" size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-regis-navy text-sm">
+                          Car Retrieval Requested — #{ticket.ticketNumber}
+                        </p>
+                        <p className="text-xs text-gray-600 truncate">
+                          {ticket.guestName} · {ticket.carColor} {ticket.carMake} {ticket.carModel}
+                          {ticket.licensePlate ? ` · ${ticket.licensePlate}` : ''}
+                          {ticket.parkingSector || ticket.parkingLocation ? ` · Parking: ${[ticket.parkingSector, ticket.parkingLocation].filter(Boolean).join('-')}` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-regis-gold hover:bg-yellow-600 text-regis-navy font-bold flex-shrink-0"
+                        onClick={() => acceptRetrievalMutation.mutate(ticket.ticketNumber)}
+                        disabled={acceptRetrievalMutation.isPending}
+                      >
+                        Accept
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Header with Toggle and New Ticket Button */}
             <div className="flex justify-between items-center gap-2">
               <Button

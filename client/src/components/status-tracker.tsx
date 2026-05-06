@@ -88,6 +88,62 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Waiting for staff to accept
+  if (ticket?.status === 'retrieval_requested') {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="bg-regis-navy text-white px-6 py-8 text-center">
+          <div className="w-16 h-16 bg-regis-gold rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Car className="text-white" size={24} />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Request Received!</h2>
+          <p className="text-blue-200 text-sm">Ticket #{ticketNumber}</p>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto w-full">
+          <div className="w-20 h-20 border-4 border-regis-gold border-t-transparent rounded-full animate-spin mb-6" />
+          <h3 className="text-xl font-bold text-regis-navy mb-3">
+            Waiting for a Valet Attendant
+          </h3>
+          <p className="text-gray-500 text-sm leading-relaxed mb-2">
+            Your request has been added to the queue. A valet attendant will accept and bring your vehicle shortly.
+          </p>
+          <p className="text-xs text-gray-400">
+            This page will update automatically — no need to refresh.
+          </p>
+
+          <div className="mt-8 w-full bg-gray-50 rounded-xl p-4 border border-gray-100 text-left space-y-2">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Clock className="text-regis-gold flex-shrink-0" size={15} />
+              <span>Waiting in queue…</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <Search size={15} className="flex-shrink-0" />
+              <span>Locating your vehicle</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <Construction size={15} className="flex-shrink-0" />
+              <span>Car in transit</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <Check size={15} className="flex-shrink-0" />
+              <span>Car ready for pickup</span>
+            </div>
+          </div>
+        </div>
+
+        <Button
+          variant="ghost"
+          onClick={onBack}
+          className="mx-auto mb-8 text-gray-400 hover:text-gray-600"
+        >
+          <X className="mr-2" size={16} />
+          Cancel Request
+        </Button>
+      </div>
+    );
+  }
+
   const stages = [
     {
       id: 0,
