@@ -45,10 +45,12 @@ async function enhancePlateForOCR(dataUrl: string): Promise<string> {
         srcH = nh - cut * 2;
       }
 
-      // --- Step 2: scale so the cropped region is at least 1500 px wide ---
+      // --- Step 2: scale the cropped region to exactly 1500 px wide ---
+      // Always scale (up OR down) — prevents massive canvases from landscape photos
+      // and ensures enough resolution for Japanese character recognition.
       const TARGET_WIDTH = 1500;
-      const scale = Math.max(1, TARGET_WIDTH / srcW);
-      const destW = Math.round(srcW * scale);
+      const scale = TARGET_WIDTH / srcW;
+      const destW = TARGET_WIDTH;
       const destH = Math.round(srcH * scale);
 
       const canvas = document.createElement('canvas');
@@ -254,7 +256,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     if (formData.carColor === color) setFormData({ ...formData, carColor: "" });
   };
 
-  const { recognizeText, recognizePlate } = useOCR();
+  const { recognizeText } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
 
@@ -680,14 +682,14 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                           //    (much sharper than the storage copy — critical for kanji/hiragana)
                           try {
                             const ocrDataUrl = await enhancePlateForOCR(rawDataUrl);
-                            const rawText = await recognizePlate(ocrDataUrl);
+                            const rawText = await recognizeText(ocrDataUrl);
                             const cleaned = rawText.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
                             setFormData(prev => ({ ...prev, licensePlate: cleaned }));
                           } catch (err) {
                             console.error('Plate OCR failed:', err);
                             toast({
                               title: "Plate scan failed",
-                              description: String(err) || "Could not read the plate — please type it manually.",
+                              description: "Could not read the plate — please type it manually.",
                               variant: "destructive",
                             });
                           } finally {
