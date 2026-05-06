@@ -17,6 +17,50 @@ import {
 } from "@shared/schema";
 import type { User as UserType } from "@shared/schema";
 
+/**
+ * Processes a plate photo: crops to the centre band (where the plate lives)
+ * and compresses to a very small JPEG. Typical result: 15–50 KB vs 3–8 MB raw.
+ */
+async function processPlateImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX_WIDTH = 600;
+      const JPEG_QUALITY = 0.4;
+
+      let srcX = 0;
+      let srcY = 0;
+      let srcW = img.naturalWidth;
+      let srcH = img.naturalHeight;
+
+      // If portrait (phone held upright pointing at plate), crop the
+      // top and bottom thirds — the plate is almost always in the middle.
+      if (srcH > srcW * 1.3) {
+        const cropTop = Math.round(srcH * 0.25);
+        const cropBot = Math.round(srcH * 0.25);
+        srcY = cropTop;
+        srcH = srcH - cropTop - cropBot;
+      }
+
+      // Scale down so the longest side is at most MAX_WIDTH.
+      const scale = Math.min(1, MAX_WIDTH / srcW);
+      const destW = Math.round(srcW * scale);
+      const destH = Math.round(srcH * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = destW;
+      canvas.height = destH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("canvas not available")); return; }
+
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, destW, destH);
+      resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 interface ValetTicketWizardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -550,11 +594,18 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                       if (file) {
                         const reader = new FileReader();
                         reader.onload = async (ev) => {
-                          const dataUrl = ev.target?.result as string;
-                          setFormData(prev => ({ ...prev, platePhotoUrl: dataUrl, licensePlate: "" }));
+                          const rawDataUrl = ev.target?.result as string;
+                          // Process: crop to plate zone + compress before storing
+                          let processedUrl = rawDataUrl;
+                          try {
+                            processedUrl = await processPlateImage(rawDataUrl);
+                          } catch {
+                            // Fall back to raw if canvas fails
+                          }
+                          setFormData(prev => ({ ...prev, platePhotoUrl: processedUrl, licensePlate: "" }));
                           setIsOcrRunning(true);
                           try {
-                            const rawText = await recognizeText(dataUrl);
+                            const rawText = await recognizeText(processedUrl);
                             const cleaned = rawText.replace(/\s+/g, ' ').trim();
                             setFormData(prev => ({ ...prev, licensePlate: cleaned }));
                           } catch {
