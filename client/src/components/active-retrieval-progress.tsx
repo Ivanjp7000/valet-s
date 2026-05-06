@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Car, CheckCircle, Clock } from "lucide-react";
 import type { ValetTicket } from "@shared/schema";
 
@@ -227,9 +228,11 @@ export function CompactRetrievalProgress({ ticket }: { ticket: ValetTicket }) {
 interface UnifiedRetrievalBoxProps {
   tickets: ValetTicket[];
   onStageComplete?: (ticketNumber: string, nextStage: number) => void;
+  onStatusChange?: (ticketNumber: string, status: string) => void;
+  canEdit?: boolean;
 }
 
-export function UnifiedRetrievalBox({ tickets, onStageComplete }: UnifiedRetrievalBoxProps) {
+export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, canEdit = true }: UnifiedRetrievalBoxProps) {
   const activeRetrievalTickets = tickets.filter(
     (t) => t.status === "retrieving" || t.status === "transit" || t.status === "ready"
   );
@@ -290,10 +293,52 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete }: UnifiedRetriev
                         : "outline"
                     }
                   >
-                    {ticket.status}
+                    {ticket.status === "retrieving" ? "Retrieving" : ticket.status === "transit" ? "In Transit" : "Ready"}
                   </Badge>
                 </div>
                 <ActiveRetrievalProgress ticket={ticket} onStageComplete={onStageComplete} />
+                {canEdit && onStatusChange && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                    {ticket.status === "retrieving" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                        onClick={() => onStatusChange(ticket.ticketNumber, "transit")}
+                      >
+                        → Mark In Transit
+                      </Button>
+                    )}
+                    {ticket.status === "transit" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs border-green-500 text-green-700 hover:bg-green-50"
+                        onClick={() => onStatusChange(ticket.ticketNumber, "ready")}
+                      >
+                        ✓ Mark Ready
+                      </Button>
+                    )}
+                    {ticket.status === "ready" && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs bg-gray-700 hover:bg-gray-800 text-white"
+                          onClick={() => onStatusChange(ticket.ticketNumber, "completed")}
+                        >
+                          Departed
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => onStatusChange(ticket.ticketNumber, "out_with_guest")}
+                        >
+                          Coming Back
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

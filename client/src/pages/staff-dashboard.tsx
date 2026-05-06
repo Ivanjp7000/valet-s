@@ -1068,6 +1068,10 @@ export default function StaffDashboard() {
             {/* Active Retrievals - Always visible for ALL users, roles, and screen sizes */}
             <UnifiedRetrievalBox
               tickets={activeTickets || []}
+              canEdit={canEdit}
+              onStatusChange={(ticketNumber, status) => {
+                updateStatusMutation.mutate({ ticketNumber, status });
+              }}
               onStageComplete={(ticketNumber, nextStage) => {
                 const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
                 const newStatus = statusMap[nextStage];
