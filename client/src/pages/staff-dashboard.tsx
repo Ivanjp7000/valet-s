@@ -566,8 +566,8 @@ export default function StaffDashboard() {
                     <p className="text-xs text-gray-500">Retrieving</p>
                   </div>
                   <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-gray-900">{statsLoading ? '-' : stats?.completed || 0}</p>
-                    <p className="text-xs text-gray-500">Done</p>
+                    <p className="text-lg font-bold text-gray-900">{activeTickets?.filter(t => t.status === 'completed').length || 0}</p>
+                    <p className="text-xs text-gray-500">Departed</p>
                   </div>
                   <div className="flex-1 bg-purple-50 rounded-lg p-2 text-center">
                     <p className="text-lg font-bold text-purple-600">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
