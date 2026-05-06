@@ -87,7 +87,7 @@ export const valetTickets = pgTable("valet_tickets", {
   ticketNumber: varchar("ticket_number", { length: 6 }).notNull().unique(),
   ouId: varchar("ou_id").references(() => organizationalUnits.id), // Which OU this ticket belongs to (denormalized for faster queries)
   locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this ticket belongs to
-  status: varchar("status").default("active").notNull(), // 'active', 'retrieving', 'transit', 'ready', 'out_with_guest', 'completed', 'cancelled'
+  status: varchar("status").default("active").notNull(), // 'active', 'retrieval_requested', 'retrieving', 'transit', 'ready', 'out_with_guest', 'completed', 'cancelled'
   estimatedTime: integer("estimated_time").default(5), // in minutes
   
   // Visitor information

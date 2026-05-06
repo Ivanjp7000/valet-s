@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CarPhotoUploader } from "@/components/car-photo-uploader";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/active-retrieval-progress";
+import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
+import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
 import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown, Printer } from "lucide-react";
 import { Link } from "wouter";
@@ -246,6 +248,9 @@ export default function StaffDashboard() {
   // Collapsible sections state
   const [inHouseExpanded, setInHouseExpanded] = useState(false);
   const [departedExpanded, setDepartedExpanded] = useState(false);
+
+  // Retrieval queue notifications
+  const [retrievalRequests, setRetrievalRequests] = useState<RetrievalRequest[]>([]);
   
   // WebSocket connection for real-time updates
   const { lastMessage } = useWebSocket();
@@ -445,18 +450,61 @@ export default function StaffDashboard() {
     if (lastMessage) {
       try {
         const data = JSON.parse(lastMessage);
-        if (data.type === 'ticket_created' || data.type === 'status_updated') {
+        if (data.type === 'ticket_created' || data.type === 'ticket_status_updated' || data.type === 'status_updated' || data.type === 'retrieval_accepted') {
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
           queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+        }
+        if (data.type === 'retrieval_requested') {
+          const req: RetrievalRequest = data.data;
+          // Show popup only for users in the same OU (or superadmin sees all)
+          const isSameOU = user?.role === 'superadmin' || !req.ouId || req.ouId === user?.ouId;
+          if (isSameOU) {
+            setRetrievalRequests(prev => {
+              if (prev.some(r => r.ticketNumber === req.ticketNumber)) return prev;
+              return [...prev, req];
+            });
+          }
+        }
+        if (data.type === 'retrieval_accepted') {
+          const ticket = data.data;
+          setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== ticket?.ticketNumber));
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [lastMessage, queryClient]);
+  }, [lastMessage, queryClient, user]);
+
+  const acceptRetrievalMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      await apiRequest("POST", `/api/tickets/${ticketNumber}/accept-retrieval`);
+    },
+    onSuccess: (_, ticketNumber) => {
+      setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== ticketNumber));
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+      toast({ title: "Retrieval Accepted", description: "You have accepted the car retrieval. Process started." });
+    },
+    onError: (error: any) => {
+      const msg = error?.message || "Failed to accept retrieval. It may have already been accepted.";
+      toast({ title: "Could Not Accept", description: msg, variant: "destructive" });
+      // Remove from queue anyway — another staff member may have accepted it
+      setRetrievalRequests([]);
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+    },
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Retrieval request popup — shown to all staff in the OU */}
+      <RetrievalNotificationPopup
+        requests={retrievalRequests}
+        onAccept={(ticketNumber) => acceptRetrievalMutation.mutate(ticketNumber)}
+        onDismiss={(ticketNumber) =>
+          setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== ticketNumber))
+        }
+      />
+
       <div className="border-b bg-white px-3 sm:px-6 py-3 sm:py-4">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">

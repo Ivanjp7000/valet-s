@@ -139,6 +139,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public: customer requests car retrieval — queues it and alerts all staff in the OU
+  app.post('/api/tickets/:ticketNumber/request-retrieval', async (req, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const ticket = await storage.getValetTicket(ticketNumber);
+
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (ticket.status !== 'active') {
+        return res.status(400).json({ message: "Ticket is not in active status" });
+      }
+
+      const updated = await storage.updateValetTicketStatus(ticketNumber, 'retrieval_requested');
+
+      broadcastToAll({
+        type: 'retrieval_requested',
+        data: {
+          ticketNumber: updated!.ticketNumber,
+          guestName: updated!.guestName,
+          carMake: updated!.carMake,
+          carModel: updated!.carModel,
+          carColor: updated!.carColor,
+          licensePlate: updated!.licensePlate,
+          visitorType: updated!.visitorType,
+          visitorSubType: updated!.visitorSubType,
+          ouId: updated!.ouId,
+          locationId: updated!.locationId,
+          parkingLocation: updated!.parkingLocation,
+          parkingSector: updated!.parkingSector,
+        },
+      });
+
+      res.json({ message: "Added to retrieval queue" });
+    } catch (error) {
+      console.error("Error requesting retrieval:", error);
+      res.status(500).json({ message: "Failed to request retrieval" });
+    }
+  });
+
   app.get('/api/faqs', async (req, res) => {
     try {
       const faqs = await storage.getFaqs();
@@ -206,6 +244,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (scopes.length === 0) return undefined; // No restrictions, see full OU
     return scopes.map(s => s.locationId);
   };
+
+  // Staff: accept a retrieval request — moves ticket to 'retrieving' and starts the timer
+  app.post('/api/tickets/:ticketNumber/accept-retrieval', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const ticket = await storage.getValetTicket(ticketNumber);
+
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (ticket.status !== 'retrieval_requested') {
+        return res.status(400).json({ message: "Ticket is not awaiting retrieval" });
+      }
+
+      const updated = await storage.updateValetTicketStatus(ticketNumber, 'retrieving');
+
+      broadcastToAll({
+        type: 'retrieval_accepted',
+        data: updated,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error accepting retrieval:", error);
+      res.status(500).json({ message: "Failed to accept retrieval" });
+    }
+  });
 
   // Protected routes (Staff/Admin only) - read access for all staff including standard_user
   app.get('/api/staff/tickets', isAuthenticated, requireReadAccess, async (req: any, res) => {

@@ -86,7 +86,28 @@ export default function Landing() {
     setSubmittedTicket("");
   };
 
-  const handleConfirmRetrieval = () => {
+  const handleConfirmRetrieval = async () => {
+    try {
+      const response = await fetch(`/api/tickets/${submittedTicket}/request-retrieval`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        toast({
+          title: "Request Failed",
+          description: err.message || "Could not add to queue. Please ask a staff member.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch {
+      toast({
+        title: "Connection Error",
+        description: "Please try again or ask a staff member.",
+        variant: "destructive",
+      });
+      return;
+    }
     setShowConfirmation(false);
     setShowStatus(true);
   };
