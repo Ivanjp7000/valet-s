@@ -23,7 +23,7 @@ import {
   type SystemSetting,
   type InsertSystemSetting,
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, desc, asc, and, or, inArray, isNull } from "drizzle-orm";
 
 // Interface for storage operations
@@ -265,20 +265,22 @@ export class DatabaseStorage implements IStorage {
     const durationSeconds = returnedAt
       ? Math.floor((returnedAt.getTime() - departedAt.getTime()) / 1000)
       : null;
-    const [trip] = await db
-      .update(ticketGuestTrips)
-      .set({ departedAt, returnedAt, durationSeconds })
-      .where(eq(ticketGuestTrips.id, tripId))
-      .returning();
-    return trip;
+    const { rows } = await pool.query(
+      `UPDATE ticket_guest_trips
+       SET departed_at = $1, returned_at = $2, duration_seconds = $3
+       WHERE id = $4
+       RETURNING id, ticket_id as "ticketId", departed_at as "departedAt", returned_at as "returnedAt", duration_seconds as "durationSeconds", created_at as "createdAt"`,
+      [departedAt, returnedAt, durationSeconds, tripId]
+    );
+    return rows[0];
   }
 
   async deleteGuestTrip(tripId: string): Promise<boolean> {
-    const result = await db
-      .delete(ticketGuestTrips)
-      .where(eq(ticketGuestTrips.id, tripId))
-      .returning();
-    return result.length > 0;
+    const { rowCount } = await pool.query(
+      `DELETE FROM ticket_guest_trips WHERE id = $1`,
+      [tripId]
+    );
+    return (rowCount ?? 0) > 0;
   }
 
   async deleteValetTicket(ticketNumber: string): Promise<boolean> {
