@@ -1478,7 +1478,12 @@ export default function StaffDashboard() {
                         );
 
                         if (panelId === 'retrievals') return (
-                          <SortablePanel key="retrievals" id="retrievals" wrapCard={false}>
+                          <SortablePanel key="retrievals" id="retrievals"
+                            title="Active Retrievals"
+                            badge={<Badge className="bg-orange-500 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => ['retrieving', 'transit', 'preparing', 'ready'].includes(t.status)).length || 0}</Badge>}
+                            icon={<Car className="text-orange-500" size={18} />}
+                            expanded={isExpanded} onToggle={toggle}
+                          >
                             <UnifiedRetrievalBox
                               tickets={activeTickets || []}
                               canEdit={canEdit}
