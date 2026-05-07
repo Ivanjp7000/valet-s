@@ -130,6 +130,12 @@ export default function AdminPanel() {
       const departed: any[] = (data.tickets || []).filter((t: any) => t.status === 'completed');
 
       const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+
+      // pdf-lib StandardFonts only support WinAnsi (Latin-1). Strip non-encodable characters.
+      const sanitize = (s: string) => (s || '-')
+        .replace(/\u2014/g, '-').replace(/\u2013/g, '-').replace(/\u2012/g, '-')
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+
       const doc = await PDFDocument.create();
       const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
       const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -155,15 +161,16 @@ export default function AdminPanel() {
 
       for (const t of departed) {
         if (y < 80) { page = doc.addPage([W, H]); y = H - M; }
-        const car = `${t.carColor || ''} ${t.carMake || ''} ${t.carModel || ''}`.trim();
-        const plate = t.licensePlate || '—';
-        const checkedIn = t.createdAt ? new Date(t.createdAt).toLocaleString('ja-JP', { hour12: false }) : '—';
-        const departed2 = t.departedAt ? new Date(t.departedAt).toLocaleString('ja-JP', { hour12: false }) : '—';
-        const stay = t.totalStaySeconds ? `${Math.floor(t.totalStaySeconds/3600)}h ${Math.floor((t.totalStaySeconds%3600)/60)}m` : '—';
+        const car = sanitize(`${t.carColor || ''} ${t.carMake || ''} ${t.carModel || ''}`.trim() || '-');
+        const plate = sanitize(t.licensePlate || '-');
+        const checkedIn = t.createdAt ? new Date(t.createdAt).toLocaleString('en-GB', { hour12: false }) : '-';
+        const departed2 = t.departedAt ? new Date(t.departedAt).toLocaleString('en-GB', { hour12: false }) : '-';
+        const stay = t.totalStaySeconds ? `${Math.floor(t.totalStaySeconds/3600)}h ${Math.floor((t.totalStaySeconds%3600)/60)}m` : '-';
         const visitor = t.visitorType === 'hotel_guest' ? 'Hotel' : t.visitorType === 'restaurant' ? 'Restaurant' : 'Other';
+        const guestName = sanitize(t.guestName || '-');
 
         page.drawText(`#${t.ticketNumber}`, { x: M, y, font: fontBold, size: 11, color: rgb(0.15,0.15,0.15) });
-        page.drawText(t.guestName || '—', { x: M + 54, y, font, size: 11, color: rgb(0.15,0.15,0.15) });
+        page.drawText(guestName, { x: M + 54, y, font, size: 11, color: rgb(0.15,0.15,0.15) });
         page.drawText(visitor, { x: W - M - 60, y, font, size: 9, color: rgb(0.5,0.5,0.5) });
         y -= 14;
         page.drawText(car, { x: M + 10, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
@@ -183,8 +190,8 @@ export default function AdminPanel() {
       const a = document.createElement('a'); a.href = url; a.download = `departed_history_${stamp}.pdf`; a.click();
       URL.revokeObjectURL(url);
       toast({ title: 'PDF ready', description: `${departed.length} departed tickets exported.` });
-    } catch (e) {
-      toast({ title: 'PDF failed', description: 'Could not generate PDF. Try again.', variant: 'destructive' });
+    } catch (e: any) {
+      toast({ title: 'PDF failed', description: e?.message || 'Could not generate PDF. Try again.', variant: 'destructive' });
     } finally {
       setPdfLoading(false);
     }
