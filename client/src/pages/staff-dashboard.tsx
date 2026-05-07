@@ -252,7 +252,8 @@ export default function StaffDashboard() {
   
   // Collapsible sections state
   const [inHouseExpanded, setInHouseExpanded] = useState(false);
-  const [departedExpanded, setDepartedExpanded] = useState(false);
+  const [departedExpanded, setDepartedExpanded] = useState(true);
+  const [departedHistoryExpanded, setDepartedHistoryExpanded] = useState(false);
 
   // Retrieval queue notifications
   const [retrievalRequests, setRetrievalRequests] = useState<RetrievalRequest[]>([]);
@@ -1175,65 +1176,114 @@ export default function StaffDashboard() {
               }}
             />
 
-            {/* Checked Out - Departed - Collapsible (hidden on mobile when compact view is on) */}
-            <Card className={compactView ? "hidden sm:block" : ""}>
-              <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedExpanded(!departedExpanded)}>
-                <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <LogOut size={18} />
-                    Checked Out - Departed ({activeTickets?.filter(t => t.status === 'completed').length || 0})
-                  </div>
-                  <ChevronDown size={20} className={`transition-transform ${departedExpanded ? 'rotate-180' : ''}`} />
-                </CardTitle>
-              </CardHeader>
-              {departedExpanded && (
-                <CardContent className="p-4 sm:p-6 pt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                    {activeTickets?.filter(t => t.status === 'completed').map((ticket) => {
-                      const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
-                      const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
-                      return (
-                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50 shadow-sm">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
-                              <p className="text-xs text-gray-400">
-                                {ticket.carMake} {ticket.carModel} • {ticket.carColor}
-                              </p>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              variant="ghost"
-                              className="h-8 w-8 p-0"
-                              onClick={() => setViewTicket(ticket)}
-                            >
-                              <Eye size={16} className="text-gray-400" />
-                            </Button>
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            <p><strong>Guest:</strong> {ticket.guestName}</p>
-                            {ticket.roomNumber && (
-                              <p><strong>Room:</strong> {ticket.roomNumber}</p>
-                            )}
-                            {stayHours !== null && (
-                              <p className="text-blue-600 font-medium mt-1">
-                                ⏱️ Total Stay: {stayHours}h {stayMins}m
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
-                      <div className="col-span-full text-center py-6 text-gray-400">
-                        <LogOut size={36} className="mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">No departed vehicles</p>
+            {/* Check Out Departed Today */}
+            {(() => {
+              const todayStart = new Date();
+              todayStart.setHours(0, 0, 0, 0);
+              const departedToday = activeTickets?.filter(t =>
+                t.status === 'completed' &&
+                t.updatedAt &&
+                new Date(t.updatedAt) >= todayStart
+              ) || [];
+              const departedHistory = activeTickets?.filter(t =>
+                t.status === 'completed' &&
+                (!t.updatedAt || new Date(t.updatedAt) < todayStart)
+              ) || [];
+
+              const DepartedCard = ({ ticket }: { ticket: typeof departedToday[0] }) => {
+                const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                return (
+                  <div className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
+                        <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
                       </div>
-                    )}
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                        <Eye size={16} className="text-gray-400" />
+                      </Button>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      <p><strong>Guest:</strong> {ticket.guestName}</p>
+                      {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
+                      {stayHours !== null && (
+                        <p className="text-blue-600 font-medium mt-1">⏱️ Total Stay: {stayHours}h {stayMins}m</p>
+                      )}
+                      {ticket.updatedAt && (
+                        <p className="text-gray-400 mt-0.5">
+                          Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              )}
-            </Card>
+                );
+              };
+
+              return (
+                <>
+                  {/* Today */}
+                  <Card className={compactView ? "hidden sm:block" : ""}>
+                    <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedExpanded(!departedExpanded)}>
+                      <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <LogOut size={18} />
+                          Check Out Departed Today
+                          <span className="ml-1 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                            {departedToday.length}
+                          </span>
+                        </div>
+                        <ChevronDown size={20} className={`transition-transform ${departedExpanded ? 'rotate-180' : ''}`} />
+                      </CardTitle>
+                    </CardHeader>
+                    {departedExpanded && (
+                      <CardContent className="p-4 sm:p-6 pt-0">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          {departedToday.length === 0 ? (
+                            <div className="col-span-full text-center py-6 text-gray-400">
+                              <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No departures today yet</p>
+                            </div>
+                          ) : (
+                            departedToday.map(t => <DepartedCard key={t.id} ticket={t} />)
+                          )}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+
+                  {/* History */}
+                  <Card className={compactView ? "hidden sm:block" : ""}>
+                    <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedHistoryExpanded(!departedHistoryExpanded)}>
+                      <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <LogOut size={18} />
+                          Check Out Departed History
+                          <span className="ml-1 bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                            {departedHistory.length}
+                          </span>
+                        </div>
+                        <ChevronDown size={20} className={`transition-transform ${departedHistoryExpanded ? 'rotate-180' : ''}`} />
+                      </CardTitle>
+                    </CardHeader>
+                    {departedHistoryExpanded && (
+                      <CardContent className="p-4 sm:p-6 pt-0">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          {departedHistory.length === 0 ? (
+                            <div className="col-span-full text-center py-6 text-gray-400">
+                              <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No historical departures</p>
+                            </div>
+                          ) : (
+                            departedHistory.map(t => <DepartedCard key={t.id} ticket={t} />)
+                          )}
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                </>
+              );
+            })()}
 
             {/* Stats Summary - At bottom (hidden on mobile when compact view is on) */}
             <div className={`grid grid-cols-2 gap-4 mt-4 ${compactView ? "hidden sm:grid" : ""}`}>
