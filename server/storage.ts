@@ -24,7 +24,7 @@ import {
   type InsertSystemSetting,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, or, inArray, isNull } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -233,7 +233,7 @@ export class DatabaseStorage implements IStorage {
         .from(ticketGuestTrips)
         .where(and(
           eq(ticketGuestTrips.ticketId, ticket.id),
-          eq(ticketGuestTrips.returnedAt, null as any)
+          isNull(ticketGuestTrips.returnedAt)
         ))
         .orderBy(desc(ticketGuestTrips.departedAt))
         .limit(1);
