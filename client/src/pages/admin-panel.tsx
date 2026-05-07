@@ -62,6 +62,7 @@ export default function AdminPanel() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [pdfRange, setPdfRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('7d');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfIncludePhotos, setPdfIncludePhotos] = useState(false);
 
   const RANGE_LABELS: Record<string, string> = {
     '1d': 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days',
@@ -159,8 +160,24 @@ export default function AdminPanel() {
         page.drawText('No departed tickets found for the selected period.', { x: M, y, font, size: 12, color: rgb(0.5,0.5,0.5) });
       }
 
+      const fetchPhotoBytes = async (photoUrl: string): Promise<Uint8Array | null> => {
+        try {
+          const r = await fetch(photoUrl);
+          if (!r.ok) return null;
+          return new Uint8Array(await r.arrayBuffer());
+        } catch { return null; }
+      };
+      const tryEmbedPhoto = async (bytes: Uint8Array) => {
+        try { return await doc.embedJpg(bytes); } catch {}
+        try { return await doc.embedPng(bytes); } catch {}
+        return null;
+      };
+
       for (const t of departed) {
-        if (y < 80) { page = doc.addPage([W, H]); y = H - M; }
+        const hasPhoto = pdfIncludePhotos && !!t.carPhoto;
+        const neededHeight = 50 + (hasPhoto ? 110 : 0);
+        if (y < 60 + neededHeight) { page = doc.addPage([W, H]); y = H - M; }
+
         const car = sanitize(`${t.carColor || ''} ${t.carMake || ''} ${t.carModel || ''}`.trim() || '-');
         const plate = sanitize(t.licensePlate || '-');
         const checkedIn = t.createdAt ? new Date(t.createdAt).toLocaleString('en-GB', { hour12: false }) : '-';
@@ -179,7 +196,20 @@ export default function AdminPanel() {
         y -= 12;
         page.drawText(`In: ${checkedIn}`, { x: M + 10, y, font, size: 8, color: rgb(0.5,0.5,0.5) });
         page.drawText(`Out: ${departed2}`, { x: M + 200, y, font, size: 8, color: rgb(0.5,0.5,0.5) });
-        y -= 10;
+        y -= 12;
+
+        if (hasPhoto) {
+          const bytes = await fetchPhotoBytes(t.carPhoto);
+          if (bytes) {
+            const img = await tryEmbedPhoto(bytes);
+            if (img) {
+              const imgW = 150, imgH = 112;
+              page.drawImage(img, { x: M + 10, y: y - imgH, width: imgW, height: imgH });
+              y -= (imgH + 8);
+            }
+          }
+        }
+
         page.drawRectangle({ x: M, y, width: W - M*2, height: 0.5, color: rgb(0.88,0.88,0.88) });
         y -= 12;
       }
@@ -1331,11 +1361,25 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
+                {/* Include photos toggle */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Options</p>
+                  <button onClick={() => setPdfIncludePhotos(!pdfIncludePhotos)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${pdfIncludePhotos ? 'border-regis-gold bg-amber-50 text-amber-800' : 'border-gray-200 bg-white text-gray-500'}`}>
+                    {pdfIncludePhotos ? <CheckSquare size={15} /> : <Square size={15} />}
+                    Include car photos
+                    <span className="text-xs font-normal opacity-60">— embeds car image per ticket</span>
+                  </button>
+                  {pdfIncludePhotos && (
+                    <p className="text-xs text-amber-700 mt-1.5 ml-1">Photos will be fetched and embedded — generation may take longer for large exports.</p>
+                  )}
+                </div>
+
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
                   <FileText size={18} className="text-gray-400 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-gray-700">What's included in the PDF</p>
-                    <p className="text-xs text-gray-500">Ticket #, Guest name, Car details, Plate, Check-in & departure time, Total stay duration, Visitor type</p>
+                    <p className="text-xs text-gray-500">Ticket #, Guest name, Car details, Plate, Check-in & departure time, Total stay duration, Visitor type{pdfIncludePhotos ? ', Car photo' : ''}</p>
                   </div>
                 </div>
 
