@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car } from "lucide-react";
+import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car, BarChart2, Database, TrendingUp, CalendarDays } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Link } from "wouter";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
-import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, UserLocationScope } from "@shared/schema";
+import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, UserLocationScope, ValetTicket } from "@shared/schema";
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -49,7 +50,12 @@ export default function AdminPanel() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [managingUserScopes, setManagingUserScopes] = useState<User | null>(null);
+  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
   const [userLocationScopes, setUserLocationScopes] = useState<UserLocationScope[]>([]);
+
+  const { data: allTickets } = useQuery<ValetTicket[]>({
+    queryKey: ["/api/staff/tickets"],
+  });
 
   const { data: faqs, isLoading: faqsLoading } = useQuery<Faq[]>({
     queryKey: ["/api/faqs"],
@@ -351,7 +357,7 @@ export default function AdminPanel() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-6' : 'sm:grid-cols-4'}`}>
               {isSuperAdmin && (
                 <TabsTrigger value="ous" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-ous">
                   <Building size={14} />
@@ -375,10 +381,13 @@ export default function AdminPanel() {
                   <span>FAQs</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="settings" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-settings">
-                <Settings size={14} />
-                <span className="hidden sm:inline">Settings</span>
-                <span className="sm:hidden">Set</span>
+              <TabsTrigger value="reports" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-reports">
+                <BarChart2 size={14} />
+                <span>Reports</span>
+              </TabsTrigger>
+              <TabsTrigger value="backup" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-backup">
+                <Database size={14} />
+                <span>Backup</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -747,23 +756,238 @@ export default function AdminPanel() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-6">
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-6">
+            {(() => {
+              const tickets = allTickets || [];
+              const now = new Date();
+              const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+              const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const yearStart = new Date(now.getFullYear(), 0, 1);
+
+              const completed = tickets.filter(t => t.status === 'completed');
+              const completedToday = completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= todayStart);
+              const completedWeek = completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= weekStart);
+              const completedMonth = completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= monthStart);
+              const completedYear = completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= yearStart);
+
+              const avgStay = (list: typeof completed) => {
+                const withTime = list.filter(t => t.totalStaySeconds && t.totalStaySeconds > 0);
+                if (!withTime.length) return null;
+                const avg = withTime.reduce((s, t) => s + (t.totalStaySeconds || 0), 0) / withTime.length;
+                const h = Math.floor(avg / 3600); const m = Math.floor((avg % 3600) / 60);
+                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+              };
+
+              const barData = (() => {
+                if (reportPeriod === 'day') {
+                  return Array.from({length: 24}, (_, h) => ({
+                    label: `${h.toString().padStart(2,'0')}:00`,
+                    Departures: completedToday.filter(t => t.updatedAt && new Date(t.updatedAt).getHours() === h).length,
+                    Arrivals: tickets.filter(t => t.createdAt && new Date(t.createdAt) >= todayStart && new Date(t.createdAt).getHours() === h).length,
+                  }));
+                }
+                if (reportPeriod === 'week') {
+                  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                  return days.map((d, i) => {
+                    const s = new Date(weekStart); s.setDate(weekStart.getDate() + i);
+                    const e = new Date(s); e.setDate(s.getDate() + 1);
+                    return { label: d, Departures: completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= s && new Date(t.updatedAt) < e).length, Arrivals: tickets.filter(t => t.createdAt && new Date(t.createdAt) >= s && new Date(t.createdAt) < e).length };
+                  });
+                }
+                if (reportPeriod === 'month') {
+                  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                  return Array.from({length: days}, (_, i) => {
+                    const s = new Date(now.getFullYear(), now.getMonth(), i + 1);
+                    const e = new Date(now.getFullYear(), now.getMonth(), i + 2);
+                    return { label: `${i+1}`, Departures: completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= s && new Date(t.updatedAt) < e).length, Arrivals: tickets.filter(t => t.createdAt && new Date(t.createdAt) >= s && new Date(t.createdAt) < e).length };
+                  });
+                }
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                return months.map((m, i) => {
+                  const s = new Date(now.getFullYear(), i, 1); const e = new Date(now.getFullYear(), i + 1, 1);
+                  return { label: m, Departures: completed.filter(t => t.updatedAt && new Date(t.updatedAt) >= s && new Date(t.updatedAt) < e).length, Arrivals: tickets.filter(t => t.createdAt && new Date(t.createdAt) >= s && new Date(t.createdAt) < e).length };
+                });
+              })();
+
+              const statusCounts = [
+                { name: 'In House', value: tickets.filter(t => t.status === 'active').length, color: '#1e3a5f' },
+                { name: 'Retrieving', value: tickets.filter(t => t.status === 'retrieving' || t.status === 'transit').length, color: '#f59e0b' },
+                { name: 'Ready', value: tickets.filter(t => t.status === 'ready').length, color: '#10b981' },
+                { name: 'Car Will Return', value: tickets.filter(t => t.status === 'out_with_guest').length, color: '#3b82f6' },
+                { name: 'Departed', value: tickets.filter(t => t.status === 'completed').length, color: '#6b7280' },
+              ].filter(s => s.value > 0);
+
+              const periodLabel = reportPeriod === 'day' ? 'Today' : reportPeriod === 'week' ? 'This Week' : reportPeriod === 'month' ? 'This Month' : 'This Year';
+              const periodCount = reportPeriod === 'day' ? completedToday.length : reportPeriod === 'week' ? completedWeek.length : reportPeriod === 'month' ? completedMonth.length : completedYear.length;
+              const periodArrivals = reportPeriod === 'day' ? tickets.filter(t => t.createdAt && new Date(t.createdAt) >= todayStart).length
+                : reportPeriod === 'week' ? tickets.filter(t => t.createdAt && new Date(t.createdAt) >= weekStart).length
+                : reportPeriod === 'month' ? tickets.filter(t => t.createdAt && new Date(t.createdAt) >= monthStart).length
+                : tickets.filter(t => t.createdAt && new Date(t.createdAt) >= yearStart).length;
+              const periodAvg = reportPeriod === 'day' ? avgStay(completedToday) : reportPeriod === 'week' ? avgStay(completedWeek) : reportPeriod === 'month' ? avgStay(completedMonth) : avgStay(completedYear);
+
+              return (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-regis-navy flex items-center gap-2">
+                        <BarChart2 size={22} className="text-regis-gold" /> Operations Report
+                      </h2>
+                      <p className="text-sm text-gray-500 mt-0.5">Statistics and performance overview</p>
+                    </div>
+                    <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                      {(['day','week','month','year'] as const).map(p => (
+                        <button key={p} onClick={() => setReportPeriod(p)}
+                          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${reportPeriod === p ? 'bg-regis-navy text-white shadow-sm' : 'text-gray-600 hover:bg-white'}`}>
+                          {p === 'day' ? 'Day' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <Card className="border-l-4 border-l-regis-navy">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Arrivals</p>
+                        <p className="text-3xl font-bold text-regis-navy mt-1">{periodArrivals}</p>
+                        <p className="text-xs text-gray-400 mt-1">{periodLabel}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-l-4 border-l-gray-400">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Departures</p>
+                        <p className="text-3xl font-bold text-gray-600 mt-1">{periodCount}</p>
+                        <p className="text-xs text-gray-400 mt-1">{periodLabel}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-l-4 border-l-yellow-400">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Avg Stay</p>
+                        <p className="text-3xl font-bold text-amber-600 mt-1">{periodAvg ?? '—'}</p>
+                        <p className="text-xs text-gray-400 mt-1">{periodLabel}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-l-4 border-l-green-500">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Currently In</p>
+                        <p className="text-3xl font-bold text-green-600 mt-1">{tickets.filter(t => t.status !== 'completed').length}</p>
+                        <p className="text-xs text-gray-400 mt-1">Active tickets</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp size={18} className="text-regis-gold" />
+                        Arrivals & Departures — {periodLabel}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {barData.every(d => d.Arrivals === 0 && d.Departures === 0) ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                          <BarChart2 size={40} className="opacity-30 mb-2" />
+                          <p className="text-sm">No data for this period yet</p>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={280}>
+                          <BarChart data={barData} margin={{ top: 4, right: 8, left: -20, bottom: 4 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={reportPeriod === 'month' ? 4 : reportPeriod === 'day' ? 3 : 0} />
+                            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 12 }} />
+                            <Bar dataKey="Arrivals" fill="#1e3a5f" radius={[3,3,0,0]} />
+                            <Bar dataKey="Departures" fill="#6b7280" radius={[3,3,0,0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <CalendarDays size={18} className="text-regis-gold" />
+                          Current Status Breakdown
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {statusCounts.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                            <p className="text-sm">No active tickets</p>
+                          </div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={220}>
+                            <PieChart>
+                              <Pie data={statusCounts} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                                {statusCounts.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                              </Pie>
+                              <Tooltip />
+                              <Legend wrapperStyle={{ fontSize: 12 }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <TrendingUp size={18} className="text-regis-gold" />
+                          All-Time Totals
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-2">
+                        {[
+                          { label: 'Total Tickets Ever', value: tickets.length, color: 'text-regis-navy' },
+                          { label: 'Total Departures', value: completed.length, color: 'text-gray-600' },
+                          { label: 'Departed Today', value: completedToday.length, color: 'text-green-600' },
+                          { label: 'Departed This Week', value: completedWeek.length, color: 'text-blue-600' },
+                          { label: 'Departed This Month', value: completedMonth.length, color: 'text-amber-600' },
+                          { label: 'Avg Stay (All Time)', value: avgStay(completed) ?? '—', color: 'text-purple-600' },
+                        ].map(row => (
+                          <div key={row.label} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                            <span className="text-sm text-gray-600">{row.label}</span>
+                            <span className={`font-bold text-lg ${row.color}`}>{row.value}</span>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })()}
+          </TabsContent>
+
+          {/* Backup Tab */}
+          <TabsContent value="backup" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>System Settings</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Database size={20} className="text-regis-gold" />
+                  Data Backup & Restore
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Average Retrieval Time (minutes)</label>
-                  <Input type="number" defaultValue="5" min="1" max="30" data-testid="input-avg-retrieval-time" />
+                <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
+                  <Database size={48} className="text-gray-300 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-500 mb-2">Backup Coming Soon</h3>
+                  <p className="text-sm text-gray-400 max-w-sm">
+                    Automated backups, manual snapshots, and data restore functionality will be available here in a future update.
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Maximum Queue Size</label>
-                  <Input type="number" defaultValue="20" min="5" max="100" data-testid="input-max-queue-size" />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 opacity-40 pointer-events-none select-none">
+                  {['Automated Daily Backup', 'Manual Snapshot', 'Restore from Backup'].map(f => (
+                    <div key={f} className="border-2 border-gray-200 rounded-lg p-4 text-center">
+                      <Database size={24} className="text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm font-medium text-gray-500">{f}</p>
+                      <p className="text-xs text-gray-400 mt-1">Not available yet</p>
+                    </div>
+                  ))}
                 </div>
-                <Button className="w-full bg-regis-navy hover:bg-blue-900" data-testid="button-save-settings">
-                  Save Settings
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
