@@ -127,7 +127,11 @@ export const valetTickets = pgTable("valet_tickets", {
   // Total stay tracking
   totalStaySeconds: integer("total_stay_seconds"), // Duration in seconds from ticket creation to departure
   departedAt: timestamp("departed_at"), // When the guest finally departed (completed)
-  
+
+  // Scheduled retrieval
+  scheduledRetrievalAt: timestamp("scheduled_retrieval_at"), // Guest-chosen future retrieval time
+  reminderEmail: varchar("reminder_email"),                  // Email to send reminder to
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

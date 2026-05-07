@@ -60,6 +60,7 @@ export interface IStorage {
   getValetTicket(ticketNumber: string): Promise<ValetTicket | undefined>;
   updateValetTicketStatus(ticketNumber: string, status: string): Promise<ValetTicket | undefined>;
   updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined>;
+  updateValetTicket(ticketNumber: string, fields: Partial<ValetTicket>): Promise<ValetTicket | undefined>;
   deleteValetTicket(ticketNumber: string): Promise<boolean>;
   getActiveTickets(): Promise<ValetTicket[]>;
   getTicketsByLocation(locationId: string): Promise<ValetTicket[]>;
@@ -216,6 +217,15 @@ export class DatabaseStorage implements IStorage {
     const [ticket] = await db
       .update(valetTickets)
       .set({ ...details, updatedAt: new Date() })
+      .where(eq(valetTickets.ticketNumber, ticketNumber))
+      .returning();
+    return ticket;
+  }
+
+  async updateValetTicket(ticketNumber: string, fields: Partial<ValetTicket>): Promise<ValetTicket | undefined> {
+    const [ticket] = await db
+      .update(valetTickets)
+      .set({ ...(fields as any), updatedAt: new Date() })
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
     return ticket;

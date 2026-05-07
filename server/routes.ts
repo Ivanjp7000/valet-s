@@ -7,6 +7,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
+import { sendScheduledRetrievalReminder } from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -174,6 +175,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error requesting retrieval:", error);
       res.status(500).json({ message: "Failed to request retrieval" });
+    }
+  });
+
+  // Schedule a future retrieval with optional email reminder
+  app.post('/api/tickets/:ticketNumber/schedule-retrieval', async (req, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { scheduledAt, email } = req.body;
+
+      if (!scheduledAt) {
+        return res.status(400).json({ message: "scheduledAt is required" });
+      }
+
+      const scheduledDate = new Date(scheduledAt);
+      const now = new Date();
+      const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      if (isNaN(scheduledDate.getTime())) {
+        return res.status(400).json({ message: "Invalid date" });
+      }
+      if (scheduledDate <= now) {
+        return res.status(400).json({ message: "Scheduled time must be in the future" });
+      }
+      if (scheduledDate > maxDate) {
+        return res.status(400).json({ message: "Cannot schedule more than 7 days in advance" });
+      }
+
+      const ticket = await storage.getValetTicket(ticketNumber);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!['active', 'pending'].includes(ticket.status)) {
+        return res.status(400).json({ message: "Ticket is not available for scheduling" });
+      }
+
+      await storage.updateValetTicket(ticketNumber, {
+        scheduledRetrievalAt: scheduledDate,
+        reminderEmail: email || null,
+      });
+
+      let emailSent = false;
+      if (email && ticket.guestName) {
+        const result = await sendScheduledRetrievalReminder({
+          to: email,
+          guestName: ticket.guestName,
+          ticketNumber,
+          scheduledAt: scheduledDate,
+        });
+        emailSent = result.sent;
+      }
+
+      res.json({ success: true, emailSent });
+    } catch (error) {
+      console.error("Error scheduling retrieval:", error);
+      res.status(500).json({ message: "Failed to schedule retrieval" });
     }
   });
 
