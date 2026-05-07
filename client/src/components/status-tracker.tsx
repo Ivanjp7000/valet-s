@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
-import { Car, Search, Construction, Check, X, Clock, Bell } from "lucide-react";
+import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ValetTicket } from "@shared/schema";
 
@@ -11,17 +11,23 @@ interface StatusTrackerProps {
   onBack: () => void;
 }
 
-const STAGE_DURATION_S = 5 * 60; // 5 minutes in seconds
+// Stage durations match the backend: retrieving=5min, transit=5min, preparing=4min
+const STAGE_DURATIONS: Record<string, number> = {
+  retrieving: 5 * 60,
+  transit: 5 * 60,
+  preparing: 4 * 60,
+};
 
 function getStageFromStatus(status: string): number {
   if (status === "retrieving") return 0;
   if (status === "transit") return 1;
-  if (status === "ready") return 2;
+  if (status === "preparing") return 2;
+  if (status === "ready") return 3;
   return -1;
 }
 
 export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
-  const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATION_S);
+  const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATIONS.retrieving);
   const { lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
 
@@ -56,17 +62,18 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
     }
     if (currentStage < 0) return;
 
+    const stageDuration = STAGE_DURATIONS[ticket.status] ?? 5 * 60;
     const stageStarted = ticket.stageStartedAt
       ? new Date(ticket.stageStartedAt).getTime()
       : Date.now();
     const elapsedSeconds = Math.floor((Date.now() - stageStarted) / 1000);
-    const remaining = Math.max(0, STAGE_DURATION_S - elapsedSeconds);
+    const remaining = Math.max(0, stageDuration - elapsedSeconds);
     setTimeRemaining(remaining);
   }, [ticket?.status, ticket?.stageStartedAt, isReady, currentStage]);
 
-  // Countdown — only runs for retrieving and transit, stops at ready
+  // Countdown — runs for retrieving, transit, and preparing
   useEffect(() => {
-    if (!ticket || ticket.status !== "retrieving" && ticket.status !== "transit") return;
+    if (!ticket || !["retrieving", "transit", "preparing"].includes(ticket.status)) return;
 
     const interval = setInterval(() => {
       setTimeRemaining((prev) => Math.max(0, prev - 1));
@@ -95,6 +102,12 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
     },
     {
       id: 2,
+      name: "Final Preparation",
+      description: "Vehicle is being prepared for handover",
+      icon: Sparkles,
+    },
+    {
+      id: 3,
       name: "Car Ready",
       description: "Your vehicle is waiting at the entrance",
       icon: Check,
@@ -137,6 +150,10 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
             <div className="flex items-center gap-2 text-sm text-gray-300">
               <Construction size={15} className="flex-shrink-0" />
               <span>Car in transit</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-300">
+              <Sparkles size={15} className="flex-shrink-0" />
+              <span>Final preparation</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-300">
               <Check size={15} className="flex-shrink-0" />
@@ -195,18 +212,15 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
 
             {/* Completed stages */}
             <div className="bg-white rounded-xl p-4 border border-green-100 text-left space-y-3">
-              {stages.map((stage) => {
-                const Icon = stage.icon;
-                return (
-                  <div key={stage.id} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                      <Check className="text-white" size={14} />
-                    </div>
-                    <span className="text-sm font-medium text-green-800">{stage.name}</span>
-                    <Check className="text-green-400 ml-auto" size={14} />
+              {stages.map((stage) => (
+                <div key={stage.id} className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                    <Check className="text-white" size={14} />
                   </div>
-                );
-              })}
+                  <span className="text-sm font-medium text-green-800">{stage.name}</span>
+                  <Check className="text-green-400 ml-auto" size={14} />
+                </div>
+              ))}
             </div>
           </motion.div>
         </div>
@@ -223,7 +237,7 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
     );
   }
 
-  // In progress (retrieving or transit)
+  // In progress (retrieving, transit, or preparing)
   if (!isActive) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center">
@@ -263,7 +277,7 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
                   key={stage.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.2 }}
+                  transition={{ delay: index * 0.15 }}
                   className="flex items-start mb-8"
                 >
                   <div
