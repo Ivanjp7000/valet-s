@@ -803,6 +803,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (locationId !== undefined) {
         updateData.locationId = locationId || null;
       }
+
+      // Pre-check email uniqueness (excluding the user being updated)
+      if (updateData.email) {
+        const existingEmail = await storage.getUserByEmail(updateData.email);
+        if (existingEmail && existingEmail.id !== id) {
+          return res.status(400).json({ message: "Email already in use by another account. Please use a different email address." });
+        }
+      }
+
+      // Pre-check username uniqueness (excluding the user being updated)
+      if (updateData.username) {
+        const existingUsername = await storage.getUserByUsername(updateData.username);
+        if (existingUsername && existingUsername.id !== id) {
+          return res.status(400).json({ message: "Username already taken. Please choose a different username." });
+        }
+      }
       
       // If password is being updated, hash it
       if (password) {
@@ -814,8 +830,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user:", error);
+      const cause = error?.cause || error;
+      if (cause?.code === '23505' && cause?.constraint === 'users_email_unique') {
+        return res.status(400).json({ message: "Email already in use by another account. Please use a different email address." });
+      }
+      if (cause?.code === '23505' && cause?.constraint === 'users_username_key') {
+        return res.status(400).json({ message: "Username already taken. Please choose a different username." });
+      }
       res.status(400).json({ message: "Failed to update user" });
     }
   });
