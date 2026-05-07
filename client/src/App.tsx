@@ -13,7 +13,7 @@ import NotFound from "@/pages/not-found";
 // Version is derived from the build date — updates automatically on every deploy
 function buildVersion() {
   const d = new Date();
-  return `V${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+  return `Release ${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
 }
 
 const APP_VERSION = buildVersion();
@@ -23,7 +23,7 @@ function VersionBadge() {
   if (isLoading || !isAuthenticated) return null;
   return (
     <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none select-none">
-      <span className="text-[10px] font-mono text-gray-400/70 tracking-wide">
+      <span className="text-xs font-mono text-gray-800 tracking-wide font-semibold">
         {APP_VERSION}
       </span>
     </div>
