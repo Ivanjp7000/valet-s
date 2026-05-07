@@ -91,6 +91,7 @@ export interface IStorage {
   getScopedLocations(user: User): Promise<PhysicalLocation[]>;
   getTicketsByOU(ouId: string): Promise<ValetTicket[]>;
   getTicketsByLocations(locationIds: string[]): Promise<ValetTicket[]>;
+  getTicketByPhotoPath(photoPath: string): Promise<ValetTicket | undefined>;
   
   // Guest trip log operations
   getTicketGuestTrips(ticketId: string): Promise<TicketGuestTrip[]>;
@@ -629,6 +630,15 @@ export class DatabaseStorage implements IStorage {
       .from(valetTickets)
       .where(inArray(valetTickets.locationId, locationIds))
       .orderBy(desc(valetTickets.createdAt));
+  }
+
+  async getTicketByPhotoPath(photoPath: string): Promise<ValetTicket | undefined> {
+    const [ticket] = await db
+      .select()
+      .from(valetTickets)
+      .where(or(eq(valetTickets.carPhoto, photoPath), eq(valetTickets.platePhotoUrl, photoPath)))
+      .limit(1);
+    return ticket;
   }
 }
 

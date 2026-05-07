@@ -152,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateValetTicketStatus(ticketNumber, 'retrieval_requested');
 
-      broadcastToAll({
+      broadcastToOU(updated!.ouId, {
         type: 'retrieval_requested',
         data: {
           ticketNumber: updated!.ticketNumber,
@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateValetTicketStatus(ticketNumber, 'retrieving');
 
-      broadcastToAll({
+      broadcastToOU(updated!.ouId, {
         type: 'retrieval_accepted',
         data: updated,
       });
@@ -387,8 +387,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'active',
       });
 
-      // Broadcast to all connected WebSocket clients
-      broadcastToAll({
+      // Broadcast to all connected WebSocket clients in the same OU
+      broadcastToOU(ticket.ouId, {
         type: 'ticket_created',
         data: ticket
       });
@@ -411,8 +411,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
-      // Broadcast status update to all connected clients
-      broadcastToAll({
+      // Broadcast status update to clients in the same OU
+      broadcastToOU(ticket!.ouId, {
         type: 'ticket_status_updated',
         data: ticket
       });
@@ -435,8 +435,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found or guest had not departed" });
       }
 
-      // Broadcast status update to all connected clients
-      broadcastToAll({
+      // Broadcast status update to clients in the same OU
+      broadcastToOU(ticket!.ouId, {
         type: 'ticket_status_updated',
         data: ticket
       });
@@ -1174,8 +1174,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         carPhoto,
       });
 
-      // Broadcast to all connected WebSocket clients
-      broadcastToAll({
+      // Broadcast to clients in the same OU
+      broadcastToOU(newTicket.ouId, {
         type: 'ticket_created',
         data: newTicket
       });
@@ -1209,8 +1209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ticket not found" });
       }
 
-      // Broadcast update
-      broadcastToAll({
+      // Broadcast update to clients in the same OU
+      broadcastToOU(updatedTicket.ouId, {
         type: 'ticket_updated',
         data: updatedTicket,
       });
@@ -1226,15 +1226,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/tickets/:ticketNumber", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
-      
+
+      // Fetch before delete so we can scope the broadcast
+      const ticketForBroadcast = await storage.getValetTicket(ticketNumber);
       const deleted = await storage.deleteValetTicket(ticketNumber);
       
       if (!deleted) {
         return res.status(404).json({ error: "Ticket not found" });
       }
 
-      // Broadcast deletion
-      broadcastToAll({
+      // Broadcast deletion scoped to the ticket's OU
+      broadcastToOU(ticketForBroadcast?.ouId ?? null, {
         type: 'ticket_deleted',
         data: { ticketNumber },
       });
@@ -1257,8 +1259,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Ticket not found" });
       }
 
-      // Broadcast archive
-      broadcastToAll({
+      // Broadcast archive to clients in the same OU
+      broadcastToOU(archivedTicket.ouId, {
         type: 'ticket_archived',
         data: archivedTicket,
       });
@@ -1282,9 +1284,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/car-photos/:photoPath(*)', async (req, res) => {
+  app.get('/car-photos/:photoPath(*)', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const photoPath = `/${req.params.photoPath}`;
+      const currentUser = req.currentUser;
+
+      // Verify this photo belongs to a ticket in the caller's OU
+      const owningTicket = await storage.getTicketByPhotoPath(photoPath);
+      if (!owningTicket) {
+        return res.status(404).json({ message: "Photo not found" });
+      }
+      if (currentUser.role !== 'superadmin' && owningTicket.ouId !== currentUser.ouId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const objectStorageService = new ObjectStorageService();
       const photoFile = await objectStorageService.getCarPhotoFile(photoPath);
       objectStorageService.downloadCarPhoto(photoFile, res);
@@ -1316,8 +1329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         staffNotes,
       });
 
-      // Broadcast update to WebSocket clients
-      broadcastToAll({
+      // Broadcast update to WebSocket clients in the same OU
+      broadcastToOU(updatedTicket?.ouId, {
         type: 'ticket_updated',
         data: updatedTicket,
       });
@@ -1352,8 +1365,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedStaff: (req as any).user?.claims?.sub,
       });
 
-      // Broadcast update to WebSocket clients
-      broadcastToAll({
+      // Broadcast update to WebSocket clients in the same OU
+      broadcastToOU(updatedTicket?.ouId, {
         type: 'ticket_details_updated',
         data: updatedTicket,
       });
@@ -1372,21 +1385,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  const clients = new Set<WebSocket>();
+  interface ClientInfo { ouId: string | null; role: string; }
+  const clients = new Map<WebSocket, ClientInfo>();
   const sessionParser = getSession();
 
   wss.on('connection', (ws, request: any) => {
     // Validate session before accepting the WebSocket connection
-    sessionParser(request, {} as any, () => {
+    sessionParser(request, {} as any, async () => {
       const localUserId = request.session?.user?.claims?.sub;
       const passportUserId = request.session?.passport?.user?.claims?.sub;
+      const userId = localUserId || passportUserId;
 
-      if (!localUserId && !passportUserId) {
+      if (!userId) {
         ws.close(1008, 'Unauthorized');
         return;
       }
 
-      clients.add(ws);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        ws.close(1008, 'Unauthorized');
+        return;
+      }
+
+      clients.set(ws, { ouId: user.ouId ?? null, role: user.role });
       console.log('Authenticated client connected to WebSocket');
 
       ws.on('close', () => {
@@ -1527,6 +1548,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Not found' });
       }
 
+      // Verify this photo belongs to a ticket in the caller's OU
+      const currentUser = req.currentUser;
+      const owningTicket = await storage.getTicketByPhotoPath(normalizedPath);
+      if (!owningTicket) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+      if (currentUser.role !== 'superadmin' && owningTicket.ouId !== currentUser.ouId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
       const photoFile = await objectStorageService.getCarPhotoFile(normalizedPath);
       await objectStorageService.downloadCarPhoto(photoFile, res);
     } catch (error) {
@@ -1538,11 +1569,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Function to broadcast to all connected clients
-  function broadcastToAll(message: any) {
+  // Broadcast to clients in the same OU (super admins receive all broadcasts)
+  function broadcastToOU(ouId: string | null | undefined, message: any) {
     const messageStr = JSON.stringify(message);
-    clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
+    clients.forEach((info, client) => {
+      if (client.readyState !== WebSocket.OPEN) return;
+      if (info.role === 'superadmin') {
+        client.send(messageStr);
+      } else if (ouId && info.ouId === ouId) {
         client.send(messageStr);
       }
     });
