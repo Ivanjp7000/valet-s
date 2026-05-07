@@ -13,6 +13,27 @@ function sanitizeUser<T extends { password?: string | null }>(user: T): Omit<T, 
   return { ...rest, hasPassword: !!password };
 }
 
+// In-memory rate limiter for public ticket endpoints
+const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+  if (!entry || now - entry.windowStart > windowMs) {
+    rateLimitStore.set(key, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= maxRequests) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
+function namesMatch(input: string, stored: string): boolean {
+  return input.trim().toLowerCase() === stored.trim().toLowerCase();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -119,24 +140,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public routes (Customer facing)
-  app.get('/api/tickets/:ticketNumber', async (req, res) => {
+  app.get('/api/tickets/:ticketNumber', async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
+      const nameParam = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+
+      // Require name as a second factor on every read — eliminates validity oracle
+      if (!nameParam) {
+        return res.status(400).json({ message: "Name is required" });
+      }
+
+      // Rate limit per-ticket (not per-IP) so rotating source addresses cannot bypass it
+      const socketIp = req.socket?.remoteAddress || 'unknown';
+      if (!checkRateLimit(`ticket-lookup:${ticketNumber}`, 15, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
+      }
+      // Secondary IP-based limit using the direct socket address (not x-forwarded-for)
+      if (!checkRateLimit(`ticket-lookup-ip:${socketIp}`, 60, 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
+      }
+
       const ticket = await storage.getValetTicket(ticketNumber);
-      
-      if (!ticket) {
+
+      // Return the same 404 whether the ticket doesn't exist or the name doesn't match
+      // — prevents enumeration oracle
+      if (!ticket || !namesMatch(nameParam, ticket.guestName)) {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
       res.json({
         ticketNumber: ticket.ticketNumber,
         status: ticket.status,
-        guestName: ticket.guestName,
         visitorType: ticket.visitorType,
         visitorSubType: ticket.visitorSubType,
-        roomNumber: ticket.roomNumber,
         createdAt: ticket.createdAt,
-        updatedAt: ticket.updatedAt,
+        stageStartedAt: ticket.stageStartedAt,
       });
     } catch (error) {
       console.error("Error fetching ticket:", error);
@@ -145,12 +183,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public: customer requests car retrieval — queues it and alerts all staff in the OU
-  app.post('/api/tickets/:ticketNumber/request-retrieval', async (req, res) => {
+  app.post('/api/tickets/:ticketNumber/request-retrieval', async (req: any, res) => {
     try {
+      const { ticketNumber: tn } = req.params;
+      const socketIp = req.socket?.remoteAddress || 'unknown';
+      if (!checkRateLimit(`ticket-write:${tn}`, 5, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+      if (!checkRateLimit(`ticket-write-ip:${socketIp}`, 30, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+
       const { ticketNumber } = req.params;
+      const { guestName } = req.body;
+
+      if (!guestName || typeof guestName !== 'string' || !guestName.trim()) {
+        return res.status(400).json({ message: "Name verification is required" });
+      }
+
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      // Return the same 404 for both not-found and name-mismatch — eliminates oracle
+      if (!ticket || !namesMatch(guestName, ticket.guestName)) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
       if (ticket.status !== 'active') {
         return res.status(400).json({ message: "Ticket is not in active status" });
       }
@@ -183,10 +239,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Schedule a future retrieval
-  app.post('/api/tickets/:ticketNumber/schedule-retrieval', async (req, res) => {
+  app.post('/api/tickets/:ticketNumber/schedule-retrieval', async (req: any, res) => {
     try {
+      const { ticketNumber: tn } = req.params;
+      const socketIp = req.socket?.remoteAddress || 'unknown';
+      if (!checkRateLimit(`ticket-write:${tn}`, 5, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+      if (!checkRateLimit(`ticket-write-ip:${socketIp}`, 30, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+
       const { ticketNumber } = req.params;
-      const { scheduledAt } = req.body;
+      const { scheduledAt, guestName } = req.body;
+
+      if (!guestName || typeof guestName !== 'string' || !guestName.trim()) {
+        return res.status(400).json({ message: "Name verification is required" });
+      }
 
       if (!scheduledAt) {
         return res.status(400).json({ message: "scheduledAt is required" });
@@ -207,7 +276,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const ticket = await storage.getValetTicket(ticketNumber);
-      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      // Return the same 404 for both not-found and name-mismatch — eliminates oracle
+      if (!ticket || !namesMatch(guestName, ticket.guestName)) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
       if (!['active', 'pending'].includes(ticket.status)) {
         return res.status(400).json({ message: "Ticket is not available for scheduling" });
       }

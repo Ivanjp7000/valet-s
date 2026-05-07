@@ -8,6 +8,7 @@ import type { ValetTicket } from "@shared/schema";
 
 interface StatusTrackerProps {
   ticketNumber: string;
+  guestName: string;
   onBack: () => void;
 }
 
@@ -26,13 +27,19 @@ function getStageFromStatus(status: string): number {
   return -1;
 }
 
-export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
+export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTrackerProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATIONS.retrieving);
   const { lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
 
   const { data: ticket } = useQuery<ValetTicket>({
-    queryKey: ["/api/tickets", ticketNumber],
+    queryKey: ["/api/tickets", ticketNumber, guestName],
+    queryFn: async () => {
+      const url = `/api/tickets/${encodeURIComponent(ticketNumber)}?name=${encodeURIComponent(guestName)}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     refetchInterval: 5000,
   });
 
@@ -49,7 +56,7 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
         message.type === "ticket_status_updated" &&
         message.data?.ticketNumber === ticketNumber
       ) {
-        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber] });
+        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName] });
       }
     } catch {}
   }, [lastMessage, ticketNumber, queryClient]);

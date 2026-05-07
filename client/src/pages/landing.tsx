@@ -15,11 +15,10 @@ import { format, addDays, startOfToday } from "date-fns";
 interface TicketPreview {
   ticketNumber: string;
   status: string;
-  guestName: string;
   visitorType: string;
   visitorSubType?: string | null;
-  roomNumber?: string | null;
   createdAt: string;
+  stageStartedAt?: string | null;
 }
 
 export default function Landing() {
@@ -37,6 +36,8 @@ export default function Landing() {
   const [submittedTicket, setSubmittedTicket] = useState("");
   const [ticketPreview, setTicketPreview] = useState<TicketPreview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const [nameError, setNameError] = useState("");
   const { toast } = useToast();
 
   const { data: faqs } = useQuery<Faq[]>({
@@ -53,15 +54,27 @@ export default function Landing() {
       return;
     }
 
+    if (!guestNameInput.trim()) {
+      setNameError("Please enter your name as it appears on the ticket.");
+      return;
+    }
+
     setIsLoading(true);
+    setNameError("");
     try {
-      const response = await fetch(`/api/tickets/${ticketNumber}`);
+      const response = await fetch(
+        `/api/tickets/${ticketNumber}?name=${encodeURIComponent(guestNameInput.trim())}`
+      );
       if (!response.ok) {
-        toast({
-          title: "Ticket Not Found",
-          description: "No valet ticket found with that number. Please check and try again.",
-          variant: "destructive",
-        });
+        if (response.status === 429) {
+          toast({
+            title: "Too Many Attempts",
+            description: "Please wait a moment before trying again.",
+            variant: "destructive",
+          });
+        } else {
+          setNameError("Ticket not found, or the name does not match. Please check and try again.");
+        }
         return;
       }
       const data: TicketPreview = await response.json();
@@ -93,6 +106,8 @@ export default function Landing() {
     setScheduleConfirmed(false);
     setScheduleDate("");
     setScheduleTime("");
+    setGuestNameInput("");
+    setNameError("");
   };
 
   const handleScheduleSubmit = async () => {
@@ -106,7 +121,7 @@ export default function Landing() {
       const response = await fetch(`/api/tickets/${submittedTicket}/schedule-retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduledAt }),
+        body: JSON.stringify({ scheduledAt, guestName: guestNameInput.trim() }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -125,6 +140,8 @@ export default function Landing() {
     try {
       const response = await fetch(`/api/tickets/${submittedTicket}/request-retrieval`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestName: guestNameInput.trim() }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -148,7 +165,7 @@ export default function Landing() {
   };
 
   if (showStatus) {
-    return <StatusTracker ticketNumber={submittedTicket} onBack={() => setShowStatus(false)} />;
+    return <StatusTracker ticketNumber={submittedTicket} guestName={guestNameInput.trim()} onBack={() => setShowStatus(false)} />;
   }
 
   if (showCamera) {
@@ -216,7 +233,7 @@ export default function Landing() {
             </button>
             <div>
               <h1 className="text-xl font-semibold text-regis-navy leading-tight">Schedule Retrieval</h1>
-              <p className="text-gray-500 text-xs">Ticket #{ticketPreview.ticketNumber} · {ticketPreview.guestName}</p>
+              <p className="text-gray-500 text-xs">Ticket #{ticketPreview.ticketNumber}</p>
             </div>
           </div>
         </div>
@@ -318,8 +335,8 @@ export default function Landing() {
                 <div className="w-20 h-20 bg-regis-gold/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Car className="text-regis-gold" size={36} />
                 </div>
-                <h2 className="text-2xl font-bold text-regis-navy mb-1">Welcome Back!</h2>
-                <p className="text-gray-500 text-sm">We found your ticket. Ready to retrieve your vehicle?</p>
+                <h2 className="text-2xl font-bold text-regis-navy mb-1">Ticket Found</h2>
+                <p className="text-gray-500 text-sm">Please confirm your identity to proceed.</p>
               </div>
 
               {/* Divider */}
@@ -334,19 +351,6 @@ export default function Landing() {
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Ticket Number</p>
                     <p className="font-bold text-regis-navy text-lg">#{ticketPreview.ticketNumber}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-yellow-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <User className="text-regis-gold" size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Guest Name</p>
-                    <p className="font-semibold text-gray-800">{ticketPreview.guestName}</p>
-                    {ticketPreview.roomNumber && (
-                      <p className="text-xs text-gray-500">Room {ticketPreview.roomNumber}</p>
-                    )}
                   </div>
                 </div>
 
@@ -507,13 +511,32 @@ export default function Landing() {
               </div>
             </div>
 
+            {/* Name Input */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Your Name (as on ticket)
+              </label>
+              <input
+                type="text"
+                value={guestNameInput}
+                onChange={e => { setGuestNameInput(e.target.value); setNameError(""); }}
+                onKeyDown={e => { if (e.key === 'Enter') handleTicketSubmit(); }}
+                placeholder="Enter your full name"
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
+              />
+              {nameError && (
+                <p className="text-red-500 text-xs mt-1">{nameError}</p>
+              )}
+            </div>
+
             {/* Submit Button */}
             <Button 
               onClick={handleTicketSubmit}
+              disabled={isLoading}
               className="w-full bg-regis-navy hover:bg-blue-900 text-white font-medium py-4 h-auto"
               data-testid="button-submit"
             >
-              Submit
+              {isLoading ? "Looking up…" : "Submit"}
             </Button>
           </CardContent>
         </Card>
