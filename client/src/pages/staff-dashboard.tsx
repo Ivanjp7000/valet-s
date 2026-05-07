@@ -24,7 +24,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, User as UserType } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
-function GuestOutCard({ ticket, onBack, canEdit = true }: { ticket: ValetTicket; onBack: () => void; canEdit?: boolean }) {
+function GuestOutCard({ ticket, onBack, onView, canEdit = true }: { ticket: ValetTicket; onBack: () => void; onView: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -49,8 +49,19 @@ function GuestOutCard({ ticket, onBack, canEdit = true }: { ticket: ValetTicket;
           <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
           <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
         </div>
-        <span className="text-xs font-mono font-bold text-blue-700">{mins}:{secs.toString().padStart(2, '0')}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-mono font-bold text-blue-700">{mins}:{secs.toString().padStart(2, '0')}</span>
+          <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={onView}>
+            <Eye size={12} className="text-gray-500" />
+          </Button>
+        </div>
       </div>
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${
+        ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
+      }`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+        PL: {ticket.parkingLocation || 'Unassigned'}
+      </span>
       {canEdit && (
         <Button 
           size="sm" 
@@ -147,7 +158,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true
   );
 }
 
-function GuestOutCardFull({ ticket, onBack, canEdit = true }: { ticket: ValetTicket; onBack: () => void; canEdit?: boolean }) {
+function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: ValetTicket; onBack: () => void; onView: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -176,13 +187,24 @@ function GuestOutCardFull({ ticket, onBack, canEdit = true }: { ticket: ValetTic
           <p className="font-bold text-lg text-regis-navy">#{ticket.ticketNumber}</p>
           <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
         </div>
-        <div className="text-right">
-          <Badge className="bg-blue-600 text-white mb-1">Out with Guest</Badge>
+        <div className="text-right flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-blue-600 text-white">Out with Guest</Badge>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 border border-gray-200 bg-white hover:bg-gray-50" onClick={onView}>
+              <Eye size={14} className="text-gray-500" />
+            </Button>
+          </div>
           <p className="text-lg font-mono font-bold text-blue-700">{timeDisplay}</p>
         </div>
       </div>
-      <div className="text-sm text-gray-600 mb-3">
+      <div className="text-sm text-gray-600 mb-3 space-y-1">
         <p><strong>Guest:</strong> {ticket.guestName}</p>
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+          ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+          PL: {ticket.parkingLocation || 'Unassigned'}
+        </span>
       </div>
       {canEdit && (
         <Button 
@@ -757,6 +779,7 @@ export default function StaffDashboard() {
                         key={ticket.id} 
                         ticket={ticket} 
                         onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                        onView={() => setViewTicket(ticket)}
                         canEdit={canEdit}
                       />
                     ))}
@@ -1066,6 +1089,7 @@ export default function StaffDashboard() {
                             key={ticket.id} 
                             ticket={ticket} 
                             onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                            onView={() => setViewTicket(ticket)}
                             canEdit={canEdit}
                           />
                         ))}
@@ -1214,6 +1238,7 @@ export default function StaffDashboard() {
                         key={ticket.id}
                         ticket={ticket}
                         onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                        onView={() => setViewTicket(ticket)}
                         canEdit={canEdit}
                       />
                     ))}
