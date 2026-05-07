@@ -254,6 +254,9 @@ export default function StaffDashboard() {
   const [inHouseExpanded, setInHouseExpanded] = useState(false);
   const [departedExpanded, setDepartedExpanded] = useState(true);
   const [departedHistoryExpanded, setDepartedHistoryExpanded] = useState(false);
+  const [historyFilterYear, setHistoryFilterYear] = useState<string>('all');
+  const [historyFilterMonth, setHistoryFilterMonth] = useState<string>('all');
+  const [historyFilterDay, setHistoryFilterDay] = useState<string>('all');
 
   // Retrieval queue notifications
   const [retrievalRequests, setRetrievalRequests] = useState<RetrievalRequest[]>([]);
@@ -1268,16 +1271,95 @@ export default function StaffDashboard() {
                     </CardHeader>
                     {departedHistoryExpanded && (
                       <CardContent className="p-4 sm:p-6 pt-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                          {departedHistory.length === 0 ? (
-                            <div className="col-span-full text-center py-6 text-gray-400">
-                              <LogOut size={36} className="mx-auto mb-2 opacity-40" />
-                              <p className="text-sm">No historical departures</p>
-                            </div>
-                          ) : (
-                            departedHistory.map(t => <DepartedCard key={t.id} ticket={t} />)
-                          )}
-                        </div>
+                        {/* Filters */}
+                        {(() => {
+                          const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+                          // Derive available years/months/days from history data
+                          const availableYears = Array.from(new Set(departedHistory.map(t => t.updatedAt ? new Date(t.updatedAt).getFullYear().toString() : null).filter(Boolean))).sort((a,b) => Number(b)-Number(a)) as string[];
+                          const availableMonths = Array.from(new Set(departedHistory.filter(t => {
+                            if (!t.updatedAt) return false;
+                            const d = new Date(t.updatedAt);
+                            return historyFilterYear === 'all' || d.getFullYear().toString() === historyFilterYear;
+                          }).map(t => t.updatedAt ? (new Date(t.updatedAt).getMonth()+1).toString() : null).filter(Boolean))).sort((a,b) => Number(a)-Number(b)) as string[];
+                          const availableDays = Array.from(new Set(departedHistory.filter(t => {
+                            if (!t.updatedAt) return false;
+                            const d = new Date(t.updatedAt);
+                            return (historyFilterYear === 'all' || d.getFullYear().toString() === historyFilterYear) &&
+                                   (historyFilterMonth === 'all' || (d.getMonth()+1).toString() === historyFilterMonth);
+                          }).map(t => t.updatedAt ? new Date(t.updatedAt).getDate().toString() : null).filter(Boolean))).sort((a,b) => Number(a)-Number(b)) as string[];
+
+                          // Apply filters
+                          const filtered = departedHistory.filter(t => {
+                            if (!t.updatedAt) return historyFilterYear === 'all' && historyFilterMonth === 'all' && historyFilterDay === 'all';
+                            const d = new Date(t.updatedAt);
+                            if (historyFilterYear !== 'all' && d.getFullYear().toString() !== historyFilterYear) return false;
+                            if (historyFilterMonth !== 'all' && (d.getMonth()+1).toString() !== historyFilterMonth) return false;
+                            if (historyFilterDay !== 'all' && d.getDate().toString() !== historyFilterDay) return false;
+                            return true;
+                          });
+
+                          const hasFilter = historyFilterYear !== 'all' || historyFilterMonth !== 'all' || historyFilterDay !== 'all';
+
+                          return (
+                            <>
+                              {/* Filter bar */}
+                              <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filter by:</span>
+                                {/* Year */}
+                                <select
+                                  value={historyFilterYear}
+                                  onChange={e => { setHistoryFilterYear(e.target.value); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
+                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
+                                >
+                                  <option value="all">All Years</option>
+                                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                </select>
+                                {/* Month */}
+                                <select
+                                  value={historyFilterMonth}
+                                  onChange={e => { setHistoryFilterMonth(e.target.value); setHistoryFilterDay('all'); }}
+                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
+                                >
+                                  <option value="all">All Months</option>
+                                  {availableMonths.map(m => <option key={m} value={m}>{monthNames[Number(m)-1]}</option>)}
+                                </select>
+                                {/* Day */}
+                                <select
+                                  value={historyFilterDay}
+                                  onChange={e => setHistoryFilterDay(e.target.value)}
+                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
+                                >
+                                  <option value="all">All Days</option>
+                                  {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                {hasFilter && (
+                                  <button
+                                    onClick={() => { setHistoryFilterYear('all'); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
+                                    className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded border border-red-200 hover:bg-red-50 transition-colors"
+                                  >
+                                    Clear
+                                  </button>
+                                )}
+                                {hasFilter && (
+                                  <span className="text-xs text-gray-400 ml-auto">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+                                )}
+                              </div>
+
+                              {/* Results */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                {filtered.length === 0 ? (
+                                  <div className="col-span-full text-center py-6 text-gray-400">
+                                    <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                                    <p className="text-sm">{hasFilter ? 'No departures match this filter' : 'No historical departures'}</p>
+                                  </div>
+                                ) : (
+                                  filtered.map(t => <DepartedCard key={t.id} ticket={t} />)
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </CardContent>
                     )}
                   </Card>
