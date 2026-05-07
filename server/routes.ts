@@ -7,7 +7,6 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { sendScheduledRetrievalReminder } from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -178,11 +177,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Schedule a future retrieval with optional email reminder
+  // Schedule a future retrieval
   app.post('/api/tickets/:ticketNumber/schedule-retrieval', async (req, res) => {
     try {
       const { ticketNumber } = req.params;
-      const { scheduledAt, email } = req.body;
+      const { scheduledAt } = req.body;
 
       if (!scheduledAt) {
         return res.status(400).json({ message: "scheduledAt is required" });
@@ -210,21 +209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateValetTicket(ticketNumber, {
         scheduledRetrievalAt: scheduledDate,
-        reminderEmail: email || null,
       });
 
-      let emailSent = false;
-      if (email && ticket.guestName) {
-        const result = await sendScheduledRetrievalReminder({
-          to: email,
-          guestName: ticket.guestName,
-          ticketNumber,
-          scheduledAt: scheduledDate,
-        });
-        emailSent = result.sent;
-      }
-
-      res.json({ success: true, emailSent });
+      res.json({ success: true });
     } catch (error) {
       console.error("Error scheduling retrieval:", error);
       res.status(500).json({ message: "Failed to schedule retrieval" });

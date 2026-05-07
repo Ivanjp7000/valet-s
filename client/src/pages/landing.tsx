@@ -6,7 +6,7 @@ import { CameraScanner } from "@/components/camera-scanner";
 import { StatusTracker } from "@/components/status-tracker";
 import { SystemLoginModal } from "@/components/system-login-modal";
 import { FAQModal } from "@/components/faq-modal";
-import { Camera, HelpCircle, Settings, Ticket, Car, Calendar, User, Building2, X, Clock, Mail, CheckCircle, ChevronLeft } from "lucide-react";
+import { Camera, HelpCircle, Settings, Ticket, Car, Calendar, User, Building2, X, Clock, CheckCircle, ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Faq } from "@shared/schema";
 import { VISITOR_TYPES } from "@shared/schema";
@@ -32,8 +32,6 @@ export default function Landing() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
-  const [scheduleEmail, setScheduleEmail] = useState("");
-  const [scheduleEmailEnabled, setScheduleEmailEnabled] = useState(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState("");
@@ -95,17 +93,11 @@ export default function Landing() {
     setScheduleConfirmed(false);
     setScheduleDate("");
     setScheduleTime("");
-    setScheduleEmail("");
-    setScheduleEmailEnabled(false);
   };
 
   const handleScheduleSubmit = async () => {
     if (!scheduleDate || !scheduleTime) {
       toast({ title: "Please select a date and time", variant: "destructive" });
-      return;
-    }
-    if (scheduleEmailEnabled && !scheduleEmail) {
-      toast({ title: "Please enter your email address", variant: "destructive" });
       return;
     }
     setScheduleLoading(true);
@@ -114,7 +106,7 @@ export default function Landing() {
       const response = await fetch(`/api/tickets/${submittedTicket}/schedule-retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduledAt, email: scheduleEmailEnabled ? scheduleEmail : undefined }),
+        body: JSON.stringify({ scheduledAt }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -202,15 +194,6 @@ export default function Landing() {
                       <p className="font-semibold text-regis-navy">{format(confirmedDate, "h:mm a")}</p>
                     </div>
                   </div>
-                  {scheduleEmailEnabled && scheduleEmail && (
-                    <div className="flex items-center gap-3">
-                      <Mail className="text-regis-gold flex-shrink-0" size={16} />
-                      <div>
-                        <p className="text-xs text-gray-400 uppercase tracking-wide">Reminder sent to</p>
-                        <p className="font-semibold text-regis-navy">{scheduleEmail}</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <p className="text-xs text-gray-400 mb-6">To change your time, scan your ticket again and select a new schedule.</p>
                 <Button onClick={handleCancelConfirmation} variant="outline" className="w-full">
@@ -275,32 +258,6 @@ export default function Landing() {
                   />
                 </div>
 
-                {/* Email reminder toggle */}
-                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={scheduleEmailEnabled}
-                      onChange={e => setScheduleEmailEnabled(e.target.checked)}
-                      className="w-4 h-4 accent-regis-navy rounded"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Mail size={15} className="text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">Send me a reminder by email</span>
-                    </div>
-                  </label>
-                  {scheduleEmailEnabled && (
-                    <div className="mt-3">
-                      <input
-                        type="email"
-                        placeholder="your@email.com"
-                        value={scheduleEmail}
-                        onChange={e => setScheduleEmail(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
-                      />
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="mt-7 space-y-3">
