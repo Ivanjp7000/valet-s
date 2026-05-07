@@ -2207,12 +2207,12 @@ export default function StaffDashboard() {
                 <TicketIcon size={20} />
                 Ticket #{viewTicket?.ticketNumber}
                 {viewTicket && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-base font-extrabold tracking-wide ${
                     viewTicket.parkingLocation
-                      ? 'bg-green-100 text-green-700 border border-green-300'
-                      : 'bg-red-100 text-red-700 border border-red-300'
+                      ? 'bg-green-100 text-green-800 border-2 border-green-400'
+                      : 'bg-red-100 text-red-700 border-2 border-red-300'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${viewTicket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${viewTicket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
                     PL: {viewTicket.parkingLocation || 'Unassigned'}
                   </span>
                 )}
