@@ -1148,6 +1148,9 @@ export default function StaffDashboard() {
                                   <p className="text-xs text-gray-500">
                                     {ticket.carMake} {ticket.carModel}
                                   </p>
+                                  {ticket.licensePlate && (
+                                    <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>
+                                  )}
                                 </div>
                                 <div className="flex items-start gap-2">
                                   <Button 
@@ -1333,6 +1336,9 @@ export default function StaffDashboard() {
                               <p className="text-xs text-gray-500">
                                 {ticket.carMake} {ticket.carModel}
                               </p>
+                              {ticket.licensePlate && (
+                                <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>
+                              )}
                             </div>
                             <div className="flex items-start gap-2">
                               <Button 
@@ -1472,6 +1478,9 @@ export default function StaffDashboard() {
                       <div>
                         <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
+                        {ticket.licensePlate && (
+                          <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>
+                        )}
                       </div>
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
                         <Eye size={16} className="text-gray-400" />
