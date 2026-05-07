@@ -226,6 +226,7 @@ export const insertValetTicketSchema = createInsertSchema(valetTickets).pick({
   carColor: true,
   licensePlate: true,
   platePhotoUrl: true,
+  carPhoto: true,
   locationId: true,
   parkingSector: true,
   parkingLocation: true,

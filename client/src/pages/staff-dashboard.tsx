@@ -2302,6 +2302,28 @@ export default function StaffDashboard() {
                       />
                     </div>
                   )}
+                  {viewTicket.carPhoto && (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 mb-2 flex items-center gap-2">
+                        Car Photo
+                        <span className="text-gray-400 font-normal">
+                          {(() => {
+                            const url = viewTicket.carPhoto!;
+                            const base64 = url.startsWith('data:') ? (url.split(',')[1] || '') : url;
+                            const bytes = Math.round(base64.length * 3 / 4);
+                            if (bytes < 1024) return `${bytes} B`;
+                            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                          })()}
+                        </span>
+                      </p>
+                      <img
+                        src={viewTicket.carPhoto}
+                        alt="Car"
+                        className="w-full max-w-xs h-40 object-cover rounded border"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
