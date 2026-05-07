@@ -1275,19 +1275,17 @@ export default function StaffDashboard() {
                         {(() => {
                           const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-                          // Derive available years/months/days from history data
+                          // Derive available years from history data (only years with data)
                           const availableYears = Array.from(new Set(departedHistory.map(t => t.updatedAt ? new Date(t.updatedAt).getFullYear().toString() : null).filter(Boolean))).sort((a,b) => Number(b)-Number(a)) as string[];
-                          const availableMonths = Array.from(new Set(departedHistory.filter(t => {
-                            if (!t.updatedAt) return false;
-                            const d = new Date(t.updatedAt);
-                            return historyFilterYear === 'all' || d.getFullYear().toString() === historyFilterYear;
-                          }).map(t => t.updatedAt ? (new Date(t.updatedAt).getMonth()+1).toString() : null).filter(Boolean))).sort((a,b) => Number(a)-Number(b)) as string[];
-                          const availableDays = Array.from(new Set(departedHistory.filter(t => {
-                            if (!t.updatedAt) return false;
-                            const d = new Date(t.updatedAt);
-                            return (historyFilterYear === 'all' || d.getFullYear().toString() === historyFilterYear) &&
-                                   (historyFilterMonth === 'all' || (d.getMonth()+1).toString() === historyFilterMonth);
-                          }).map(t => t.updatedAt ? new Date(t.updatedAt).getDate().toString() : null).filter(Boolean))).sort((a,b) => Number(a)-Number(b)) as string[];
+                          // Always show all 12 months
+                          const allMonths = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+                          // Days: all days for selected month/year, or 1-31 if no month selected
+                          const daysInMonth = (() => {
+                            if (historyFilterMonth === 'all') return Array.from({length:31},(_,i)=>(i+1).toString());
+                            const year = historyFilterYear !== 'all' ? Number(historyFilterYear) : new Date().getFullYear();
+                            const count = new Date(year, Number(historyFilterMonth), 0).getDate();
+                            return Array.from({length:count},(_,i)=>(i+1).toString());
+                          })();
 
                           // Apply filters
                           const filtered = departedHistory.filter(t => {
@@ -1312,7 +1310,7 @@ export default function StaffDashboard() {
                                   onChange={e => { setHistoryFilterYear(e.target.value); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
                                   className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
                                 >
-                                  <option value="all">All Years</option>
+                                  <option value="all">Year</option>
                                   {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                                 </select>
                                 {/* Month */}
@@ -1321,8 +1319,8 @@ export default function StaffDashboard() {
                                   onChange={e => { setHistoryFilterMonth(e.target.value); setHistoryFilterDay('all'); }}
                                   className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
                                 >
-                                  <option value="all">All Months</option>
-                                  {availableMonths.map(m => <option key={m} value={m}>{monthNames[Number(m)-1]}</option>)}
+                                  <option value="all">Month</option>
+                                  {allMonths.map(m => <option key={m} value={m}>{monthNames[Number(m)-1]}</option>)}
                                 </select>
                                 {/* Day */}
                                 <select
@@ -1330,8 +1328,8 @@ export default function StaffDashboard() {
                                   onChange={e => setHistoryFilterDay(e.target.value)}
                                   className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
                                 >
-                                  <option value="all">All Days</option>
-                                  {availableDays.map(d => <option key={d} value={d}>{d}</option>)}
+                                  <option value="all">Day</option>
+                                  {daysInMonth.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                                 {hasFilter && (
                                   <button
