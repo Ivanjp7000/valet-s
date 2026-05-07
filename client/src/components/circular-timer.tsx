@@ -48,7 +48,7 @@ export function CircularTimer({
   const barWidth = `${Math.max(0, (1 - progress) * 100)}%`;
 
   return (
-    <div className="flex flex-col items-end gap-0.5 min-w-[72px]">
+    <div className="flex flex-col items-end gap-0.5 w-fit">
       <span className={`text-xs font-bold tabular-nums ${progress >= 1 ? "text-red-600" : text}`}>
         {formatTime()}
       </span>
