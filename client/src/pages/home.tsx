@@ -157,19 +157,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Compact Access Level */}
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center gap-2">
-                <Badge className={`${getRoleColor(user?.role || '')} text-white text-xs`}>
-                  {getRoleLabel(user?.role || '')}
-                </Badge>
-                <span className="text-xs text-gray-600">
-                  {user?.role === 'superadmin' && "Full system access"}
-                  {user?.role === 'privilege_admin' && "OU-level access"}
-                  {user?.role === 'standard_admin' && "Daily operations"}
-                </span>
-              </div>
-            </div>
           </div>
         )}
 
@@ -249,24 +236,6 @@ export default function Home() {
             )}
           </div>
 
-          <div className="mt-6 sm:mt-8 p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="font-medium text-regis-navy mb-2 text-sm sm:text-base">Your Access Level</h3>
-            {user?.role === 'superadmin' && (
-              <p className="text-xs sm:text-sm text-gray-600">
-                As a Super Admin, you have full access to manage all organizations, locations, and users across the entire system.
-              </p>
-            )}
-            {user?.role === 'privilege_admin' && (
-              <p className="text-xs sm:text-sm text-gray-600">
-                As a Privilege Admin, you can manage locations and standard admin accounts within your assigned organization.
-              </p>
-            )}
-            {user?.role === 'standard_admin' && (
-              <p className="text-xs sm:text-sm text-gray-600">
-                As a Standard Admin, you can manage daily valet operations including ticket handling and vehicle tracking.
-              </p>
-            )}
-          </div>
         </div>
       </div>
     </div>
