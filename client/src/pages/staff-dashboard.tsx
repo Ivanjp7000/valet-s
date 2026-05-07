@@ -1029,7 +1029,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'retrievals') return (
                           <SortablePanel key="retrievals" id="retrievals"
-                            title={`Being Retrieved (${activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})`}
+                            title={`Retrieving Car (${activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})`}
                             icon={<Car size={14} />}
                             expanded={isExpanded} onToggle={toggle}
                           >
