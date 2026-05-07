@@ -1302,46 +1302,75 @@ export default function StaffDashboard() {
                           return (
                             <>
                               {/* Filter bar */}
-                              <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filter by:</span>
-                                {/* Year */}
-                                <select
-                                  value={historyFilterYear}
-                                  onChange={e => { setHistoryFilterYear(e.target.value); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
-                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
-                                >
-                                  <option value="all">Year</option>
-                                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                                {/* Month */}
-                                <select
-                                  value={historyFilterMonth}
-                                  onChange={e => { setHistoryFilterMonth(e.target.value); setHistoryFilterDay('all'); }}
-                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
-                                >
-                                  <option value="all">Month</option>
-                                  {allMonths.map(m => <option key={m} value={m}>{monthNames[Number(m)-1]}</option>)}
-                                </select>
-                                {/* Day */}
-                                <select
-                                  value={historyFilterDay}
-                                  onChange={e => setHistoryFilterDay(e.target.value)}
-                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
-                                >
-                                  <option value="all">Day</option>
-                                  {daysInMonth.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                                {hasFilter && (
-                                  <button
-                                    onClick={() => { setHistoryFilterYear('all'); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
-                                    className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded border border-red-200 hover:bg-red-50 transition-colors"
+                              <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filter by:</span>
+                                  <div className="flex items-center gap-2">
+                                    {hasFilter && (
+                                      <span className="text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+                                    )}
+                                    {hasFilter && (
+                                      <button
+                                        onClick={() => { setHistoryFilterYear('all'); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
+                                        className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-0.5 rounded border border-red-200 hover:bg-red-50 transition-colors"
+                                      >
+                                        Clear
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Year — dropdown (few options) */}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-500 w-10 shrink-0">Year</span>
+                                  <select
+                                    value={historyFilterYear}
+                                    onChange={e => { setHistoryFilterYear(e.target.value); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
+                                    className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
                                   >
-                                    Clear
-                                  </button>
-                                )}
-                                {hasFilter && (
-                                  <span className="text-xs text-gray-400 ml-auto">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
-                                )}
+                                    <option value="all">All</option>
+                                    {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                  </select>
+                                </div>
+
+                                {/* Month — compact button grid with abbreviations */}
+                                <div className="flex items-start gap-2">
+                                  <span className="text-xs text-gray-500 w-10 shrink-0 pt-1">Month</span>
+                                  <div className="grid grid-cols-6 gap-1">
+                                    {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((abbr, i) => {
+                                      const val = (i+1).toString();
+                                      const active = historyFilterMonth === val;
+                                      return (
+                                        <button
+                                          key={val}
+                                          onClick={() => { setHistoryFilterMonth(active ? 'all' : val); setHistoryFilterDay('all'); }}
+                                          className={`text-xs px-1.5 py-1 rounded font-medium transition-colors ${active ? 'bg-regis-navy text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}
+                                        >
+                                          {abbr}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Day — compact button grid */}
+                                <div className="flex items-start gap-2">
+                                  <span className="text-xs text-gray-500 w-10 shrink-0 pt-1">Day</span>
+                                  <div className="grid grid-cols-10 gap-1">
+                                    {daysInMonth.map(d => {
+                                      const active = historyFilterDay === d;
+                                      return (
+                                        <button
+                                          key={d}
+                                          onClick={() => setHistoryFilterDay(active ? 'all' : d)}
+                                          className={`text-xs px-1.5 py-1 rounded font-medium transition-colors ${active ? 'bg-regis-navy text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}
+                                        >
+                                          {d}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               </div>
 
                               {/* Results */}
