@@ -2377,13 +2377,13 @@ export default function StaffDashboard() {
                       <div className={`col-span-2 rounded-lg p-3 ${
                         viewTicket.retrievalDurationSeconds == null
                           ? 'bg-yellow-50 border border-yellow-200'
-                          : viewTicket.retrievalDurationSeconds <= 840
+                          : viewTicket.retrievalDurationSeconds <= 660
                           ? 'bg-green-50 border border-green-200'
                           : 'bg-red-50 border border-red-200'
                       }`}>
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs text-gray-500 mb-0.5">Total Retrieval Time</p>
+                            <p className="text-xs text-gray-500 mb-0.5">Retrieval Time (this request)</p>
                             <p className="text-xl font-bold">
                               {viewTicket.retrievalDurationSeconds != null
                                 ? (() => {
@@ -2404,14 +2404,14 @@ export default function StaffDashboard() {
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-gray-500 mb-0.5">SLA Target</p>
-                            <p className="text-sm font-semibold text-gray-600">≤ 14 min</p>
+                            <p className="text-sm font-semibold text-gray-600">≤ 11 min</p>
                             {viewTicket.retrievalDurationSeconds != null && (
                               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                                viewTicket.retrievalDurationSeconds <= 840
+                                viewTicket.retrievalDurationSeconds <= 660
                                   ? 'bg-green-200 text-green-800'
                                   : 'bg-red-200 text-red-800'
                               }`}>
-                                {viewTicket.retrievalDurationSeconds <= 840 ? '✓ Met' : '✗ Exceeded'}
+                                {viewTicket.retrievalDurationSeconds <= 660 ? '✓ Met' : '✗ Exceeded'}
                               </span>
                             )}
                           </div>
@@ -2420,9 +2420,9 @@ export default function StaffDashboard() {
                           <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${
-                                viewTicket.retrievalDurationSeconds <= 840 ? 'bg-green-500' : 'bg-red-500'
+                                viewTicket.retrievalDurationSeconds <= 660 ? 'bg-green-500' : 'bg-red-500'
                               }`}
-                              style={{ width: `${Math.min(100, (viewTicket.retrievalDurationSeconds / 840) * 100)}%` }}
+                              style={{ width: `${Math.min(100, (viewTicket.retrievalDurationSeconds / 660) * 100)}%` }}
                             />
                           </div>
                         )}
