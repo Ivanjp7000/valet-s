@@ -879,7 +879,7 @@ export default function StaffDashboard() {
                     <p className="text-xs text-gray-500">In House</p>
                   </div>
                   <div className="flex-1 bg-orange-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-orange-600">{activeTickets?.filter(t => ['retrieving', 'transit', 'ready'].includes(t.status)).length || 0}</p>
+                    <p className="text-lg font-bold text-orange-600">{activeTickets?.filter(t => ['retrieving', 'transit', 'preparing', 'ready'].includes(t.status)).length || 0}</p>
                     <p className="text-xs text-gray-500">Retrieving</p>
                   </div>
                   <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
@@ -938,7 +938,7 @@ export default function StaffDashboard() {
                     <Car size={14} /> Being Retrieved ({activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})
                   </h3>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).map((ticket) => (
+                    {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).map((ticket) => (
                       <div key={ticket.id} className="bg-gray-50 rounded p-2 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
@@ -948,7 +948,7 @@ export default function StaffDashboard() {
                                 <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
                               )}
                               {ticket.status === 'transit' && (
-                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
+                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'preparing' })}>Final Prep</Button>
                               )}
                               <Button
                                 size="sm"
@@ -964,7 +964,7 @@ export default function StaffDashboard() {
                         <CompactRetrievalProgress ticket={ticket} />
                       </div>
                     ))}
-                    {activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length === 0 && (
+                    {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).length === 0 && (
                       <p className="text-xs text-gray-400 text-center py-2">No active retrievals</p>
                     )}
                   </div>
@@ -1406,7 +1406,7 @@ export default function StaffDashboard() {
                 updateStatusMutation.mutate({ ticketNumber, status });
               }}
               onStageComplete={(ticketNumber, nextStage) => {
-                const statusMap: Record<number, string> = { 2: 'transit', 3: 'ready', 4: 'completed' };
+                const statusMap: Record<number, string> = { 2: 'transit', 3: 'preparing', 4: 'ready' };
                 const newStatus = statusMap[nextStage];
                 if (newStatus) {
                   updateStatusMutation.mutate({ ticketNumber, status: newStatus });

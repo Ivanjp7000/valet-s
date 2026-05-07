@@ -160,9 +160,12 @@ export class DatabaseStorage implements IStorage {
     } else if (status === 'transit') {
       updateData.stageStartedAt = now;
       updateData.currentStage = 2;
-    } else if (status === 'ready') {
+    } else if (status === 'preparing') {
       updateData.stageStartedAt = now;
       updateData.currentStage = 3;
+    } else if (status === 'ready') {
+      updateData.stageStartedAt = now;
+      updateData.currentStage = 4;
     } else if (status === 'completed') {
       updateData.currentStage = 4;
       updateData.departedAt = now;
