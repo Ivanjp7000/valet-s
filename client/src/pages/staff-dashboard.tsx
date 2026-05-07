@@ -104,9 +104,14 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true
             <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
           )}
           <p className="text-xs text-gray-500 truncate">{ticket.carMake} {ticket.carModel}</p>
-          {ticket.parkingLocation && (
-            <p className="text-xs text-blue-600 font-medium">📍 {ticket.parkingLocation}</p>
-          )}
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
+            ticket.parkingLocation
+              ? 'bg-green-100 text-green-700 border border-green-300'
+              : 'bg-red-100 text-red-700 border border-red-300'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+            PL: {ticket.parkingLocation || 'Unassigned'}
+          </span>
         </div>
         <div className="flex flex-col gap-1">
           <Button 
@@ -1740,9 +1745,19 @@ export default function StaffDashboard() {
         <Dialog open={!!viewTicket} onOpenChange={() => setViewTicket(null)}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
                 <TicketIcon size={20} />
                 Ticket #{viewTicket?.ticketNumber}
+                {viewTicket && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                    viewTicket.parkingLocation
+                      ? 'bg-green-100 text-green-700 border border-green-300'
+                      : 'bg-red-100 text-red-700 border border-red-300'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${viewTicket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                    PL: {viewTicket.parkingLocation || 'Unassigned'}
+                  </span>
+                )}
               </DialogTitle>
             </DialogHeader>
             {viewTicket && (
@@ -1820,10 +1835,14 @@ export default function StaffDashboard() {
                 </div>
 
                 <div className="border-t pt-4">
-                  <h3 className="font-semibold text-regis-navy mb-3">Parking Information</h3>
-                  <div>
-                    <p className="text-xs text-gray-500">Parking Location</p>
-                    <p className="font-medium">{viewTicket.parkingLocation || 'Not assigned'}</p>
+                  <h3 className="font-semibold text-regis-navy mb-3">Parking Location</h3>
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${
+                    viewTicket.parkingLocation
+                      ? 'bg-green-100 text-green-700 border border-green-300'
+                      : 'bg-red-100 text-red-700 border border-red-300'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${viewTicket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {viewTicket.parkingLocation || 'Not assigned'}
                   </div>
                 </div>
 
