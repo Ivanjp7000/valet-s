@@ -108,7 +108,8 @@ export default function AdminPanel() {
       const res = await fetch(`/api/backup/export?${params}`);
       if (!res.ok) throw new Error('Export failed');
       const data = await res.json();
-      const stamp = new Date().toISOString().slice(0,10);
+      const _d = new Date();
+      const stamp = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
 
       if (backupFormat === 'json') {
         triggerDownload(JSON.stringify(data, null, 2), `backup_${stamp}.json`, 'application/json');
@@ -157,7 +158,8 @@ export default function AdminPanel() {
       let page = doc.addPage([W, H]);
       let y = H - M;
 
-      const stamp = new Date().toISOString().slice(0,10);
+      const _now = new Date();
+      const stamp = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
       const rangeLabel = RANGE_LABELS[pdfRange];
 
       // Title
