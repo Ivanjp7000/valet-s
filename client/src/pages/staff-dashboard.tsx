@@ -586,7 +586,10 @@ export default function StaffDashboard() {
     queryKey: ["/api/staff/tickets", viewTicket?.ticketNumber, "trips"],
     queryFn: async () => {
       if (!viewTicket) return [];
-      const res = await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/trips`, { credentials: "include" });
+      const res = await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/trips`, {
+        credentials: "include",
+        cache: "no-store",
+      });
       if (!res.ok) return [];
       return res.json();
     },
