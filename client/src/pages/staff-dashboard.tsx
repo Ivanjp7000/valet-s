@@ -1516,7 +1516,7 @@ export default function StaffDashboard() {
             })()}
 
             {/* Stats Summary - At bottom (hidden on mobile when compact view is on) */}
-            <div className={`grid grid-cols-2 gap-4 mt-4 ${compactView ? "hidden sm:grid" : ""}`}>
+            <div className="grid grid-cols-2 gap-4 mt-4 hidden sm:grid">
               <Card className="shadow-sm">
                 <CardContent className="p-4 text-center">
                   <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
