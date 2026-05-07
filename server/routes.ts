@@ -1290,6 +1290,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // ── Google Cloud Vision OCR endpoint ──────────────────────────────────────
+  // Accepts a base64-encoded image (data URL or raw base64) and returns the
+  // text detected by Google Cloud Vision TEXT_DETECTION.
+  // The API key is kept server-side so it is never exposed to the browser.
+  app.post('/api/ocr/plate', isAuthenticated, async (req: any, res) => {
+    try {
+      const apiKey = process.env.GOOGLE_VISION_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ message: 'Google Vision API key not configured' });
+      }
+
+      const { imageBase64 } = req.body as { imageBase64?: string };
+      if (!imageBase64) {
+        return res.status(400).json({ message: 'imageBase64 is required' });
+      }
+
+      // Strip data-URL prefix if present ("data:image/...;base64,")
+      const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '');
+
+      const visionUrl =
+        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
+
+      const body = {
+        requests: [
+          {
+            image: { content: base64Data },
+            features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+            imageContext: {
+              languageHints: ['ja', 'en'],
+            },
+          },
+        ],
+      };
+
+      const response = await fetch(visionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error('[Vision API] error:', errText);
+        return res.status(502).json({ message: 'Vision API request failed', detail: errText });
+      }
+
+      const json = (await response.json()) as any;
+      const annotation = json.responses?.[0]?.textAnnotations?.[0];
+      const text: string = annotation?.description ?? '';
+
+      return res.json({ text });
+    } catch (err: any) {
+      console.error('[Vision API] unexpected error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Function to broadcast to all connected clients
   function broadcastToAll(message: any) {
     const messageStr = JSON.stringify(message);

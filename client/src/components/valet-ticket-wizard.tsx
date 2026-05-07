@@ -18,72 +18,38 @@ import {
 import type { User as UserType } from "@shared/schema";
 
 /**
- * Prepares a plate image specifically for OCR:
- *  1. Crops to the centre band on portrait shots (same logic as processPlateImage)
- *     so Tesseract only scans the plate region, not the whole car/background.
- *  2. Upscales the cropped region to at least 1500 px wide.
- *  3. Converts to greyscale (luminance weights).
- *  4. Stretches contrast across the full 0-255 range.
- * Returns a PNG data URL — no toBlob, no canvas-taint risk.
+ * Prepares a plate image for Google Cloud Vision API:
+ *  1. Crops to the centre band on portrait shots so Vision sees only the plate area.
+ *  2. Scales to at most 1200 px wide (Vision works well at this resolution).
+ *  3. Keeps full colour — Vision reads colour images better than greyscale.
+ * Returns a JPEG data URL at 80% quality (~50-150 KB), well within Vision's limits.
  */
-async function enhancePlateForOCR(dataUrl: string): Promise<string> {
+async function prepareForVisionAPI(dataUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const nw = img.naturalWidth;
       const nh = img.naturalHeight;
 
-      // --- Step 1: portrait crop (same as processPlateImage) ---
-      let srcX = 0;
-      let srcY = 0;
-      let srcW = nw;
-      let srcH = nh;
+      let srcX = 0, srcY = 0, srcW = nw, srcH = nh;
       if (nh > nw * 1.3) {
-        // Portrait: crop top & bottom 25% — plate lives in the middle 50%
         const cut = Math.round(nh * 0.25);
         srcY = cut;
         srcH = nh - cut * 2;
       }
 
-      // --- Step 2: scale the cropped region to exactly 1500 px wide ---
-      // Always scale (up OR down) — prevents massive canvases from landscape photos
-      // and ensures enough resolution for Japanese character recognition.
-      const TARGET_WIDTH = 1500;
-      const scale = TARGET_WIDTH / srcW;
-      const destW = TARGET_WIDTH;
+      const MAX_WIDTH = 1200;
+      const scale = Math.min(1, MAX_WIDTH / srcW);
+      const destW = Math.round(srcW * scale);
       const destH = Math.round(srcH * scale);
 
       const canvas = document.createElement('canvas');
       canvas.width = destW;
       canvas.height = destH;
       const ctx = canvas.getContext('2d')!;
-      // Draw only the cropped region, scaled up
       ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, destW, destH);
 
-      const imageData = ctx.getImageData(0, 0, destW, destH);
-      const d = imageData.data;
-
-      // --- Step 3: greyscale (luminance) ---
-      for (let i = 0; i < d.length; i += 4) {
-        const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
-        d[i] = d[i + 1] = d[i + 2] = g;
-      }
-
-      // --- Step 4: contrast stretch (min-max → 0-255) then boost ---
-      let min = 255, max = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i] < min) min = d[i];
-        if (d[i] > max) max = d[i];
-      }
-      const range = max - min || 1;
-      for (let i = 0; i < d.length; i += 4) {
-        const v = Math.round(((d[i] - min) / range) * 255);
-        const boosted = Math.min(255, Math.max(0, (v - 128) * 1.4 + 128));
-        d[i] = d[i + 1] = d[i + 2] = boosted;
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      resolve(canvas.toDataURL('image/png'));
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
     img.onerror = reject;
     img.src = dataUrl;
@@ -715,12 +681,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                           setFormData(prev => ({ ...prev, platePhotoUrl: processedUrl, licensePlate: "" }));
                           setIsOcrRunning(true);
 
-                          // 3. Run OCR on a separately-enhanced data URL:
-                          //    greyscale + contrast stretch + upscaled to 1500 px
-                          //    (much sharper than the storage copy — critical for kanji/hiragana)
+                          // 3. Send to Google Cloud Vision for accurate Japanese plate reading
                           try {
-                            const ocrDataUrl = await enhancePlateForOCR(rawDataUrl);
-                            const rawText = await recognizePlate(ocrDataUrl);
+                            const visionDataUrl = await prepareForVisionAPI(rawDataUrl);
+                            const rawText = await recognizePlate(visionDataUrl);
                             const cleaned = extractJapanesePlate(rawText);
                             setFormData(prev => ({ ...prev, licensePlate: cleaned }));
                           } catch (err) {

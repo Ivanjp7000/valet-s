@@ -2,14 +2,13 @@ import { useCallback } from 'react';
 import Tesseract from 'tesseract.js';
 
 /**
- * Singleton worker — created once, reused for every plate scan.
- * Configured with PSM 7 (single text line) which is essential for
- * licence plates. Re-initialises automatically if creation fails.
+ * Singleton Tesseract worker — used only for non-plate general text (e.g. ticket scanning).
+ * Plate OCR now goes through Google Cloud Vision via the server.
  */
 let _worker: Tesseract.Worker | null = null;
 let _workerPromise: Promise<Tesseract.Worker> | null = null;
 
-function getPlateWorker(): Promise<Tesseract.Worker> {
+function getTextWorker(): Promise<Tesseract.Worker> {
   if (_worker) return Promise.resolve(_worker);
   if (_workerPromise) return _workerPromise;
 
@@ -18,16 +17,12 @@ function getPlateWorker(): Promise<Tesseract.Worker> {
       console.log('[OCR]', m.status, Math.round((m.progress || 0) * 100) + '%'),
   })
     .then(async (w) => {
-      // PSM 7 = SINGLE_LINE — tells Tesseract the whole image is one row of text.
-      // This is the single most important setting for licence plates.
-      await w.setParameters({ tessedit_pageseg_mode: '7' } as any);
       _worker = w;
-      console.log('[OCR] Worker ready — PSM 7 set');
       return w;
     })
     .catch((err) => {
       console.error('[OCR] Worker init failed:', err);
-      _workerPromise = null; // allow retry on next call
+      _workerPromise = null;
       throw err;
     });
 
@@ -35,29 +30,38 @@ function getPlateWorker(): Promise<Tesseract.Worker> {
 }
 
 export function useOCR() {
-  /** General-purpose (non-plate) recognition. */
+  /** General-purpose (non-plate) recognition — used for ticket number scanning. */
   const recognizeText = useCallback(
     async (imageSource: Tesseract.ImageLike): Promise<string> => {
-      const result = await Tesseract.recognize(imageSource, 'jpn+eng', {
-        logger: (m) =>
-          console.log('[OCR]', m.status, Math.round((m.progress || 0) * 100) + '%'),
-      });
+      const worker = await getTextWorker();
+      const result = await worker.recognize(imageSource);
       return result.data.text;
     },
     []
   );
 
   /**
-   * Plate-specific recognition.
-   * Uses the persistent PSM-7 worker — no repeated language-data downloads.
+   * Plate recognition via Google Cloud Vision (server-side).
+   * Sends the enhanced plate image as a base64 data URL to /api/ocr/plate.
+   * Falls back to an empty string on error so the caller can show a toast.
    */
   const recognizePlate = useCallback(
-    async (imageSource: Tesseract.ImageLike): Promise<string> => {
-      const worker = await getPlateWorker();
-      const result = await worker.recognize(imageSource);
-      const raw = result.data.text;
-      console.log('[OCR] raw plate text:', JSON.stringify(raw));
-      return raw;
+    async (imageDataUrl: string): Promise<string> => {
+      const response = await fetch('/api/ocr/plate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: imageDataUrl }),
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message ?? `OCR request failed (${response.status})`);
+      }
+
+      const { text } = (await response.json()) as { text: string };
+      console.log('[Vision OCR] raw text:', JSON.stringify(text));
+      return text;
     },
     []
   );
