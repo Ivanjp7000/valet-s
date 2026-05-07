@@ -897,10 +897,16 @@ export default function StaffDashboard() {
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                            <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                            <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
                               <div className="flex justify-between items-start mb-2 sm:mb-3">
                                 <div>
-                                  <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                                      PL: {ticket.parkingLocation || 'Unassigned'}
+                                    </span>
+                                  </div>
                                   <p className="text-xs text-gray-500">
                                     {ticket.carMake} {ticket.carModel}
                                   </p>
@@ -939,9 +945,6 @@ export default function StaffDashboard() {
                                   <p><strong>Room:</strong> {ticket.roomNumber}</p>
                                 )}
                                 <p><strong>Color:</strong> {ticket.carColor}</p>
-                                {ticket.parkingLocation && (
-                                  <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
-                                )}
                               </div>
 
                               {canEdit && (
@@ -1078,10 +1081,16 @@ export default function StaffDashboard() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                       {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                        <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
                           <div className="flex justify-between items-start mb-2 sm:mb-3">
                             <div>
-                              <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                                  PL: {ticket.parkingLocation || 'Unassigned'}
+                                </span>
+                              </div>
                               <p className="text-xs text-gray-500">
                                 {ticket.carMake} {ticket.carModel}
                               </p>
@@ -1120,9 +1129,6 @@ export default function StaffDashboard() {
                               <p><strong>Room:</strong> {ticket.roomNumber}</p>
                             )}
                             <p><strong>Color:</strong> {ticket.carColor}</p>
-                            {ticket.parkingLocation && (
-                              <p><strong>Parking:</strong> {ticket.parkingLocation}</p>
-                            )}
                           </div>
 
                           {canEdit && (
@@ -1311,11 +1317,17 @@ export default function StaffDashboard() {
                   ) : (
                     <div className="space-y-3 sm:space-y-4">
                       {allTickets?.map((ticket) => (
-                        <div key={ticket.id} className="border border-gray-200 rounded-lg p-3 sm:p-4">
+                        <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/30' : 'border-red-400 bg-red-50/30'}`}>
                           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 mb-3">
                             <div className="flex items-center justify-between sm:block">
                               <div>
-                                <p className="font-medium text-sm sm:text-base">Ticket #{ticket.ticketNumber}</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-medium text-sm sm:text-base">Ticket #{ticket.ticketNumber}</p>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    PL: {ticket.parkingLocation || 'Unassigned'}
+                                  </span>
+                                </div>
                                 <p className="text-xs text-gray-500 sm:hidden">
                                   {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'Unknown'}
                                 </p>
