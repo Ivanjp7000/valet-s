@@ -16,7 +16,10 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown, Printer } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, LayoutGrid, List, ChevronDown, Printer, GripVertical } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -406,6 +409,60 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
   );
 }
 
+// ── Draggable, collapsible dashboard panel ──────────────────────────────────
+const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'guest-out', 'departed-today', 'departed-history'];
+const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed'];
+
+function SortablePanel({
+  id, title, icon, badge, borderClass, headerClass, expanded, onToggle, children, wrapCard = true,
+}: {
+  id: string; title?: string; icon?: React.ReactNode; badge?: React.ReactNode;
+  borderClass?: string; headerClass?: string; expanded?: boolean; onToggle?: () => void;
+  children: React.ReactNode; wrapCard?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+
+  const dragHandle = (
+    <button
+      ref={setActivatorNodeRef} {...attributes} {...listeners}
+      onClick={e => e.stopPropagation()}
+      className="cursor-grab active:cursor-grabbing touch-none p-1 rounded hover:bg-black/5 flex-shrink-0"
+      title="Drag to reorder"
+    >
+      <GripVertical size={16} className="text-gray-400" />
+    </button>
+  );
+
+  if (!wrapCard) {
+    return (
+      <div ref={setNodeRef} style={style} className="relative">
+        <div className="absolute top-4 right-14 z-10">{dragHandle}</div>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={`border-2 ${borderClass || 'border-gray-200'} shadow-sm`}>
+        <CardHeader className="p-4 cursor-pointer select-none" onClick={onToggle}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              {dragHandle}
+              {icon}
+              <span className={`font-semibold text-sm sm:text-base truncate ${headerClass || 'text-regis-navy'}`}>{title}</span>
+              {badge}
+            </div>
+            <ChevronDown size={18} className={`text-gray-400 flex-shrink-0 ml-2 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+          </div>
+        </CardHeader>
+        {expanded && <CardContent className="p-4 pt-0">{children}</CardContent>}
+      </Card>
+    </div>
+  );
+}
+
 export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -459,10 +516,48 @@ export default function StaffDashboard() {
   // Compact view toggle for mobile
   const [compactView, setCompactView] = useState(true);
   
-  // Collapsible sections state
-  const [inHouseExpanded, setInHouseExpanded] = useState(false);
-  const [departedExpanded, setDepartedExpanded] = useState(true);
-  const [departedHistoryExpanded, setDepartedHistoryExpanded] = useState(false);
+  // ── Panel order & collapse state (persisted to localStorage) ──────────────
+  const [desktopPanelOrder, setDesktopPanelOrder] = useState<string[]>(() => {
+    try { const s = localStorage.getItem('valet-desktop-panel-order'); return s ? JSON.parse(s) : DESKTOP_PANELS_DEFAULT; } catch { return DESKTOP_PANELS_DEFAULT; }
+  });
+  const [mobilePanelOrder, setMobilePanelOrder] = useState<string[]>(() => {
+    try { const s = localStorage.getItem('valet-mobile-panel-order'); return s ? JSON.parse(s) : MOBILE_PANELS_DEFAULT; } catch { return MOBILE_PANELS_DEFAULT; }
+  });
+  const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set()); // all start collapsed
+
+  const togglePanel = (id: string) => setExpandedPanels(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDesktopDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setDesktopPanelOrder(prev => {
+        const next = arrayMove(prev, prev.indexOf(active.id as string), prev.indexOf(over.id as string));
+        localStorage.setItem('valet-desktop-panel-order', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  const handleMobileDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setMobilePanelOrder(prev => {
+        const next = arrayMove(prev, prev.indexOf(active.id as string), prev.indexOf(over.id as string));
+        localStorage.setItem('valet-mobile-panel-order', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
   const [historyFilterYear, setHistoryFilterYear] = useState<string>('all');
   const [historyFilterMonth, setHistoryFilterMonth] = useState<string>('all');
   const [historyFilterDay, setHistoryFilterDay] = useState<string>('all');
@@ -892,184 +987,161 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                {/* Ready for Collection - on top */}
-                <div className="bg-white border-2 border-green-200 rounded-lg p-3">
-                  <h3 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-1">
-                    <Check size={14} /> Ready for Collection ({activeTickets?.filter(t => t.status === 'ready').length || 0})
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {activeTickets?.filter(t => t.status === 'ready').map((ticket) => (
-                      <div key={ticket.id} className="bg-green-50 rounded p-2 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
-                            <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
-                          </div>
-                        </div>
-                        {canEdit && (
-                          <div className="flex gap-1">
-                            <Button 
-                              size="sm" 
-                              className="h-6 px-2 text-xs bg-gray-600 hover:bg-gray-700 text-white flex-1"
-                              onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}
-                            >
-                              Departed
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white flex-1"
-                              onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}
-                            >
-                              Coming Back
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {activeTickets?.filter(t => t.status === 'ready').length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-2">No cars ready for collection</p>
-                    )}
-                  </div>
-                </div>
+                {/* Draggable Mobile Compact Panels - all start collapsed */}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleMobileDragEnd}>
+                  <SortableContext items={mobilePanelOrder} strategy={verticalListSortingStrategy}>
+                    <div className="flex flex-col gap-3">
+                      {mobilePanelOrder.map(panelId => {
+                        const isExpanded = expandedPanels.has(panelId);
+                        const toggle = () => togglePanel(panelId);
 
-                {/* Compact Being Retrieved - only retrieving and transit */}
-                <div className="bg-white border rounded-lg p-3">
-                  <h3 className="text-sm font-semibold text-regis-navy mb-2 flex items-center gap-1">
-                    <Car size={14} /> Being Retrieved ({activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).map((ticket) => (
-                      <div key={ticket.id} className="bg-gray-50 rounded p-2 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
-                          {canEdit && (
-                            <div className="flex gap-1">
-                              {ticket.status === 'retrieving' && (
-                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
-                              )}
-                              {ticket.status === 'transit' && (
-                                <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'preparing' })}>Final Prep</Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-50"
-                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'active' })}
-                              >
-                                ✕
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <CompactRetrievalProgress ticket={ticket} />
-                      </div>
-                    ))}
-                    {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-2">No active retrievals</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Car Currently in Use Guest will Return */}
-                <div className="bg-white border-2 border-blue-200 rounded-lg p-3">
-                  <h3 className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-1">
-                    <Car size={14} /> Car in Use Guest Will Return ({activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
-                      <GuestOutCard 
-                        key={ticket.id} 
-                        ticket={ticket} 
-                        onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
-                        onView={() => setViewTicket(ticket)}
-                        canEdit={canEdit}
-                      />
-                    ))}
-                    {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-2">No cars out with guests</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Compact In House - Collapsible */}
-                <div className="bg-white border rounded-lg p-3">
-                  <button 
-                    className="w-full text-sm font-semibold text-regis-navy flex items-center justify-between"
-                    onClick={() => setInHouseExpanded(!inHouseExpanded)}
-                  >
-                    <span className="flex items-center gap-1">
-                      <Clock size={14} /> In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
-                    </span>
-                    <ChevronDown size={16} className={`transition-transform ${inHouseExpanded ? 'rotate-180' : ''}`} />
-                  </button>
-                  {inHouseExpanded && (
-                    <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
-                      {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                        <CompactInHouseCard 
-                          key={ticket.id} 
-                          ticket={ticket} 
-                          onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                          onEdit={() => setEditTicketData(ticket)}
-                          onView={() => setViewTicket(ticket)}
-                          canEdit={canEdit}
-                        />
-                      ))}
-                      {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                        <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Checked Out - Departed - Collapsible */}
-                <div className="bg-white border border-gray-300 rounded-lg p-3">
-                  <button 
-                    className="w-full text-sm font-semibold text-gray-600 flex items-center justify-between"
-                    onClick={() => setDepartedExpanded(!departedExpanded)}
-                  >
-                    <span className="flex items-center gap-1">
-                      <LogOut size={14} /> Checked Out - Departed ({activeTickets?.filter(t => t.status === 'completed').length || 0})
-                    </span>
-                    <ChevronDown size={16} className={`transition-transform ${departedExpanded ? 'rotate-180' : ''}`} />
-                  </button>
-                  {departedExpanded && (
-                    <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
-                      {activeTickets?.filter(t => t.status === 'completed').map((ticket) => {
-                        const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
-                        const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
-                        return (
-                          <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
-                                <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
-                              </div>
-                              <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
-                              {stayHours !== null && (
-                                <p className="text-xs text-blue-600 font-medium">
-                                  ⏱️ Stayed: {stayHours}h {stayMins}m
-                                </p>
+                        if (panelId === 'ready') return (
+                          <SortablePanel key="ready" id="ready"
+                            title={`Ready for Collection (${activeTickets?.filter(t => t.status === 'ready').length || 0})`}
+                            icon={<Check size={14} />} borderClass="border-green-200" headerClass="text-green-700"
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
+                              {activeTickets?.filter(t => t.status === 'ready').map((ticket) => (
+                                <div key={ticket.id} className="bg-green-50 rounded p-2 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+                                      <span className="text-xs text-gray-500 ml-1">{ticket.carMake}</span>
+                                    </div>
+                                  </div>
+                                  {canEdit && (
+                                    <div className="flex gap-1">
+                                      <Button size="sm" className="h-6 px-2 text-xs bg-gray-600 hover:bg-gray-700 text-white flex-1"
+                                        onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}>Departed</Button>
+                                      <Button size="sm" className="h-6 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                                        onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}>Coming Back</Button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              {activeTickets?.filter(t => t.status === 'ready').length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-2">No cars ready for collection</p>
                               )}
                             </div>
-                            <div className="flex gap-1">
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                className="h-6 w-6 p-0"
-                                onClick={() => setViewTicket(ticket)}
-                              >
-                                <Eye size={14} className="text-gray-400" />
-                              </Button>
-                            </div>
-                          </div>
+                          </SortablePanel>
                         );
+
+                        if (panelId === 'retrievals') return (
+                          <SortablePanel key="retrievals" id="retrievals"
+                            title={`Being Retrieved (${activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})`}
+                            icon={<Car size={14} />}
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
+                              {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).map((ticket) => (
+                                <div key={ticket.id} className="bg-gray-50 rounded p-2 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium text-sm">#{ticket.ticketNumber}</span>
+                                    {canEdit && (
+                                      <div className="flex gap-1">
+                                        {ticket.status === 'retrieving' && (
+                                          <Button size="sm" variant="outline" className="h-6 px-2 text-xs"
+                                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'transit' })}>Transit</Button>
+                                        )}
+                                        {ticket.status === 'transit' && (
+                                          <Button size="sm" variant="outline" className="h-6 px-2 text-xs"
+                                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'preparing' })}>Final Prep</Button>
+                                        )}
+                                        <Button size="sm" variant="outline" className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                                          onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'active' })}>✕</Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <CompactRetrievalProgress ticket={ticket} />
+                                </div>
+                              ))}
+                              {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-2">No active retrievals</p>
+                              )}
+                            </div>
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'guest-out') return (
+                          <SortablePanel key="guest-out" id="guest-out"
+                            title={`Car in Use — Guest Will Return (${activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})`}
+                            icon={<Car size={14} />} borderClass="border-blue-200" headerClass="text-blue-700"
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
+                              {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
+                                <GuestOutCard key={ticket.id} ticket={ticket}
+                                  onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                                  onView={() => setViewTicket(ticket)} canEdit={canEdit} />
+                              ))}
+                              {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-2">No cars out with guests</p>
+                              )}
+                            </div>
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'in-house') return (
+                          <SortablePanel key="in-house" id="in-house"
+                            title={`In House (${activeTickets?.filter(t => t.status === 'active').length || 0})`}
+                            icon={<Clock size={14} />}
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
+                              {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                                <CompactInHouseCard key={ticket.id} ticket={ticket}
+                                  onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                                  onEdit={() => setEditTicketData(ticket)}
+                                  onView={() => setViewTicket(ticket)} canEdit={canEdit} />
+                              ))}
+                              {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
+                              )}
+                            </div>
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'departed') return (
+                          <SortablePanel key="departed" id="departed"
+                            title={`Checked Out — Departed (${activeTickets?.filter(t => t.status === 'completed').length || 0})`}
+                            icon={<LogOut size={14} />} headerClass="text-gray-600"
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
+                              {activeTickets?.filter(t => t.status === 'completed').map((ticket) => {
+                                const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                                const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                                return (
+                                  <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
+                                        <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                                      {stayHours !== null && (
+                                        <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>
+                                      )}
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
+                                      <Eye size={14} className="text-gray-400" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                              {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-2">No departed vehicles</p>
+                              )}
+                            </div>
+                          </SortablePanel>
+                        );
+
+                        return null;
                       })}
-                      {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
-                        <p className="text-xs text-gray-400 text-center py-2">No departed vehicles</p>
-                      )}
                     </div>
-                  )}
-                </div>
+                  </SortableContext>
+                </DndContext>
 
                 {/* Staff Quick Access - Super Admin Only (Mobile Compact View) */}
                 {user?.role === 'superadmin' && (
@@ -1109,7 +1181,7 @@ export default function StaffDashboard() {
               <>
                 {/* In House - Full View (Mobile Extended Only - Desktop has its own section below) */}
                 <Card className="shadow-lg border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50/30 mb-4 sm:hidden">
-                  <CardHeader className="p-4 sm:p-6 pb-2 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
+                  <CardHeader className="p-4 sm:p-6 pb-2 cursor-pointer" onClick={() => togglePanel('in-house')}>
                     <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                       <div className="flex items-center gap-2 text-regis-navy">
                         <Clock size={20} />
@@ -1119,11 +1191,11 @@ export default function StaffDashboard() {
                         <Badge className="bg-regis-navy text-white text-lg px-4 py-1">
                           {activeTickets?.filter(t => t.status === 'active').length || 0}
                         </Badge>
-                        <ChevronDown size={20} className={`transition-transform ${inHouseExpanded ? 'rotate-180' : ''}`} />
+                        <ChevronDown size={20} className={`transition-transform ${expandedPanels.has('in-house') ? 'rotate-180' : ''}`} />
                       </div>
                     </CardTitle>
                   </CardHeader>
-                  {inHouseExpanded && (
+                  {expandedPanels.has('in-house') && (
                     <CardContent className="p-4 sm:p-6 pt-2">
                       {ticketsLoading ? (
                         <div className="text-center py-6 sm:py-8">Loading tickets...</div>
@@ -1305,171 +1377,13 @@ export default function StaffDashboard() {
               </>
             )}
 
-            {/* In House - Desktop Version (hidden on mobile, always shows on desktop) */}
-            <Card className="hidden sm:block">
-              <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setInHouseExpanded(!inHouseExpanded)}>
-                <CardTitle className="flex items-center justify-between text-base sm:text-lg">
-                  <div className="flex items-center gap-2">
-                    <Clock className="text-regis-navy" size={18} />
-                    In House ({activeTickets?.filter(t => t.status === 'active').length || 0})
-                  </div>
-                  <ChevronDown size={20} className={`transition-transform ${inHouseExpanded ? 'rotate-180' : ''}`} />
-                </CardTitle>
-              </CardHeader>
-              {inHouseExpanded && (
-                <CardContent className="p-4 sm:p-6 pt-0">
-                  {ticketsLoading ? (
-                    <div className="text-center py-6 sm:py-8">Loading tickets...</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                      {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                        <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
-                          <div className="flex justify-between items-start mb-2 sm:mb-3">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
-                                  PL: {ticket.parkingLocation || 'Unassigned'}
-                                </span>
-                              </div>
-                              <p className="text-xs text-gray-500">
-                                {ticket.carMake} {ticket.carModel}
-                              </p>
-                              {ticket.licensePlate && (
-                                <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>
-                              )}
-                            </div>
-                            <div className="flex items-start gap-2">
-                              <Button 
-                                size="sm" 
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                onClick={() => setViewTicket(ticket)}
-                              >
-                                <Eye size={16} className="text-gray-500" />
-                              </Button>
-                              {canEdit && (
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0"
-                                  onClick={() => setEditTicketData(ticket)}
-                                >
-                                  <Edit size={16} className="text-gray-500" />
-                                </Button>
-                              )}
-                              <CircularTimer 
-                                createdAt={ticket.createdAt || new Date()} 
-                                maxHours={24}
-                                size={40}
-                                strokeWidth={3}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                            <p><strong>Guest:</strong> {ticket.guestName}</p>
-                            {ticket.roomNumber && (
-                              <p><strong>Room:</strong> {ticket.roomNumber}</p>
-                            )}
-                            <p><strong>Color:</strong> {ticket.carColor}</p>
-                          </div>
-
-                          {canEdit && (
-                            <Button
-                              size="sm"
-                              className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
-                              onClick={() => updateStatusMutation.mutate({ 
-                                ticketNumber: ticket.ticketNumber, 
-                                status: 'retrieving' 
-                              })}
-                              data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
-                            >
-                              <Play size={14} className="mr-1" />
-                              Retrieve
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                        <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
-                          <Clock size={36} className="mx-auto mb-2 opacity-40" />
-                          <p className="text-sm">No vehicles in house</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              )}
-            </Card>
-
-            {/* Active Retrievals - Always visible for ALL users, roles, and screen sizes */}
-            <UnifiedRetrievalBox
-              tickets={activeTickets || []}
-              canEdit={canEdit}
-              onStatusChange={(ticketNumber, status) => {
-                updateStatusMutation.mutate({ ticketNumber, status });
-              }}
-              onStageComplete={(ticketNumber, nextStage) => {
-                const statusMap: Record<number, string> = { 2: 'transit', 3: 'preparing', 4: 'ready' };
-                const newStatus = statusMap[nextStage];
-                if (newStatus) {
-                  updateStatusMutation.mutate({ ticketNumber, status: newStatus });
-                }
-              }}
-            />
-
-            {/* Car in Use - Guest Will Return — Always visible desktop card */}
-            <Card className="hidden sm:block shadow-lg border-2 border-blue-200 bg-gradient-to-br from-white to-blue-50/30">
-              <CardHeader className="p-4 sm:p-6 pb-2">
-                <CardTitle className="flex items-center justify-between text-base sm:text-lg">
-                  <div className="flex items-center gap-2 text-blue-700">
-                    <Car size={20} />
-                    Car in Use — Guest Will Return
-                  </div>
-                  <Badge className="bg-blue-600 text-white text-lg px-4 py-1">
-                    {activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-2">
-                {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 ? (
-                  <div className="text-center py-6 text-gray-400">
-                    <Car size={36} className="mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">No cars out with guests</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
-                      <GuestOutCardFull
-                        key={ticket.id}
-                        ticket={ticket}
-                        onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
-                        onView={() => setViewTicket(ticket)}
-                        canEdit={canEdit}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Check Out Departed Today */}
+            {/* Desktop Dashboard Panels — Draggable & Collapsible (hidden on mobile) */}
             {(() => {
-              const todayStart = new Date();
-              todayStart.setHours(0, 0, 0, 0);
-              const departedToday = activeTickets?.filter(t =>
-                t.status === 'completed' &&
-                t.updatedAt &&
-                new Date(t.updatedAt) >= todayStart
-              ) || [];
-              const departedHistory = activeTickets?.filter(t =>
-                t.status === 'completed' &&
-                (!t.updatedAt || new Date(t.updatedAt) < todayStart)
-              ) || [];
+              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+              const departedToday = activeTickets?.filter(t => t.status === 'completed' && t.updatedAt && new Date(t.updatedAt) >= todayStart) || [];
+              const departedHistory = activeTickets?.filter(t => t.status === 'completed' && (!t.updatedAt || new Date(t.updatedAt) < todayStart)) || [];
 
-              const DepartedCard = ({ ticket }: { ticket: typeof departedToday[0] }) => {
+              const DepartedCard = ({ ticket }: { ticket: ValetTicket }) => {
                 const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
                 const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
                 return (
@@ -1478,9 +1392,7 @@ export default function StaffDashboard() {
                       <div>
                         <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
-                        {ticket.licensePlate && (
-                          <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>
-                        )}
+                        {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
                       </div>
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
                         <Eye size={16} className="text-gray-400" />
@@ -1489,204 +1401,238 @@ export default function StaffDashboard() {
                     <div className="text-xs text-gray-500">
                       <p><strong>Guest:</strong> {ticket.guestName}</p>
                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
-                      {stayHours !== null && (
-                        <p className="text-blue-600 font-medium mt-1">⏱️ Total Stay: {stayHours}h {stayMins}m</p>
-                      )}
-                      {ticket.updatedAt && (
-                        <p className="text-gray-400 mt-0.5">
-                          Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
+                      {stayHours !== null && <p className="text-blue-600 font-medium mt-1">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
+                      {ticket.updatedAt && <p className="text-gray-400 mt-0.5">Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                     </div>
                   </div>
                 );
               };
 
               return (
-                <>
-                  {/* Today */}
-                  <Card className={compactView ? "hidden sm:block" : ""}>
-                    <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedExpanded(!departedExpanded)}>
-                      <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <LogOut size={18} />
-                          Check Out Departed Today
-                          <span className="ml-1 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                            {departedToday.length}
-                          </span>
-                        </div>
-                        <ChevronDown size={20} className={`transition-transform ${departedExpanded ? 'rotate-180' : ''}`} />
-                      </CardTitle>
-                    </CardHeader>
-                    {departedExpanded && (
-                      <CardContent className="p-4 sm:p-6 pt-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                          {departedToday.length === 0 ? (
-                            <div className="col-span-full text-center py-6 text-gray-400">
-                              <LogOut size={36} className="mx-auto mb-2 opacity-40" />
-                              <p className="text-sm">No departures today yet</p>
-                            </div>
-                          ) : (
-                            departedToday.map(t => <DepartedCard key={t.id} ticket={t} />)
-                          )}
-                        </div>
-                      </CardContent>
-                    )}
-                  </Card>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDesktopDragEnd}>
+                  <SortableContext items={desktopPanelOrder} strategy={verticalListSortingStrategy}>
+                    <div className="hidden sm:flex sm:flex-col gap-4">
+                      {desktopPanelOrder.map(panelId => {
+                        const isExpanded = expandedPanels.has(panelId);
+                        const toggle = () => togglePanel(panelId);
 
-                  {/* History */}
-                  <Card className={compactView ? "hidden sm:block" : ""}>
-                    <CardHeader className="p-4 sm:p-6 cursor-pointer" onClick={() => setDepartedHistoryExpanded(!departedHistoryExpanded)}>
-                      <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <LogOut size={18} />
-                          Check Out Departed History
-                          <span className="ml-1 bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
-                            {departedHistory.length}
-                          </span>
-                        </div>
-                        <ChevronDown size={20} className={`transition-transform ${departedHistoryExpanded ? 'rotate-180' : ''}`} />
-                      </CardTitle>
-                    </CardHeader>
-                    {departedHistoryExpanded && (
-                      <CardContent className="p-4 sm:p-6 pt-0">
-                        {/* Filters */}
-                        {(() => {
-                          const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-                          // Derive available years from history data (only years with data)
-                          const availableYears = Array.from(new Set(departedHistory.map(t => t.updatedAt ? new Date(t.updatedAt).getFullYear().toString() : null).filter(Boolean))).sort((a,b) => Number(b)-Number(a)) as string[];
-                          // Always show all 12 months
-                          const allMonths = ['1','2','3','4','5','6','7','8','9','10','11','12'];
-                          // Days: all days for selected month/year, or 1-31 if no month selected
-                          const daysInMonth = (() => {
-                            if (historyFilterMonth === 'all') return Array.from({length:31},(_,i)=>(i+1).toString());
-                            const year = historyFilterYear !== 'all' ? Number(historyFilterYear) : new Date().getFullYear();
-                            const count = new Date(year, Number(historyFilterMonth), 0).getDate();
-                            return Array.from({length:count},(_,i)=>(i+1).toString());
-                          })();
-
-                          // Apply filters
-                          const filtered = departedHistory.filter(t => {
-                            if (!t.updatedAt) return historyFilterYear === 'all' && historyFilterMonth === 'all' && historyFilterDay === 'all';
-                            const d = new Date(t.updatedAt);
-                            if (historyFilterYear !== 'all' && d.getFullYear().toString() !== historyFilterYear) return false;
-                            if (historyFilterMonth !== 'all' && (d.getMonth()+1).toString() !== historyFilterMonth) return false;
-                            if (historyFilterDay !== 'all' && d.getDate().toString() !== historyFilterDay) return false;
-                            return true;
-                          });
-
-                          const hasFilter = historyFilterYear !== 'all' || historyFilterMonth !== 'all' || historyFilterDay !== 'all';
-
-                          return (
-                            <>
-                              {/* Search panel */}
-                              <div className="mb-4 rounded-lg border border-gray-200 overflow-hidden">
-                                {/* Header — always visible, click to expand */}
-                                <button
-                                  onClick={() => setHistorySearchExpanded(!historySearchExpanded)}
-                                  className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Search:</span>
-                                    {hasFilter && !historySearchExpanded && (
-                                      <span className="text-xs bg-regis-navy text-white px-1.5 py-0.5 rounded font-medium">
-                                        {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-                                      </span>
+                        if (panelId === 'in-house') return (
+                          <SortablePanel key="in-house" id="in-house"
+                            title="In House"
+                            badge={<Badge className="bg-regis-navy text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => t.status === 'active').length || 0}</Badge>}
+                            icon={<Clock className="text-regis-navy" size={18} />}
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            {ticketsLoading ? <div className="text-center py-6">Loading tickets...</div> : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                                  <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
+                                    <div className="flex justify-between items-start mb-2 sm:mb-3">
+                                      <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <p className="font-bold text-base sm:text-lg text-regis-navy">#{ticket.ticketNumber}</p>
+                                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                                            PL: {ticket.parkingLocation || 'Unassigned'}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel}</p>
+                                        {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
+                                      </div>
+                                      <div className="flex items-start gap-2">
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                                          <Eye size={16} className="text-gray-500" />
+                                        </Button>
+                                        {canEdit && (
+                                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditTicketData(ticket)}>
+                                            <Edit size={16} className="text-gray-500" />
+                                          </Button>
+                                        )}
+                                        <CircularTimer createdAt={ticket.createdAt || new Date()} maxHours={24} size={40} strokeWidth={3} />
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                                      <p><strong>Guest:</strong> {ticket.guestName}</p>
+                                      {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
+                                      <p><strong>Color:</strong> {ticket.carColor}</p>
+                                    </div>
+                                    {canEdit && (
+                                      <Button size="sm" className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
+                                        onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                                        data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
+                                      >
+                                        <Play size={14} className="mr-1" /> Retrieve
+                                      </Button>
                                     )}
                                   </div>
-                                  <ChevronDown size={14} className={`text-gray-400 transition-transform ${historySearchExpanded ? 'rotate-180' : ''}`} />
-                                </button>
-
-                                {/* Collapsible body */}
-                                {historySearchExpanded && (
-                                  <div className="p-3 bg-gray-50 border-t border-gray-200 space-y-3">
-                                    {/* Year */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs text-gray-500 w-10 shrink-0">Year</span>
-                                      <select
-                                        value={historyFilterYear}
-                                        onChange={e => { setHistoryFilterYear(e.target.value); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
-                                        className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold"
-                                      >
-                                        <option value="all">All</option>
-                                        {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                                      </select>
-                                    </div>
-
-                                    {/* Month — compact button grid */}
-                                    <div className="flex items-start gap-2">
-                                      <span className="text-xs text-gray-500 w-10 shrink-0 pt-1">Month</span>
-                                      <div className="grid grid-cols-6 gap-1">
-                                        {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((abbr, i) => {
-                                          const val = (i+1).toString();
-                                          const active = historyFilterMonth === val;
-                                          return (
-                                            <button
-                                              key={val}
-                                              onClick={() => { setHistoryFilterMonth(active ? 'all' : val); setHistoryFilterDay('all'); }}
-                                              className={`text-xs px-1.5 py-1 rounded font-medium transition-colors ${active ? 'bg-regis-navy text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}
-                                            >
-                                              {abbr}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-
-                                    {/* Day — compact button grid */}
-                                    <div className="flex items-start gap-2">
-                                      <span className="text-xs text-gray-500 w-10 shrink-0 pt-1">Day</span>
-                                      <div className="grid grid-cols-10 gap-1">
-                                        {daysInMonth.map(d => {
-                                          const active = historyFilterDay === d;
-                                          return (
-                                            <button
-                                              key={d}
-                                              onClick={() => setHistoryFilterDay(active ? 'all' : d)}
-                                              className={`text-xs px-1.5 py-1 rounded font-medium transition-colors ${active ? 'bg-regis-navy text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}
-                                            >
-                                              {d}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-
-                                    {/* Footer */}
-                                    <div className="flex items-center justify-between pt-1">
-                                      <span className="text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
-                                      {hasFilter && (
-                                        <button
-                                          onClick={() => { setHistoryFilterYear('all'); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
-                                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-0.5 rounded border border-red-200 hover:bg-red-50 transition-colors"
-                                        >
-                                          Clear
-                                        </button>
-                                      )}
-                                    </div>
+                                ))}
+                                {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                                  <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
+                                    <Clock size={36} className="mx-auto mb-2 opacity-40" />
+                                    <p className="text-sm">No vehicles in house</p>
                                   </div>
                                 )}
                               </div>
+                            )}
+                          </SortablePanel>
+                        );
 
-                              {/* Results */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                {filtered.length === 0 ? (
-                                  <div className="col-span-full text-center py-6 text-gray-400">
-                                    <LogOut size={36} className="mx-auto mb-2 opacity-40" />
-                                    <p className="text-sm">{hasFilter ? 'No departures match this filter' : 'No historical departures'}</p>
-                                  </div>
-                                ) : (
-                                  filtered.map(t => <DepartedCard key={t.id} ticket={t} />)
-                                )}
+                        if (panelId === 'retrievals') return (
+                          <SortablePanel key="retrievals" id="retrievals" wrapCard={false}>
+                            <UnifiedRetrievalBox
+                              tickets={activeTickets || []}
+                              canEdit={canEdit}
+                              onStatusChange={(ticketNumber, status) => { updateStatusMutation.mutate({ ticketNumber, status }); }}
+                              onStageComplete={(ticketNumber, nextStage) => {
+                                const statusMap: Record<number, string> = { 2: 'transit', 3: 'preparing', 4: 'ready' };
+                                const newStatus = statusMap[nextStage];
+                                if (newStatus) updateStatusMutation.mutate({ ticketNumber, status: newStatus });
+                              }}
+                            />
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'guest-out') return (
+                          <SortablePanel key="guest-out" id="guest-out"
+                            title="Car in Use — Guest Will Return"
+                            badge={<Badge className="bg-blue-600 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</Badge>}
+                            icon={<Car className="text-blue-700" size={18} />}
+                            borderClass="border-blue-200" headerClass="text-blue-700"
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 ? (
+                              <div className="text-center py-6 text-gray-400">
+                                <Car size={36} className="mx-auto mb-2 opacity-40" />
+                                <p className="text-sm">No cars out with guests</p>
                               </div>
-                            </>
-                          );
-                        })()}
-                      </CardContent>
-                    )}
-                  </Card>
-                </>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
+                                  <GuestOutCardFull key={ticket.id} ticket={ticket}
+                                    onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                                    onView={() => setViewTicket(ticket)} canEdit={canEdit} />
+                                ))}
+                              </div>
+                            )}
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'departed-today') return (
+                          <SortablePanel key="departed-today" id="departed-today"
+                            title="Check Out Departed Today"
+                            badge={<span className="ml-2 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{departedToday.length}</span>}
+                            icon={<LogOut className="text-gray-600" size={18} />} headerClass="text-gray-600"
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                              {departedToday.length === 0 ? (
+                                <div className="col-span-full text-center py-6 text-gray-400">
+                                  <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                                  <p className="text-sm">No departures today yet</p>
+                                </div>
+                              ) : departedToday.map(t => <DepartedCard key={t.id} ticket={t} />)}
+                            </div>
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'departed-history') return (
+                          <SortablePanel key="departed-history" id="departed-history"
+                            title="Check Out Departed History"
+                            badge={<span className="ml-2 bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{departedHistory.length}</span>}
+                            icon={<LogOut className="text-gray-500" size={18} />} headerClass="text-gray-500"
+                            expanded={isExpanded} onToggle={toggle}
+                          >
+                            {(() => {
+                              const availableYears = Array.from(new Set(departedHistory.map(t => t.updatedAt ? new Date(t.updatedAt).getFullYear().toString() : null).filter(Boolean))).sort((a,b) => Number(b)-Number(a)) as string[];
+                              const daysInMonth = (() => {
+                                if (historyFilterMonth === 'all') return Array.from({length:31},(_,i)=>(i+1).toString());
+                                const year = historyFilterYear !== 'all' ? Number(historyFilterYear) : new Date().getFullYear();
+                                const count = new Date(year, Number(historyFilterMonth), 0).getDate();
+                                return Array.from({length:count},(_,i)=>(i+1).toString());
+                              })();
+                              const filtered = departedHistory.filter(t => {
+                                if (!t.updatedAt) return historyFilterYear === 'all' && historyFilterMonth === 'all' && historyFilterDay === 'all';
+                                const d = new Date(t.updatedAt);
+                                if (historyFilterYear !== 'all' && d.getFullYear().toString() !== historyFilterYear) return false;
+                                if (historyFilterMonth !== 'all' && (d.getMonth()+1).toString() !== historyFilterMonth) return false;
+                                if (historyFilterDay !== 'all' && d.getDate().toString() !== historyFilterDay) return false;
+                                return true;
+                              });
+                              const hasFilter = historyFilterYear !== 'all' || historyFilterMonth !== 'all' || historyFilterDay !== 'all';
+                              return (
+                                <>
+                                  <div className="mb-4 rounded-lg border border-gray-200 overflow-hidden">
+                                    <button onClick={() => setHistorySearchExpanded(!historySearchExpanded)}
+                                      className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Search:</span>
+                                        {hasFilter && !historySearchExpanded && (
+                                          <span className="text-xs bg-regis-navy text-white px-1.5 py-0.5 rounded font-medium">
+                                            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <ChevronDown size={14} className={`text-gray-400 transition-transform ${historySearchExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {historySearchExpanded && (
+                                      <div className="p-3 bg-gray-50 border-t border-gray-200 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-gray-500 w-10 shrink-0">Year</span>
+                                          <select value={historyFilterYear} onChange={e => { setHistoryFilterYear(e.target.value); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
+                                            className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-regis-gold">
+                                            <option value="all">All</option>
+                                            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                          </select>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                          <span className="text-xs text-gray-500 w-10 shrink-0 pt-1">Month</span>
+                                          <div className="grid grid-cols-6 gap-1">
+                                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((abbr, i) => {
+                                              const val = (i+1).toString(); const active = historyFilterMonth === val;
+                                              return <button key={val} onClick={() => { setHistoryFilterMonth(active ? 'all' : val); setHistoryFilterDay('all'); }}
+                                                className={`text-xs px-1.5 py-1 rounded font-medium transition-colors ${active ? 'bg-regis-navy text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}>{abbr}</button>;
+                                            })}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-start gap-2">
+                                          <span className="text-xs text-gray-500 w-10 shrink-0 pt-1">Day</span>
+                                          <div className="grid grid-cols-10 gap-1">
+                                            {daysInMonth.map(d => {
+                                              const active = historyFilterDay === d;
+                                              return <button key={d} onClick={() => setHistoryFilterDay(active ? 'all' : d)}
+                                                className={`text-xs px-1.5 py-1 rounded font-medium transition-colors ${active ? 'bg-regis-navy text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}>{d}</button>;
+                                            })}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-1">
+                                          <span className="text-xs text-gray-400">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+                                          {hasFilter && (
+                                            <button onClick={() => { setHistoryFilterYear('all'); setHistoryFilterMonth('all'); setHistoryFilterDay('all'); }}
+                                              className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-0.5 rounded border border-red-200 hover:bg-red-50 transition-colors">Clear</button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                    {filtered.length === 0 ? (
+                                      <div className="col-span-full text-center py-6 text-gray-400">
+                                        <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                                        <p className="text-sm">{hasFilter ? 'No departures match this filter' : 'No historical departures'}</p>
+                                      </div>
+                                    ) : filtered.map(t => <DepartedCard key={t.id} ticket={t} />)}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </SortablePanel>
+                        );
+
+                        return null;
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               );
             })()}
 
