@@ -1503,6 +1503,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proxy endpoint: fetches a car/plate photo from object storage and streams it to the client.
+  // Handles both full GCS signed URLs and normalized /car-photos/ paths stored in the DB.
+  app.get('/api/backup/photo', isAuthenticated, requireReadAccess, async (req: any, res) => {
+    try {
+      const raw = req.query.path as string;
+      if (!raw) return res.status(400).json({ message: 'path required' });
+
+      const objectStorageService = new ObjectStorageService();
+      let normalizedPath = raw;
+
+      // Full signed GCS URL → normalize to internal path
+      if (raw.startsWith('https://storage.googleapis.com/')) {
+        normalizedPath = objectStorageService.normalizeCarPhotoPath(raw);
+      }
+
+      // Strip any leftover query string (signed URL params)
+      if (normalizedPath.includes('?')) {
+        normalizedPath = normalizedPath.split('?')[0];
+      }
+
+      if (!normalizedPath.startsWith('/car-photos/')) {
+        return res.status(404).json({ message: 'Not found' });
+      }
+
+      const photoFile = await objectStorageService.getCarPhotoFile(normalizedPath);
+      await objectStorageService.downloadCarPhoto(photoFile, res);
+    } catch (error) {
+      if (error instanceof ObjectNotFoundError) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+      console.error('Error proxying backup photo:', error);
+      res.status(500).json({ message: 'Error serving photo' });
+    }
+  });
+
   // Function to broadcast to all connected clients
   function broadcastToAll(message: any) {
     const messageStr = JSON.stringify(message);
