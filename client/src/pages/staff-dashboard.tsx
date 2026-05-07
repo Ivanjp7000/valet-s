@@ -521,7 +521,19 @@ export default function StaffDashboard() {
     try { const s = localStorage.getItem('valet-desktop-panel-order'); return s ? JSON.parse(s) : DESKTOP_PANELS_DEFAULT; } catch { return DESKTOP_PANELS_DEFAULT; }
   });
   const [mobilePanelOrder, setMobilePanelOrder] = useState<string[]>(() => {
-    try { const s = localStorage.getItem('valet-mobile-panel-order'); return s ? JSON.parse(s) : MOBILE_PANELS_DEFAULT; } catch { return MOBILE_PANELS_DEFAULT; }
+    try {
+      const s = localStorage.getItem('valet-mobile-panel-order');
+      if (!s) return MOBILE_PANELS_DEFAULT;
+      let order: string[] = JSON.parse(s);
+      // Migrate: replace old 'departed' with the two new panels
+      if (order.includes('departed') && !order.includes('departed-today')) {
+        const idx = order.indexOf('departed');
+        order = [...order.slice(0, idx), 'departed-today', 'departed-history', ...order.slice(idx + 1)];
+      }
+      // Ensure any new panels not yet in saved order are appended
+      MOBILE_PANELS_DEFAULT.forEach(p => { if (!order.includes(p)) order.push(p); });
+      return order;
+    } catch { return MOBILE_PANELS_DEFAULT; }
   });
   const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set()); // all start collapsed
 
