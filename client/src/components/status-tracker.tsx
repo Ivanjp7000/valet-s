@@ -347,15 +347,29 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
             })}
           </AnimatePresence>
 
-          {/* Current Stage Summary Card */}
-          <div className="mt-4 bg-regis-gold/10 border border-regis-gold/30 rounded-xl p-4 text-center">
-            <p className="text-regis-navy font-medium flex items-center justify-center gap-2">
-              <Clock size={16} />
-              {stages[currentStage]?.name}
-            </p>
-            <p className="text-3xl font-bold text-regis-navy mt-2">{formatTime(timeRemaining)}</p>
-            <p className="text-sm text-gray-500 mt-1">estimated time remaining</p>
-          </div>
+          {/* Total Estimated Time Summary Card */}
+          {(() => {
+            // Sum up: current stage remaining + full duration of every stage still ahead
+            const futureStageDurations = [
+              STAGE_DURATIONS.retrieving,  // stage 0
+              STAGE_DURATIONS.transit,     // stage 1
+              STAGE_DURATIONS.preparing,   // stage 2
+            ];
+            const futureExtra = futureStageDurations
+              .slice(currentStage + 1)
+              .reduce((sum, d) => sum + d, 0);
+            const totalRemaining = timeRemaining + futureExtra;
+            return (
+              <div className="mt-4 bg-regis-gold/10 border border-regis-gold/30 rounded-xl p-4 text-center">
+                <p className="text-regis-navy font-medium flex items-center justify-center gap-2">
+                  <Clock size={16} />
+                  Total estimated wait
+                </p>
+                <p className="text-3xl font-bold text-regis-navy mt-2">{formatTime(totalRemaining)}</p>
+                <p className="text-sm text-gray-500 mt-1">across all remaining stages</p>
+              </div>
+            );
+          })()}
 
           <p className="text-xs text-center text-gray-400 mt-4">
             This page updates automatically — no need to refresh
