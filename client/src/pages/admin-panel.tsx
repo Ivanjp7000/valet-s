@@ -16,7 +16,7 @@ import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
-import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, UserLocationScope, ValetTicket } from "@shared/schema";
+import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, SafeUser, UserLocationScope, ValetTicket } from "@shared/schema";
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -272,7 +272,7 @@ export default function AdminPanel() {
     queryKey: ["/api/locations"],
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery<User[]>({
+  const { data: users, isLoading: usersLoading } = useQuery<SafeUser[]>({
     queryKey: ["/api/users"],
   });
 

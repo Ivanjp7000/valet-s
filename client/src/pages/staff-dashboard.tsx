@@ -25,7 +25,7 @@ import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { ValetTicket, User as UserType } from "@shared/schema";
+import type { ValetTicket, SafeUser as UserType } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
 // Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
@@ -2501,8 +2501,8 @@ export default function StaffDashboard() {
                 <div>
                   <label className="text-sm font-medium text-gray-700">Password Status</label>
                   <div className="mt-1 flex items-center gap-2">
-                    <Badge variant={editUserData.password ? 'default' : 'destructive'}>
-                      {editUserData.password ? 'Password Set' : 'No Password'}
+                    <Badge variant={editUserData.hasPassword ? 'default' : 'destructive'}>
+                      {editUserData.hasPassword ? 'Password Set' : 'No Password'}
                     </Badge>
                   </div>
                 </div>
@@ -2620,7 +2620,7 @@ export default function StaffDashboard() {
                   </p>
                 </div>
               )}
-              {user?.password && (
+              {user?.hasPassword && (
                 <div>
                   <label className="text-sm font-medium text-gray-700">Current Password</label>
                   <Input

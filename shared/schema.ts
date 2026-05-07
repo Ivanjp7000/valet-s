@@ -285,3 +285,5 @@ export const insertFaqSchema = createInsertSchema(faqs).pick({
 export const updateValetTicketStatusSchema = z.object({
   status: z.enum(['active', 'retrieving', 'transit', 'preparing', 'ready', 'completed', 'cancelled', 'out_with_guest']),
 });
+
+export type SafeUser = Omit<User, 'password'> & { hasPassword: boolean };

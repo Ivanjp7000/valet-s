@@ -8,6 +8,11 @@ import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
+function sanitizeUser<T extends { password?: string | null }>(user: T): Omit<T, 'password'> & { hasPassword: boolean } {
+  const { password, ...rest } = user;
+  return { ...rest, hasPassword: !!password };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -106,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user);
+      res.json(user ? sanitizeUser(user) : user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -805,12 +810,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.role === 'superadmin') {
         // Super Admin sees all users
         const users = await storage.getAllUsers();
-        res.json(users);
+        res.json(users.map(sanitizeUser));
       } else {
         // Privilege Admin sees standard admins and standard users in their OU
         const users = await storage.getUsersByOU(user.ouId!);
         const filteredUsers = users.filter(u => ['standard_admin', 'standard_user'].includes(u.role));
-        res.json(filteredUsers);
+        res.json(filteredUsers.map(sanitizeUser));
       }
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -1077,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const users = await storage.getAllUsers();
         const usersWithScopes = await Promise.all(
           users.map(async (user) => ({
-            ...user,
+            ...sanitizeUser(user),
             locationScopes: await storage.getUserLocationScopes(user.id)
           }))
         );
@@ -1087,7 +1092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const result = await storage.getUsersWithLocationScopes(currentUser.ouId);
         const filteredResult = result
           .filter(r => ['standard_admin', 'standard_user'].includes(r.user.role))
-          .map(r => ({ ...r.user, locationScopes: r.scopes }));
+          .map(r => ({ ...sanitizeUser(r.user), locationScopes: r.scopes }));
         res.json(filteredResult);
       } else {
         res.json([]);
@@ -1164,7 +1169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.currentUser;
       const scopedUsers = await storage.getScopedUsers(user);
-      res.json(scopedUsers);
+      res.json(scopedUsers.map(sanitizeUser));
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users" });
