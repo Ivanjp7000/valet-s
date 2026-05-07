@@ -16,7 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -514,6 +514,16 @@ export default function StaffDashboard() {
   const [deleteTicket, setDeleteTicket] = useState<ValetTicket | null>(null);
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'storage'>('day');
   const [archiveTicket, setArchiveTicket] = useState<ValetTicket | null>(null);
+
+  // Backup state
+  const [backupRange, setBackupRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('30d');
+  const [backupFormat, setBackupFormat] = useState<'csv'|'json'>('csv');
+  const [backupIncludeTickets, setBackupIncludeTickets] = useState(true);
+  const [backupIncludeUsers, setBackupIncludeUsers] = useState(false);
+  const [backupIncludeLocations, setBackupIncludeLocations] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [pdfRange, setPdfRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('7d');
+  const [pdfLoading, setPdfLoading] = useState(false);
   
   // Compact view toggle for mobile
   
@@ -835,6 +845,127 @@ export default function StaffDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
     },
   });
+
+  const BACKUP_RANGE_LABELS: Record<string, string> = {
+    '1d': 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days',
+    '3m': 'Last 3 months', '6m': 'Last 6 months', '1y': 'Last year', 'all': 'All time',
+  };
+
+  function toCSVBackup(rows: Record<string, any>[]): string {
+    if (!rows.length) return '';
+    const keys = Object.keys(rows[0]);
+    const header = keys.join(',');
+    const body = rows.map(r =>
+      keys.map(k => { const v = r[k] ?? ''; return `"${String(v).replace(/"/g, '""')}"`; }).join(',')
+    );
+    return [header, ...body].join('\n');
+  }
+
+  function triggerDownloadBackup(content: string, filename: string, mime: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleFullExport() {
+    if (!backupIncludeTickets && !backupIncludeUsers && !backupIncludeLocations) {
+      toast({ title: 'Nothing selected', description: 'Select at least one data type to export.', variant: 'destructive' }); return;
+    }
+    setBackupLoading(true);
+    try {
+      const params = new URLSearchParams({
+        range: backupRange,
+        includeTickets: String(backupIncludeTickets),
+        includeUsers: String(backupIncludeUsers),
+        includeLocations: String(backupIncludeLocations),
+      });
+      const res = await fetch(`/api/backup/export?${params}`);
+      if (!res.ok) throw new Error('Export failed');
+      const data = await res.json();
+      const stamp = new Date().toISOString().slice(0,10);
+      if (backupFormat === 'json') {
+        triggerDownloadBackup(JSON.stringify(data, null, 2), `backup_${stamp}.json`, 'application/json');
+      } else {
+        const parts: string[] = [];
+        if (data.tickets?.length)   parts.push(`=== TICKETS ===\n${toCSVBackup(data.tickets)}`);
+        if (data.users?.length)     parts.push(`=== USERS ===\n${toCSVBackup(data.users)}`);
+        if (data.locations?.length) parts.push(`=== LOCATIONS ===\n${toCSVBackup(data.locations)}`);
+        triggerDownloadBackup(parts.join('\n\n'), `backup_${stamp}.csv`, 'text/csv');
+      }
+      toast({ title: 'Export complete', description: `Downloaded as ${backupFormat.toUpperCase()}.` });
+    } catch (e) {
+      toast({ title: 'Export failed', description: 'Could not generate export. Try again.', variant: 'destructive' });
+    } finally {
+      setBackupLoading(false);
+    }
+  }
+
+  async function handlePdfExport() {
+    setPdfLoading(true);
+    try {
+      const params = new URLSearchParams({ range: pdfRange, includeTickets: 'true', includeUsers: 'false', includeLocations: 'false' });
+      const res = await fetch(`/api/backup/export?${params}`);
+      if (!res.ok) throw new Error('Export failed');
+      const data = await res.json();
+      const departed: any[] = (data.tickets || []).filter((t: any) => t.status === 'completed');
+
+      const doc = await PDFDocument.create();
+      const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const W = 595, H = 842, M = 40;
+      let page = doc.addPage([W, H]);
+      let y = H - M;
+      const stamp = new Date().toISOString().slice(0,10);
+
+      page.drawText('Departed History Report', { x: M, y, font: fontBold, size: 18, color: rgb(0.1,0.1,0.1) });
+      y -= 22;
+      page.drawText(`Range: ${BACKUP_RANGE_LABELS[pdfRange]}   |   Generated: ${stamp}   |   Total: ${departed.length} records`, { x: M, y, font, size: 10, color: rgb(0.45,0.45,0.45) });
+      y -= 18;
+      page.drawRectangle({ x: M, y, width: W - M*2, height: 1, color: rgb(0.8,0.7,0.2) });
+      y -= 16;
+
+      if (departed.length === 0) {
+        page.drawText('No departed tickets found for the selected period.', { x: M, y, font, size: 12, color: rgb(0.5,0.5,0.5) });
+      }
+
+      for (const t of departed) {
+        if (y < 80) { page = doc.addPage([W, H]); y = H - M; }
+        const car = `${t.carColor || ''} ${t.carMake || ''} ${t.carModel || ''}`.trim();
+        const plate = t.licensePlate || '—';
+        const checkedIn = t.createdAt ? new Date(t.createdAt).toLocaleString('ja-JP', { hour12: false }) : '—';
+        const departedStr = t.departedAt ? new Date(t.departedAt).toLocaleString('ja-JP', { hour12: false }) : '—';
+        const stay = t.totalStaySeconds ? `${Math.floor(t.totalStaySeconds/3600)}h ${Math.floor((t.totalStaySeconds%3600)/60)}m` : '—';
+        const visitor = t.visitorType === 'hotel_guest' ? 'Hotel' : t.visitorType === 'restaurant' ? 'Restaurant' : 'Other';
+
+        page.drawText(`#${t.ticketNumber}`, { x: M, y, font: fontBold, size: 11, color: rgb(0.15,0.15,0.15) });
+        page.drawText(t.guestName || '—', { x: M + 54, y, font, size: 11, color: rgb(0.15,0.15,0.15) });
+        page.drawText(visitor, { x: W - M - 60, y, font, size: 9, color: rgb(0.5,0.5,0.5) });
+        y -= 14;
+        page.drawText(car, { x: M + 10, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
+        page.drawText(`Plate: ${plate}`, { x: M + 220, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
+        page.drawText(`Stay: ${stay}`, { x: W - M - 80, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
+        y -= 12;
+        page.drawText(`In: ${checkedIn}`, { x: M + 10, y, font, size: 8, color: rgb(0.5,0.5,0.5) });
+        page.drawText(`Out: ${departedStr}`, { x: M + 200, y, font, size: 8, color: rgb(0.5,0.5,0.5) });
+        y -= 10;
+        page.drawRectangle({ x: M, y, width: W - M*2, height: 0.5, color: rgb(0.88,0.88,0.88) });
+        y -= 12;
+      }
+
+      const bytes = await doc.save();
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `departed_history_${stamp}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'PDF ready', description: `${departed.length} departed tickets exported.` });
+    } catch (e) {
+      toast({ title: 'PDF failed', description: 'Could not generate PDF. Try again.', variant: 'destructive' });
+    } finally {
+      setPdfLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -2058,32 +2189,108 @@ export default function StaffDashboard() {
           {/* Backup Tab */}
           {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
             <TabsContent value="backup" className="space-y-6">
+
+              {/* Section 1 — Full Data Export */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Database size={20} className="text-regis-gold" />
-                    Data Backup & Restore
+                    <Download size={20} className="text-regis-gold" />
+                    Full Data Export
                   </CardTitle>
+                  <p className="text-sm text-gray-500 mt-1">Export your data as a file. All data is scoped to your organization.</p>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
-                    <Database size={48} className="text-gray-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-500 mb-2">Backup Coming Soon</h3>
-                    <p className="text-sm text-gray-400 max-w-sm">
-                      Automated backups, manual snapshots, and data restore functionality will be available here in a future update.
-                    </p>
+                <CardContent className="space-y-5">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Include in export</p>
+                    <div className="flex flex-wrap gap-3">
+                      {[
+                        { label: 'Tickets', value: backupIncludeTickets, set: setBackupIncludeTickets },
+                        { label: 'Staff Users', value: backupIncludeUsers, set: setBackupIncludeUsers },
+                        { label: 'Locations', value: backupIncludeLocations, set: setBackupIncludeLocations },
+                      ].map(({ label, value, set }) => (
+                        <button key={label} onClick={() => set(!value)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${value ? 'border-regis-gold bg-amber-50 text-amber-800' : 'border-gray-200 bg-white text-gray-500'}`}>
+                          {value ? <CheckSquare size={15} /> : <Square size={15} />}
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 opacity-40 pointer-events-none select-none">
-                    {['Automated Daily Backup', 'Manual Snapshot', 'Restore from Backup'].map(f => (
-                      <div key={f} className="border-2 border-gray-200 rounded-lg p-4 text-center">
-                        <Database size={24} className="text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm font-medium text-gray-500">{f}</p>
-                        <p className="text-xs text-gray-400 mt-1">Not available yet</p>
-                      </div>
-                    ))}
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Date range</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(['1d','7d','30d','3m','6m','1y','all'] as const).map(r => (
+                        <button key={r} onClick={() => setBackupRange(r)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${backupRange === r ? 'bg-regis-gold text-white border-regis-gold' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
+                          {BACKUP_RANGE_LABELS[r]}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Format</p>
+                    <div className="flex flex-wrap gap-3">
+                      <button onClick={() => setBackupFormat('csv')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${backupFormat === 'csv' ? 'border-regis-gold bg-amber-50 text-amber-800' : 'border-gray-200 bg-white text-gray-500'}`}>
+                        <FileText size={15} />
+                        CSV
+                        <span className="text-xs font-normal opacity-60">— opens in Excel</span>
+                      </button>
+                      <button onClick={() => setBackupFormat('json')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${backupFormat === 'json' ? 'border-regis-gold bg-amber-50 text-amber-800' : 'border-gray-200 bg-white text-gray-500'}`}>
+                        <FileJson size={15} />
+                        JSON
+                        <span className="text-xs font-normal opacity-60">— structured data</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button onClick={handleFullExport} disabled={backupLoading} className="bg-regis-gold hover:bg-amber-600 text-white gap-2">
+                    {backupLoading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    {backupLoading ? 'Preparing export…' : `Export as ${backupFormat.toUpperCase()}`}
+                  </Button>
                 </CardContent>
               </Card>
+
+              {/* Section 2 — Departed History PDF */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileDown size={20} className="text-regis-gold" />
+                    Departed History — PDF Report
+                  </CardTitle>
+                  <p className="text-sm text-gray-500 mt-1">Export a formatted PDF of all checked-out (departed) tickets. Ideal for record-keeping and audits.</p>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Date range</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(['1d','7d','30d','3m','6m','1y','all'] as const).map(r => (
+                        <button key={r} onClick={() => setPdfRange(r)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${pdfRange === r ? 'bg-regis-gold text-white border-regis-gold' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}>
+                          {BACKUP_RANGE_LABELS[r]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <FileText size={18} className="text-gray-400 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">What's included in the PDF</p>
+                      <p className="text-xs text-gray-500">Ticket #, Guest name, Car details, Plate, Check-in & departure time, Total stay duration, Visitor type</p>
+                    </div>
+                  </div>
+
+                  <Button onClick={handlePdfExport} disabled={pdfLoading} className="bg-regis-gold hover:bg-amber-600 text-white gap-2">
+                    {pdfLoading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+                    {pdfLoading ? 'Generating PDF…' : 'Download PDF Report'}
+                  </Button>
+                </CardContent>
+              </Card>
+
             </TabsContent>
           )}
         </Tabs>
