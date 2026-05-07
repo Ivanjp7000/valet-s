@@ -1065,7 +1065,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'guest-out') return (
                           <SortablePanel key="guest-out" id="guest-out"
-                            title={`Car in Use Will Return (${activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})`}
+                            title={`Car Will Return (${activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})`}
                             icon={<Car size={14} />} borderClass="border-blue-200" headerClass="text-blue-700"
                             expanded={isExpanded} onToggle={toggle}
                           >
@@ -1346,7 +1346,7 @@ export default function StaffDashboard() {
                     <CardTitle className="flex items-center justify-between text-base sm:text-lg">
                       <div className="flex items-center gap-2 text-blue-700">
                         <Car size={20} />
-                        Car in Use Will Return
+                        Car Will Return
                       </div>
                       <Badge className="bg-blue-600 text-white text-lg px-4 py-1">
                         {activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}
@@ -1499,7 +1499,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'guest-out') return (
                           <SortablePanel key="guest-out" id="guest-out"
-                            title="Car in Use Will Return"
+                            title="Car Will Return"
                             badge={<Badge className="bg-blue-600 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</Badge>}
                             icon={<Car className="text-blue-700" size={18} />}
                             borderClass="border-blue-200" headerClass="text-blue-700"
