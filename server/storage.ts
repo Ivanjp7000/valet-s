@@ -4,6 +4,7 @@ import {
   physicalLocations,
   userLocationScopes,
   valetTickets,
+  ticketGuestTrips,
   faqs,
   systemSettings,
   type User,
@@ -16,6 +17,7 @@ import {
   type InsertUserLocationScope,
   type ValetTicket,
   type InsertValetTicket,
+  type TicketGuestTrip,
   type Faq,
   type InsertFaq,
   type SystemSetting,
@@ -87,6 +89,9 @@ export interface IStorage {
   getScopedLocations(user: User): Promise<PhysicalLocation[]>;
   getTicketsByOU(ouId: string): Promise<ValetTicket[]>;
   getTicketsByLocations(locationIds: string[]): Promise<ValetTicket[]>;
+  
+  // Guest trip log operations
+  getTicketGuestTrips(ticketId: string): Promise<TicketGuestTrip[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -176,6 +181,15 @@ export class DatabaseStorage implements IStorage {
       .set(updateData)
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
+
+    // If transitioning to out_with_guest, log a new trip entry
+    if (status === 'out_with_guest' && ticket) {
+      await db.insert(ticketGuestTrips).values({
+        ticketId: ticket.id,
+        departedAt: now,
+      });
+    }
+
     return ticket;
   }
 
@@ -211,7 +225,38 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
+
+    // Close the open trip entry for this ticket
+    if (updatedTicket) {
+      const openTrips = await db
+        .select()
+        .from(ticketGuestTrips)
+        .where(and(
+          eq(ticketGuestTrips.ticketId, ticket.id),
+          eq(ticketGuestTrips.returnedAt, null as any)
+        ))
+        .orderBy(desc(ticketGuestTrips.departedAt))
+        .limit(1);
+
+      if (openTrips.length > 0) {
+        const trip = openTrips[0];
+        const tripDuration = Math.floor((now.getTime() - new Date(trip.departedAt).getTime()) / 1000);
+        await db
+          .update(ticketGuestTrips)
+          .set({ returnedAt: now, durationSeconds: tripDuration })
+          .where(eq(ticketGuestTrips.id, trip.id));
+      }
+    }
+
     return updatedTicket;
+  }
+
+  async getTicketGuestTrips(ticketId: string): Promise<TicketGuestTrip[]> {
+    return db
+      .select()
+      .from(ticketGuestTrips)
+      .where(eq(ticketGuestTrips.ticketId, ticketId))
+      .orderBy(desc(ticketGuestTrips.departedAt));
   }
 
   async deleteValetTicket(ticketNumber: string): Promise<boolean> {

@@ -406,6 +406,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get guest trip history for a ticket
+  app.get('/api/staff/tickets/:ticketNumber/trips', isAuthenticated, requireReadAccess, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const ticket = await storage.getValetTicket(ticketNumber);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      const trips = await storage.getTicketGuestTrips(ticket.id);
+      res.json(trips);
+    } catch (error) {
+      console.error("Error fetching guest trips:", error);
+      res.status(500).json({ message: "Failed to fetch guest trips" });
+    }
+  });
+
   app.get('/api/staff/stats', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser;

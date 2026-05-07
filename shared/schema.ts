@@ -130,6 +130,19 @@ export const valetTickets = pgTable("valet_tickets", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Guest trip log — one entry per time the car goes out with the guest and comes back
+export const ticketGuestTrips = pgTable("ticket_guest_trips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull().references(() => valetTickets.id, { onDelete: 'cascade' }),
+  departedAt: timestamp("departed_at").notNull(),
+  returnedAt: timestamp("returned_at"),
+  durationSeconds: integer("duration_seconds"), // null while still out
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type InsertTicketGuestTrip = typeof ticketGuestTrips.$inferInsert;
+export type TicketGuestTrip = typeof ticketGuestTrips.$inferSelect;
+
 // FAQ entries table
 export const faqs = pgTable("faqs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

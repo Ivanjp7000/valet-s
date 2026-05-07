@@ -394,6 +394,18 @@ export default function StaffDashboard() {
     }
   }, [user?.mustChangePassword]);
 
+  // Guest trip history for the currently viewed ticket
+  const { data: viewTicketTrips } = useQuery<{ id: string; ticketId: string; departedAt: string; returnedAt: string | null; durationSeconds: number | null; createdAt: string }[]>({
+    queryKey: ["/api/staff/tickets", viewTicket?.ticketNumber, "trips"],
+    queryFn: async () => {
+      if (!viewTicket) return [];
+      const res = await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/trips`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!viewTicket,
+  });
+
   // Update ticket details mutation
   const updateTicketMutation = useMutation({
     mutationFn: async (ticketData: Partial<ValetTicket> & { ticketNumber: string }) => {
@@ -2118,6 +2130,63 @@ export default function StaffDashboard() {
                   <div className="border-t pt-4">
                     <h3 className="font-semibold text-regis-navy mb-3">Staff Notes</h3>
                     <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{viewTicket.staffNotes}</p>
+                  </div>
+                )}
+
+                {viewTicketTrips && viewTicketTrips.length > 0 && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold text-regis-navy mb-3 flex items-center gap-2">
+                      <Car size={16} />
+                      Car Out with Guest — Trip Log ({viewTicketTrips.length} trip{viewTicketTrips.length !== 1 ? 's' : ''})
+                    </h3>
+                    <div className="space-y-2">
+                      {viewTicketTrips.map((trip, index) => {
+                        const departeAt = new Date(trip.departedAt);
+                        const returnedAt = trip.returnedAt ? new Date(trip.returnedAt) : null;
+                        const dur = trip.durationSeconds;
+                        const durDisplay = dur != null
+                          ? dur < 60
+                            ? `${dur}s`
+                            : dur < 3600
+                              ? `${Math.floor(dur / 60)}m ${dur % 60}s`
+                              : `${Math.floor(dur / 3600)}h ${Math.floor((dur % 3600) / 60)}m`
+                          : null;
+                        return (
+                          <div key={trip.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-blue-800 text-xs">Trip #{viewTicketTrips.length - index}</span>
+                              {durDisplay ? (
+                                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-300">
+                                  {durDisplay}
+                                </span>
+                              ) : (
+                                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                                  Still Out
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-gray-500">Departed</p>
+                                <p className="font-medium text-gray-800">{departeAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                <p className="text-gray-400">{departeAt.toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500">Returned</p>
+                                {returnedAt ? (
+                                  <>
+                                    <p className="font-medium text-green-700">{returnedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                    <p className="text-gray-400">{returnedAt.toLocaleDateString()}</p>
+                                  </>
+                                ) : (
+                                  <p className="font-medium text-amber-600">Not yet returned</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
