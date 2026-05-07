@@ -53,6 +53,7 @@ export default function AdminPanel() {
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'storage'>('day');
   const [reportOuId, setReportOuId] = useState('');
   const [reportLocationId, setReportLocationId] = useState('');
+  const [usersOuId, setUsersOuId] = useState('');
   const [userLocationScopes, setUserLocationScopes] = useState<UserLocationScope[]>([]);
 
   // Backup state
@@ -502,7 +503,9 @@ export default function AdminPanel() {
   
   const filteredUsers = isPrivilegeAdmin && user?.ouId
     ? users?.filter(u => u.ouId === user.ouId && u.role !== 'superadmin')
-    : users;
+    : isSuperAdmin && usersOuId
+      ? users?.filter(u => u.ouId === usersOuId)
+      : users;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -758,6 +761,33 @@ export default function AdminPanel() {
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4 sm:space-y-6">
+            {/* OU selector — Super Admin must pick an OU before seeing users */}
+            {isSuperAdmin && (
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Organisation</label>
+                  <select
+                    value={usersOuId}
+                    onChange={e => setUsersOuId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-regis-navy"
+                  >
+                    <option value="">— Select OU —</option>
+                    {(ous || []).map(ou => (
+                      <option key={ou.id} value={ou.id}>{ou.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Placeholder until OU is selected */}
+            {isSuperAdmin && !usersOuId ? (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                <Users size={48} className="opacity-20 mb-3" />
+                <p className="text-base font-medium">Select an Organisation</p>
+                <p className="text-sm mt-1">Choose an OU above to view its users</p>
+              </div>
+            ) : (
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
                 <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">
@@ -896,6 +926,7 @@ export default function AdminPanel() {
                 )}
               </CardContent>
             </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="faqs" className="space-y-6">
