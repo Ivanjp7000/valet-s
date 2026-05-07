@@ -51,6 +51,8 @@ export default function AdminPanel() {
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [managingUserScopes, setManagingUserScopes] = useState<User | null>(null);
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'storage'>('day');
+  const [reportOuId, setReportOuId] = useState('');
+  const [reportLocationId, setReportLocationId] = useState('');
   const [userLocationScopes, setUserLocationScopes] = useState<UserLocationScope[]>([]);
 
   // Backup state
@@ -961,8 +963,52 @@ export default function AdminPanel() {
 
           {/* Reports Tab */}
           <TabsContent value="reports" className="space-y-6">
-            {(() => {
-              const tickets = allTickets || [];
+            {/* OU + Location selectors — required before report is shown */}
+            {isSuperAdmin && (
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Organisation</label>
+                  <select
+                    value={reportOuId}
+                    onChange={e => { setReportOuId(e.target.value); setReportLocationId(''); }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-regis-navy"
+                  >
+                    <option value="">— Select OU —</option>
+                    {(ous || []).map(ou => (
+                      <option key={ou.id} value={ou.id}>{ou.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Location</label>
+                  <select
+                    value={reportLocationId}
+                    onChange={e => setReportLocationId(e.target.value)}
+                    disabled={!reportOuId}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-regis-navy disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <option value="">— Select Location —</option>
+                    {(locations || []).filter(l => l.ouId === reportOuId).map(l => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Placeholder shown until OU + Location are both selected */}
+            {isSuperAdmin && (!reportOuId || !reportLocationId) ? (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                <BarChart2 size={48} className="opacity-20 mb-3" />
+                <p className="text-base font-medium">Select an Organisation and Location</p>
+                <p className="text-sm mt-1">Choose both filters above to view the report</p>
+              </div>
+            ) : null}
+
+            {(!isSuperAdmin || (reportOuId && reportLocationId)) && (() => {
+              const tickets = isSuperAdmin
+                ? (allTickets || []).filter(t => t.ouId === reportOuId && t.locationId === reportLocationId)
+                : (allTickets || []);
               const now = new Date();
               const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
               const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
