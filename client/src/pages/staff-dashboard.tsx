@@ -512,7 +512,7 @@ export default function StaffDashboard() {
   const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
   const [editTicketData, setEditTicketData] = useState<ValetTicket | null>(null);
   const [deleteTicket, setDeleteTicket] = useState<ValetTicket | null>(null);
-  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year'>('day');
+  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'storage'>('day');
   const [archiveTicket, setArchiveTicket] = useState<ValetTicket | null>(null);
   
   // Compact view toggle for mobile
@@ -2147,16 +2147,18 @@ export default function StaffDashboard() {
                         </h2>
                         <p className="text-sm text-gray-500 mt-0.5">Statistics and performance overview</p>
                       </div>
-                      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                        {(['day','week','month','year'] as const).map(p => (
+                      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-wrap">
+                        {(['day','week','month','year','storage'] as const).map(p => (
                           <button key={p} onClick={() => setReportPeriod(p)}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${reportPeriod === p ? 'bg-regis-navy text-white shadow-sm' : 'text-gray-600 hover:bg-white'}`}>
-                            {p === 'day' ? 'Day' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${reportPeriod === p ? 'bg-regis-navy text-white shadow-sm' : 'text-gray-600 hover:bg-white'}`}>
+                            {p === 'day' ? 'Day' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : p === 'year' ? 'Year' : 'Storage'}
                           </button>
                         ))}
                       </div>
                     </div>
 
+                    {reportPeriod !== 'storage' ? (
+                      <>
                     {/* Summary Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <Card className="border-l-4 border-l-regis-navy">
@@ -2271,6 +2273,124 @@ export default function StaffDashboard() {
                         </CardContent>
                       </Card>
                     </div>
+                      </>
+                    ) : (() => {
+                      const ticketCount = allTickets.length;
+                      const userCount = allUsers?.length ?? 0;
+                      const imgBytes = ticketCount * 80 * 1024;
+                      const textBytes = (ticketCount * 2 + userCount * 1) * 1024;
+                      const docBytes = ticketCount * 12 * 1024;
+                      const sessionBytes = userCount * 4 * 1024;
+                      const totalBytes = imgBytes + textBytes + docBytes + sessionBytes;
+                      const fmt = (b: number) => b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024).toFixed(0)} KB`;
+                      const pct = (b: number) => totalBytes > 0 ? Math.round((b / totalBytes) * 100) : 0;
+                      const categories = [
+                        { label: 'Images', sublabel: 'License plate photos', bytes: imgBytes, color: 'bg-blue-500', textColor: 'text-blue-600', icon: '🖼️' },
+                        { label: 'Documents', sublabel: 'PDF thermal labels', bytes: docBytes, color: 'bg-amber-500', textColor: 'text-amber-600', icon: '📄' },
+                        { label: 'Text & Records', sublabel: 'Tickets, users & sessions', bytes: textBytes, color: 'bg-green-500', textColor: 'text-green-600', icon: '📝' },
+                        { label: 'Sessions', sublabel: 'Auth & session data', bytes: sessionBytes, color: 'bg-purple-500', textColor: 'text-purple-600', icon: '🔐' },
+                      ];
+                      const pieData = categories.map(c => ({ name: c.label, value: c.bytes }));
+                      const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
+                      return (
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <Card className="border-l-4 border-l-blue-500 col-span-2 sm:col-span-1">
+                              <CardContent className="p-4">
+                                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Estimated</p>
+                                <p className="text-2xl font-bold text-regis-navy mt-1">{fmt(totalBytes)}</p>
+                                <p className="text-xs text-gray-400 mt-1">Across all categories</p>
+                              </CardContent>
+                            </Card>
+                            <Card className="border-l-4 border-l-blue-400">
+                              <CardContent className="p-4">
+                                <p className="text-xs text-gray-500 uppercase tracking-wide">Images</p>
+                                <p className="text-2xl font-bold text-blue-600 mt-1">{fmt(imgBytes)}</p>
+                                <p className="text-xs text-gray-400 mt-1">{pct(imgBytes)}% of total</p>
+                              </CardContent>
+                            </Card>
+                            <Card className="border-l-4 border-l-amber-400">
+                              <CardContent className="p-4">
+                                <p className="text-xs text-gray-500 uppercase tracking-wide">Documents</p>
+                                <p className="text-2xl font-bold text-amber-600 mt-1">{fmt(docBytes)}</p>
+                                <p className="text-xs text-gray-400 mt-1">{pct(docBytes)}% of total</p>
+                              </CardContent>
+                            </Card>
+                            <Card className="border-l-4 border-l-green-400">
+                              <CardContent className="p-4">
+                                <p className="text-xs text-gray-500 uppercase tracking-wide">Text & Records</p>
+                                <p className="text-2xl font-bold text-green-600 mt-1">{fmt(textBytes)}</p>
+                                <p className="text-xs text-gray-400 mt-1">{pct(textBytes)}% of total</p>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <Card>
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <Database size={18} className="text-regis-gold" />
+                                  Usage by Category
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <ResponsiveContainer width="100%" height={220}>
+                                  <PieChart>
+                                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
+                                      {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                    </Pie>
+                                    <Tooltip formatter={(v: number) => fmt(v)} />
+                                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </CardContent>
+                            </Card>
+
+                            <Card>
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <Database size={18} className="text-regis-gold" />
+                                  Breakdown Detail
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4 pt-2">
+                                {categories.map(cat => (
+                                  <div key={cat.label}>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-2">
+                                        <span>{cat.icon}</span>
+                                        <div>
+                                          <p className="text-sm font-medium text-gray-800">{cat.label}</p>
+                                          <p className="text-xs text-gray-400">{cat.sublabel}</p>
+                                        </div>
+                                      </div>
+                                      <span className={`text-sm font-bold ${cat.textColor}`}>{fmt(cat.bytes)}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 rounded-full h-2">
+                                      <div className={`${cat.color} h-2 rounded-full transition-all`} style={{ width: `${pct(cat.bytes)}%` }} />
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-0.5 text-right">{pct(cat.bytes)}%</p>
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          <Card className="border border-amber-200 bg-amber-50">
+                            <CardContent className="p-4 flex items-start gap-3">
+                              <span className="text-2xl">ℹ️</span>
+                              <div>
+                                <p className="text-sm font-medium text-amber-800">Estimated figures</p>
+                                <p className="text-xs text-amber-700 mt-1">
+                                  Calculated from record counts using typical file size estimates (plate image ≈ 80 KB, PDF label ≈ 12 KB, text record ≈ 1–3 KB).
+                                  Based on <strong>{ticketCount}</strong> ticket{ticketCount !== 1 ? 's' : ''} and <strong>{userCount}</strong> user{userCount !== 1 ? 's' : ''}.
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
