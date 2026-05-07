@@ -57,7 +57,7 @@ function GuestOutCard({ ticket, onBack, canEdit = true }: { ticket: ValetTicket;
           className="h-6 px-3 text-xs bg-green-600 hover:bg-green-700 text-white w-full"
           onClick={onBack}
         >
-          Back
+          Guest is Back
         </Button>
       )}
     </div>
@@ -190,7 +190,7 @@ function GuestOutCardFull({ ticket, onBack, canEdit = true }: { ticket: ValetTic
           className="w-full bg-green-600 hover:bg-green-700 text-white"
           onClick={onBack}
         >
-          Back
+          Guest is Back
         </Button>
       )}
     </div>

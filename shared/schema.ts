@@ -263,5 +263,5 @@ export const insertFaqSchema = createInsertSchema(faqs).pick({
 });
 
 export const updateValetTicketStatusSchema = z.object({
-  status: z.enum(['active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled']),
+  status: z.enum(['active', 'retrieving', 'transit', 'ready', 'completed', 'cancelled', 'out_with_guest']),
 });
