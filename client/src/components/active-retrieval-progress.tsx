@@ -10,7 +10,7 @@ interface ActiveRetrievalProgressProps {
   onStageComplete?: (ticketNumber: string, nextStage: number) => void;
 }
 
-const STAGE_DURATION_MS = 5 * 60 * 1000; // 5 minutes per stage
+const STAGE_DURATION_MS = 5 * 60 * 1000;
 
 const stages = [
   { id: 1, name: "Retrieving", icon: Car, color: "blue" },
@@ -23,7 +23,6 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
   const [currentStageIndex, setCurrentStageIndex] = useState<number>(0);
   const hasTriggeredRef = useRef<string | null>(null);
 
-  // Calculate initial time and stage
   useEffect(() => {
     let stageIndex = 0;
     if (ticket.status === "retrieving") stageIndex = 0;
@@ -33,15 +32,20 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
 
     setCurrentStageIndex(stageIndex);
 
+    if (ticket.status === "ready") {
+      setTimeRemaining(0);
+      return;
+    }
+
     const stageStarted = ticket.stageStartedAt ? new Date(ticket.stageStartedAt).getTime() : Date.now();
     const elapsed = Date.now() - stageStarted;
     const remaining = Math.max(0, STAGE_DURATION_MS - elapsed);
     setTimeRemaining(remaining);
   }, [ticket.status, ticket.stageStartedAt]);
 
-  // Countdown timer
+  // Countdown timer — only runs for retrieving and transit, NOT ready
   useEffect(() => {
-    if (ticket.status !== "retrieving" && ticket.status !== "transit" && ticket.status !== "ready") {
+    if (ticket.status !== "retrieving" && ticket.status !== "transit") {
       return;
     }
 
@@ -55,7 +59,7 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
   // Auto-progression with ref-based guard to prevent infinite loops
   useEffect(() => {
     const key = `${ticket.ticketNumber}-${ticket.status}`;
-    
+
     if (
       timeRemaining === 0 &&
       hasTriggeredRef.current !== key &&
@@ -86,8 +90,16 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Clock className="text-regis-navy" size={18} />
-          <span className="text-lg font-bold text-regis-navy">{formatTime(timeRemaining)}</span>
+          {ticket.status === "ready" ? (
+            <CheckCircle className="text-green-600" size={18} />
+          ) : (
+            <Clock className="text-regis-navy" size={18} />
+          )}
+          {ticket.status === "ready" ? (
+            <span className="text-lg font-bold text-green-600">Car Ready</span>
+          ) : (
+            <span className="text-lg font-bold text-regis-navy">{formatTime(timeRemaining)}</span>
+          )}
         </div>
         <Badge variant="outline" className="text-xs">
           Stage {currentStageIndex + 1} of 3
@@ -105,13 +117,15 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
             <div key={stage.id} className="flex flex-col items-center flex-1">
               <div className="flex items-center w-full">
                 {index > 0 && (
-                  <div 
+                  <div
                     className={`flex-1 h-1 ${isCompleted || isActive ? 'bg-regis-gold' : 'bg-gray-200'}`}
                   />
                 )}
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                    isActive
+                    isActive && ticket.status === "ready"
+                      ? "bg-green-500 text-white"
+                      : isActive
                       ? "bg-regis-gold text-regis-navy ring-4 ring-regis-gold/30 animate-pulse"
                       : isCompleted
                       ? "bg-green-500 text-white"
@@ -121,19 +135,25 @@ export function ActiveRetrievalProgress({ ticket, onStageComplete }: ActiveRetri
                   <StageIcon size={20} />
                 </div>
                 {index < stages.length - 1 && (
-                  <div 
+                  <div
                     className={`flex-1 h-1 ${isCompleted ? 'bg-regis-gold' : 'bg-gray-200'}`}
                   />
                 )}
               </div>
               <span
                 className={`text-xs mt-2 font-medium ${
-                  isActive ? "text-regis-navy" : isCompleted ? "text-green-600" : "text-gray-400"
+                  isActive && ticket.status === "ready"
+                    ? "text-green-600"
+                    : isActive
+                    ? "text-regis-navy"
+                    : isCompleted
+                    ? "text-green-600"
+                    : "text-gray-400"
                 }`}
               >
                 {stage.name}
               </span>
-              {isActive && (
+              {isActive && ticket.status !== "ready" && (
                 <div className="w-full mt-1 bg-gray-200 rounded-full h-1.5">
                   <div
                     className="bg-regis-gold h-1.5 rounded-full transition-all duration-1000"
@@ -163,14 +183,20 @@ export function CompactRetrievalProgress({ ticket }: { ticket: ValetTicket }) {
 
     setCurrentStageIndex(stageIndex);
 
+    if (ticket.status === "ready") {
+      setTimeRemaining(0);
+      return;
+    }
+
     const stageStarted = ticket.stageStartedAt ? new Date(ticket.stageStartedAt).getTime() : Date.now();
     const elapsed = Date.now() - stageStarted;
     const remaining = Math.max(0, STAGE_DURATION_MS - elapsed);
     setTimeRemaining(remaining);
   }, [ticket.status, ticket.stageStartedAt]);
 
+  // Only count down when retrieving or transit — stops at ready
   useEffect(() => {
-    if (ticket.status !== "retrieving" && ticket.status !== "transit" && ticket.status !== "ready") {
+    if (ticket.status !== "retrieving" && ticket.status !== "transit") {
       return;
     }
     const interval = setInterval(() => {
@@ -192,7 +218,6 @@ export function CompactRetrievalProgress({ ticket }: { ticket: ValetTicket }) {
 
   return (
     <div className="flex items-center gap-1">
-      {/* Compact 3-stage icons */}
       <div className="flex items-center gap-0.5">
         {stages.map((stage, index) => {
           const StageIcon = stage.icon;
@@ -206,7 +231,9 @@ export function CompactRetrievalProgress({ ticket }: { ticket: ValetTicket }) {
               )}
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                  isActive
+                  isActive && ticket.status === "ready"
+                    ? "bg-green-500 text-white"
+                    : isActive
                     ? "bg-regis-gold text-regis-navy animate-pulse"
                     : isCompleted
                     ? "bg-green-500 text-white"
@@ -219,8 +246,11 @@ export function CompactRetrievalProgress({ ticket }: { ticket: ValetTicket }) {
           );
         })}
       </div>
-      {/* Timer */}
-      <span className="text-xs font-mono font-bold text-regis-navy ml-1">{formatTime(timeRemaining)}</span>
+      {ticket.status === "ready" ? (
+        <span className="text-xs font-bold text-green-600 ml-1">Ready!</span>
+      ) : (
+        <span className="text-xs font-mono font-bold text-regis-navy ml-1">{formatTime(timeRemaining)}</span>
+      )}
     </div>
   );
 }
@@ -275,7 +305,11 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
             {activeRetrievalTickets.map((ticket) => (
               <div
                 key={ticket.id}
-                className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm"
+                className={`p-4 rounded-lg border shadow-sm ${
+                  ticket.status === "ready"
+                    ? "bg-green-50 border-green-300"
+                    : "bg-white border-gray-200"
+                }`}
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -285,12 +319,12 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
                     </p>
                   </div>
                   <Badge
-                    variant={
+                    className={
                       ticket.status === "ready"
-                        ? "default"
+                        ? "bg-green-600 text-white"
                         : ticket.status === "transit"
-                        ? "secondary"
-                        : "outline"
+                        ? "bg-yellow-500 text-white"
+                        : "bg-blue-500 text-white"
                     }
                   >
                     {ticket.status === "retrieving" ? "Retrieving" : ticket.status === "transit" ? "In Transit" : "Ready"}

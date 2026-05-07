@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Car, Search, Construction, Check, X, Clock } from "lucide-react";
+import { Car, Search, Construction, Check, X, Clock, Bell } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ValetTicket } from "@shared/schema";
 
@@ -13,83 +11,98 @@ interface StatusTrackerProps {
   onBack: () => void;
 }
 
+const STAGE_DURATION_S = 5 * 60; // 5 minutes in seconds
+
+function getStageFromStatus(status: string): number {
+  if (status === "retrieving") return 0;
+  if (status === "transit") return 1;
+  if (status === "ready") return 2;
+  return -1;
+}
+
 export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
-  const [currentStage, setCurrentStage] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [stageStartTime, setStageStartTime] = useState<Date | null>(null);
-  const [isCompleted, setIsCompleted] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATION_S);
   const { lastMessage } = useWebSocket();
+  const queryClient = useQueryClient();
 
   const { data: ticket } = useQuery<ValetTicket>({
     queryKey: ["/api/tickets", ticketNumber],
-    refetchInterval: 5000, // Poll every 5 seconds as backup
+    refetchInterval: 5000,
   });
 
-  // Stage durations in minutes: 5 min, 5 min, 3 min
-  const stageDurations = [5, 5, 3];
+  const currentStage = ticket ? getStageFromStatus(ticket.status) : -1;
+  const isReady = ticket?.status === "ready";
+  const isActive = currentStage >= 0;
 
-  // Listen for WebSocket updates
+  // Immediately refetch when a WebSocket update arrives for this ticket
   useEffect(() => {
-    if (lastMessage) {
+    if (!lastMessage) return;
+    try {
       const message = JSON.parse(lastMessage);
-      if (message.type === 'ticket_status_updated' && 
-          message.data.ticketNumber === ticketNumber) {
-        // Update will be handled by react-query cache invalidation
+      if (
+        message.type === "ticket_status_updated" &&
+        message.data?.ticketNumber === ticketNumber
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber] });
       }
-    }
-  }, [lastMessage, ticketNumber]);
+    } catch {}
+  }, [lastMessage, ticketNumber, queryClient]);
 
-  // Initialize timing when component mounts
+  // Sync timer with DB stageStartedAt when status changes
   useEffect(() => {
-    if (ticket && !stageStartTime && !isCompleted) {
-      const now = new Date();
-      setStageStartTime(now);
-      setTimeRemaining(stageDurations[0] * 60); // Convert to seconds
+    if (!ticket || isReady) {
+      setTimeRemaining(0);
+      return;
     }
-  }, [ticket, stageStartTime, isCompleted]);
+    if (currentStage < 0) return;
 
-  // Handle countdown and stage progression
+    const stageStarted = ticket.stageStartedAt
+      ? new Date(ticket.stageStartedAt).getTime()
+      : Date.now();
+    const elapsedSeconds = Math.floor((Date.now() - stageStarted) / 1000);
+    const remaining = Math.max(0, STAGE_DURATION_S - elapsedSeconds);
+    setTimeRemaining(remaining);
+  }, [ticket?.status, ticket?.stageStartedAt, isReady, currentStage]);
+
+  // Countdown — only runs for retrieving and transit, stops at ready
   useEffect(() => {
-    if (!stageStartTime || isCompleted || currentStage >= 3) return;
+    if (!ticket || ticket.status !== "retrieving" && ticket.status !== "transit") return;
 
-    const timer = setInterval(() => {
-      const now = new Date();
-      const elapsedSeconds = Math.floor((now.getTime() - stageStartTime.getTime()) / 1000);
-      const currentStageDuration = stageDurations[currentStage] * 60;
-      const remaining = Math.max(0, currentStageDuration - elapsedSeconds);
-      
-      setTimeRemaining(remaining);
-
-      // Progress to next stage when time expires
-      if (remaining === 0) {
-        if (currentStage < 2) {
-          const nextStage = currentStage + 1;
-          setCurrentStage(nextStage);
-          setStageStartTime(now);
-          setTimeRemaining(stageDurations[nextStage] * 60);
-        } else {
-          // All stages completed
-          setIsCompleted(true);
-          setTimeout(() => {
-            alert('Your vehicle is ready for pickup!');
-            onBack();
-          }, 2000);
-        }
-      }
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
+    return () => clearInterval(interval);
+  }, [ticket?.status]);
 
-    return () => clearInterval(timer);
-  }, [stageStartTime, currentStage, isCompleted, onBack]);
-
-  // Format time as MM:SS
   const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const stages = [
+    {
+      id: 0,
+      name: "Retrieving Car",
+      description: "Our valet is locating your vehicle",
+      icon: Search,
+    },
+    {
+      id: 1,
+      name: "Car in Transit",
+      description: "Vehicle being brought to pickup area",
+      icon: Construction,
+    },
+    {
+      id: 2,
+      name: "Car Ready",
+      description: "Your vehicle is waiting at the entrance",
+      icon: Check,
+    },
+  ];
+
   // Waiting for staff to accept
-  if (ticket?.status === 'retrieval_requested') {
+  if (ticket?.status === "retrieval_requested") {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <div className="bg-regis-navy text-white px-6 py-8 text-center">
@@ -144,53 +157,85 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
     );
   }
 
-  const stages = [
-    {
-      id: 0,
-      name: "Retrieving Car",
-      description: "Our valet is locating your vehicle",
-      icon: Search,
-      color: "yellow"
-    },
-    {
-      id: 1,
-      name: "Car in Transit",
-      description: "Vehicle being brought to pickup area",
-      icon: Construction,
-      color: "blue"
-    },
-    {
-      id: 2,
-      name: "Car Ready",
-      description: "Your vehicle is waiting for pickup",
-      icon: Check,
-      color: "green"
-    }
-  ];
+  // Car is READY — show full-screen celebration
+  if (isReady) {
+    return (
+      <div className="min-h-screen bg-green-50 flex flex-col">
+        <div className="bg-green-600 text-white px-6 py-8 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <Check className="text-green-600" size={40} />
+          </motion.div>
+          <h2 className="text-2xl font-bold mb-2">Your Car is Ready!</h2>
+          <p className="text-green-100 text-sm">Ticket #{ticketNumber}</p>
+        </div>
 
-  const getStageProgress = (stageId: number) => {
-    if (stageId < currentStage) return 100;
-    if (stageId === currentStage) return 100;
-    return 0;
-  };
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto w-full">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="w-full"
+          >
+            <div className="bg-white rounded-2xl shadow-lg border-2 border-green-200 p-8 mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Car className="text-green-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-green-800 mb-2">
+                Please proceed to the valet entrance
+              </h3>
+              <p className="text-gray-500 text-sm">
+                Your vehicle is waiting for you at the pickup area. Please head over now.
+              </p>
+            </div>
 
-  const getStageIcon = (stage: any, stageId: number) => {
-    const IconComponent = stage.icon;
-    
-    if (stageId < currentStage) {
-      return <Check className="text-white" size={20} />;
-    } else if (stageId === currentStage) {
-      return <IconComponent className="text-white" size={20} />;
-    } else {
-      return <IconComponent className="text-gray-500" size={20} />;
-    }
-  };
+            {/* Completed stages */}
+            <div className="bg-white rounded-xl p-4 border border-green-100 text-left space-y-3">
+              {stages.map((stage) => {
+                const Icon = stage.icon;
+                return (
+                  <div key={stage.id} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                      <Check className="text-white" size={14} />
+                    </div>
+                    <span className="text-sm font-medium text-green-800">{stage.name}</span>
+                    <Check className="text-green-400 ml-auto" size={14} />
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
 
-  const getStageColor = (stageId: number) => {
-    if (stageId < currentStage) return "bg-green-500";
-    if (stageId === currentStage) return "bg-regis-gold animate-pulse";
-    return "bg-gray-300";
-  };
+        <Button
+          variant="ghost"
+          onClick={onBack}
+          className="mx-auto mb-8 text-gray-400 hover:text-gray-600"
+        >
+          <X className="mr-2" size={16} />
+          Back to Home
+        </Button>
+      </div>
+    );
+  }
+
+  // In progress (retrieving or transit)
+  if (!isActive) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 border-4 border-regis-gold border-t-transparent rounded-full animate-spin mb-6" />
+        <p className="text-gray-500">Loading status…</p>
+        <Button variant="ghost" onClick={onBack} className="mt-6 text-gray-400">
+          <X className="mr-2" size={16} />
+          Back
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -207,101 +252,105 @@ export function StatusTracker({ ticketNumber, onBack }: StatusTrackerProps) {
         {/* Progress Timeline */}
         <div className="p-8">
           <AnimatePresence>
-            {stages.map((stage, index) => (
-              <motion.div
-                key={stage.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.2 }}
-                className="flex items-center mb-8"
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 transition-all duration-500 ${getStageColor(stage.id)}`}>
-                  {getStageIcon(stage, stage.id)}
-                </div>
-                <div className="flex-1">
-                  <h3 className={`font-semibold transition-colors duration-300 ${
-                    stage.id <= currentStage ? 'text-regis-navy' : 'text-gray-500'
-                  }`}>
-                    {stage.name}
-                  </h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    stage.id <= currentStage ? 'text-gray-600' : 'text-gray-400'
-                  }`}>
-                    {stage.description}
-                  </p>
-                  
-                  {/* Show countdown timer for current stage */}
-                  {stage.id === currentStage && !isCompleted && (
-                    <div className="mt-2 flex items-center space-x-2">
-                      <Clock className="text-regis-gold" size={16} />
-                      <span className="text-lg font-bold text-regis-navy">
-                        {formatTime(timeRemaining)}
-                      </span>
-                      <span className="text-sm text-gray-500">remaining</span>
-                    </div>
-                  )}
-                  
-                  {/* Show completion checkmark for completed stages */}
-                  {stage.id < currentStage && (
-                    <div className="mt-2 flex items-center space-x-2">
-                      <Check className="text-green-500" size={16} />
-                      <span className="text-sm text-green-600 font-medium">Completed</span>
-                    </div>
-                  )}
-                  
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <motion.div
-                      className={`h-2 rounded-full transition-all duration-1000 ${
-                        stage.id <= currentStage ? 'bg-regis-gold' : 'bg-gray-300'
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${getStageProgress(stage.id)}%` }}
-                      transition={{ duration: 1 }}
-                    />
+            {stages.map((stage, index) => {
+              const Icon = stage.icon;
+              const isStageActive = index === currentStage;
+              const isStageCompleted = index < currentStage;
+              const isStageWaiting = index > currentStage;
+
+              return (
+                <motion.div
+                  key={stage.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.2 }}
+                  className="flex items-start mb-8"
+                >
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 flex-shrink-0 transition-all duration-500 ${
+                      isStageCompleted
+                        ? "bg-green-500"
+                        : isStageActive
+                        ? "bg-regis-gold animate-pulse"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    {isStageCompleted ? (
+                      <Check className="text-white" size={20} />
+                    ) : (
+                      <Icon
+                        className={isStageActive ? "text-white" : "text-gray-400"}
+                        size={20}
+                      />
+                    )}
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="flex-1">
+                    <h3
+                      className={`font-semibold transition-colors duration-300 ${
+                        isStageWaiting ? "text-gray-400" : "text-regis-navy"
+                      }`}
+                    >
+                      {stage.name}
+                    </h3>
+                    <p
+                      className={`text-sm transition-colors duration-300 ${
+                        isStageWaiting ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
+                      {stage.description}
+                    </p>
+
+                    {isStageActive && (
+                      <div className="mt-2 flex items-center space-x-2">
+                        <Clock className="text-regis-gold" size={16} />
+                        <span className="text-lg font-bold text-regis-navy">
+                          {formatTime(timeRemaining)}
+                        </span>
+                        <span className="text-sm text-gray-500">remaining</span>
+                      </div>
+                    )}
+
+                    {isStageCompleted && (
+                      <div className="mt-2 flex items-center space-x-2">
+                        <Check className="text-green-500" size={16} />
+                        <span className="text-sm text-green-600 font-medium">Completed</span>
+                      </div>
+                    )}
+
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                      <motion.div
+                        className={`h-2 rounded-full transition-all duration-1000 ${
+                          isStageCompleted || isStageActive ? "bg-regis-gold" : "bg-gray-200"
+                        }`}
+                        initial={{ width: 0 }}
+                        animate={{ width: isStageCompleted || isStageActive ? "100%" : "0%" }}
+                        transition={{ duration: 1 }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
-          {/* Current Stage Progress */}
-          {!isCompleted && (
-            <Card className="mt-8 bg-light-gold">
-              <CardContent className="p-4 text-center">
-                <p className="text-regis-navy font-medium flex items-center justify-center">
-                  <Clock className="mr-2" size={16} />
-                  Current Stage: {stages[currentStage]?.name}
-                </p>
-                <p className="text-3xl font-bold text-regis-navy mt-2">
-                  {formatTime(timeRemaining)}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  {Math.floor(timeRemaining / 60)} minutes {timeRemaining % 60} seconds remaining
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          {/* Current Stage Summary Card */}
+          <div className="mt-4 bg-regis-gold/10 border border-regis-gold/30 rounded-xl p-4 text-center">
+            <p className="text-regis-navy font-medium flex items-center justify-center gap-2">
+              <Clock size={16} />
+              {stages[currentStage]?.name}
+            </p>
+            <p className="text-3xl font-bold text-regis-navy mt-2">{formatTime(timeRemaining)}</p>
+            <p className="text-sm text-gray-500 mt-1">estimated time remaining</p>
+          </div>
 
-          {/* Completion Message */}
-          {isCompleted && (
-            <Card className="mt-8 bg-green-100 border-green-300">
-              <CardContent className="p-4 text-center">
-                <Check className="mx-auto text-green-600 mb-2" size={48} />
-                <p className="text-green-800 font-bold text-xl">
-                  Vehicle Ready for Pickup!
-                </p>
-                <p className="text-green-600 text-sm mt-1">
-                  Please proceed to the valet area
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          <p className="text-xs text-center text-gray-400 mt-4">
+            This page updates automatically — no need to refresh
+          </p>
 
-          {/* Cancel Button */}
           <Button
             variant="ghost"
             onClick={onBack}
-            className="w-full mt-6 text-gray-500 hover:text-gray-700"
+            className="w-full mt-4 text-gray-400 hover:text-gray-600"
           >
             <X className="mr-2" size={16} />
             Cancel Request
