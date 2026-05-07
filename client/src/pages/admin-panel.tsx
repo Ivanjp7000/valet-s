@@ -57,6 +57,7 @@ export default function AdminPanel() {
   const [userLocationScopes, setUserLocationScopes] = useState<UserLocationScope[]>([]);
 
   // Backup state
+  const [backupOuId, setBackupOuId] = useState('');
   const [backupRange, setBackupRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('30d');
   const [backupFormat, setBackupFormat] = useState<'csv'|'json'>('csv');
   const [backupIncludeTickets, setBackupIncludeTickets] = useState(true);
@@ -102,6 +103,7 @@ export default function AdminPanel() {
         includeTickets: String(backupIncludeTickets),
         includeUsers: String(backupIncludeUsers),
         includeLocations: String(backupIncludeLocations),
+        ...(isSuperAdmin && backupOuId ? { ouId: backupOuId } : {}),
       });
       const res = await fetch(`/api/backup/export?${params}`);
       if (!res.ok) throw new Error('Export failed');
@@ -128,7 +130,13 @@ export default function AdminPanel() {
   async function handlePdfExport() {
     setPdfLoading(true);
     try {
-      const params = new URLSearchParams({ range: pdfRange, includeTickets: 'true', includeUsers: 'false', includeLocations: 'false' });
+      const params = new URLSearchParams({
+        range: pdfRange,
+        includeTickets: 'true',
+        includeUsers: 'false',
+        includeLocations: 'false',
+        ...(isSuperAdmin && backupOuId ? { ouId: backupOuId } : {}),
+      });
       const res = await fetch(`/api/backup/export?${params}`);
       if (!res.ok) throw new Error('Export failed');
       const data = await res.json();
@@ -1401,6 +1409,34 @@ export default function AdminPanel() {
           {/* Backup Tab */}
           <TabsContent value="backup" className="space-y-6">
 
+            {/* OU selector — required for Super Admins before showing backup content */}
+            {isSuperAdmin && (
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Organisation</label>
+                  <select
+                    value={backupOuId}
+                    onChange={e => setBackupOuId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-regis-navy"
+                  >
+                    <option value="">— Select OU —</option>
+                    {(ous || []).map(ou => (
+                      <option key={ou.id} value={ou.id}>{ou.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Placeholder shown until OU is selected */}
+            {isSuperAdmin && !backupOuId ? (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+                <Database size={48} className="opacity-20 mb-3" />
+                <p className="text-base font-medium">Select an Organisation</p>
+                <p className="text-sm mt-1">Choose an organisation above to access backup and export options</p>
+              </div>
+            ) : (<>
+
             {/* Section 1 — Full Data Export */}
             <Card>
               <CardHeader>
@@ -1533,6 +1569,7 @@ export default function AdminPanel() {
               </CardContent>
             </Card>
 
+            </>)}
           </TabsContent>
         </Tabs>
       </div>
