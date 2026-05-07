@@ -1188,6 +1188,40 @@ export default function StaffDashboard() {
               }}
             />
 
+            {/* Car in Use - Guest Will Return — Always visible desktop card */}
+            <Card className="hidden sm:block shadow-lg border-2 border-blue-200 bg-gradient-to-br from-white to-blue-50/30">
+              <CardHeader className="p-4 sm:p-6 pb-2">
+                <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                  <div className="flex items-center gap-2 text-blue-700">
+                    <Car size={20} />
+                    Car in Use — Guest Will Return
+                  </div>
+                  <Badge className="bg-blue-600 text-white text-lg px-4 py-1">
+                    {activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 pt-2">
+                {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 ? (
+                  <div className="text-center py-6 text-gray-400">
+                    <Car size={36} className="mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">No cars out with guests</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
+                      <GuestOutCardFull
+                        key={ticket.id}
+                        ticket={ticket}
+                        onBack={() => guestReturnedMutation.mutate(ticket.ticketNumber)}
+                        canEdit={canEdit}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Check Out Departed Today */}
             {(() => {
               const todayStart = new Date();
