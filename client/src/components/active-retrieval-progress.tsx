@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Car, CheckCircle, Clock } from "lucide-react";
+import { Car, CheckCircle, Clock, X } from "lucide-react";
 import type { ValetTicket } from "@shared/schema";
 
 interface ActiveRetrievalProgressProps {
@@ -336,6 +336,17 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
                           Coming Back
                         </Button>
                       </>
+                    )}
+                    {(ticket.status === "retrieving" || ticket.status === "transit") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                        onClick={() => onStatusChange(ticket.ticketNumber, "pending")}
+                      >
+                        <X size={12} className="mr-1" />
+                        Cancel
+                      </Button>
                     )}
                   </div>
                 )}

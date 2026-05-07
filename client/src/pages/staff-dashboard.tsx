@@ -726,6 +726,14 @@ export default function StaffDashboard() {
                               {ticket.status === 'transit' && (
                                 <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'ready' })}>Ready</Button>
                               )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'pending' })}
+                              >
+                                ✕
+                              </Button>
                             </div>
                           )}
                         </div>
