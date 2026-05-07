@@ -522,21 +522,32 @@ export default function Landing() {
             </div>
 
             {/* 5 Digit Boxes */}
-            <div className="flex justify-center gap-2 mb-6">
-              {[0, 1, 2, 3, 4].map((index) => (
-                <input
-                  key={index}
-                  id={`digit-${index}`}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={ticketNumber[index] || ''}
-                  onChange={(e) => handleDigitChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-12 h-14 text-center text-2xl font-mono font-bold border-2 border-gray-300 rounded-lg focus:border-regis-gold focus:outline-none focus:ring-2 focus:ring-regis-gold/20"
-                  data-testid={`input-digit-${index}`}
-                />
-              ))}
+            <div className="flex flex-col items-center mb-6">
+              <div className="flex justify-center gap-2">
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <input
+                    key={index}
+                    id={`digit-${index}`}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={ticketNumber[index] || ''}
+                    onChange={(e) => handleDigitChange(index, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(index, e)}
+                    className="w-12 h-14 text-center text-2xl font-mono font-bold border-2 border-gray-300 rounded-lg focus:border-regis-gold focus:outline-none focus:ring-2 focus:ring-regis-gold/20"
+                    data-testid={`input-digit-${index}`}
+                  />
+                ))}
+              </div>
+              {/* Start-here indicator under the first box */}
+              <div className="flex justify-start w-full pl-[calc(50%-130px)] mt-1.5">
+                <div className="flex flex-col items-center gap-0.5 w-12">
+                  <svg width="10" height="8" viewBox="0 0 10 8" className="text-regis-gold fill-current">
+                    <polygon points="5,0 10,8 0,8" />
+                  </svg>
+                  <span className="text-[10px] font-semibold text-regis-gold uppercase tracking-wide leading-none whitespace-nowrap">Start here</span>
+                </div>
+              </div>
             </div>
 
             {/* Submit Button */}
