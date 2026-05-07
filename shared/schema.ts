@@ -113,9 +113,11 @@ export const valetTickets = pgTable("valet_tickets", {
   createdByName: varchar("created_by_name"), // Full name of staff for display
   
   // Timer tracking for auto-progression
-  retrievalStartedAt: timestamp("retrieval_started_at"), // When retrieval process began (for 15-min total)
-  stageStartedAt: timestamp("stage_started_at"), // When current stage started (for 5-min countdown)
-  currentStage: integer("current_stage").default(0), // 0=not started, 1=retrieving, 2=transit, 3=ready
+  retrievalStartedAt: timestamp("retrieval_started_at"), // When retrieval process began
+  retrievalReadyAt: timestamp("retrieval_ready_at"),     // When status first reached 'ready'
+  retrievalDurationSeconds: integer("retrieval_duration_seconds"), // Total seconds from retrieving → ready (SLA metric)
+  stageStartedAt: timestamp("stage_started_at"), // When current stage started (for per-stage countdown)
+  currentStage: integer("current_stage").default(0), // 0=not started, 1=retrieving, 2=transit, 3=preparing, 4=ready
   
   // Guest vehicle out tracking
   guestDepartedAt: timestamp("guest_departed_at"), // When guest took the car out (Coming Back clicked)

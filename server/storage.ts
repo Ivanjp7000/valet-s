@@ -166,6 +166,14 @@ export class DatabaseStorage implements IStorage {
     } else if (status === 'ready') {
       updateData.stageStartedAt = now;
       updateData.currentStage = 4;
+      updateData.retrievalReadyAt = now;
+      // Calculate SLA duration: from when retrieval started → now
+      const existingForSLA = await this.getValetTicket(ticketNumber);
+      if (existingForSLA?.retrievalStartedAt) {
+        updateData.retrievalDurationSeconds = Math.floor(
+          (now.getTime() - new Date(existingForSLA.retrievalStartedAt).getTime()) / 1000
+        );
+      }
     } else if (status === 'completed') {
       updateData.currentStage = 4;
       updateData.departedAt = now;

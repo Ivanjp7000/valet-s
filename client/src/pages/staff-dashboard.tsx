@@ -2354,6 +2354,83 @@ export default function StaffDashboard() {
                   />
                 )}
 
+                {/* Retrieval SLA block — only shown when ticket has gone through retrieval */}
+                {viewTicket.retrievalStartedAt && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold text-regis-navy mb-3">Retrieval Performance (SLA)</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 mb-1">Retrieval Started</p>
+                        <p className="text-sm font-medium">
+                          {new Date(viewTicket.retrievalStartedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-500 mb-1">Car Ready At</p>
+                        <p className="text-sm font-medium">
+                          {viewTicket.retrievalReadyAt
+                            ? new Date(viewTicket.retrievalReadyAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : <span className="text-gray-400 italic">Pending</span>
+                          }
+                        </p>
+                      </div>
+                      <div className={`col-span-2 rounded-lg p-3 ${
+                        viewTicket.retrievalDurationSeconds == null
+                          ? 'bg-yellow-50 border border-yellow-200'
+                          : viewTicket.retrievalDurationSeconds <= 840
+                          ? 'bg-green-50 border border-green-200'
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">Total Retrieval Time</p>
+                            <p className="text-xl font-bold">
+                              {viewTicket.retrievalDurationSeconds != null
+                                ? (() => {
+                                    const m = Math.floor(viewTicket.retrievalDurationSeconds / 60);
+                                    const s = viewTicket.retrievalDurationSeconds % 60;
+                                    return `${m}m ${s}s`;
+                                  })()
+                                : viewTicket.retrievalStartedAt
+                                ? (() => {
+                                    const elapsed = Math.floor((Date.now() - new Date(viewTicket.retrievalStartedAt).getTime()) / 1000);
+                                    const m = Math.floor(elapsed / 60);
+                                    const s = elapsed % 60;
+                                    return `${m}m ${s}s (live)`;
+                                  })()
+                                : '—'
+                              }
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-500 mb-0.5">SLA Target</p>
+                            <p className="text-sm font-semibold text-gray-600">≤ 14 min</p>
+                            {viewTicket.retrievalDurationSeconds != null && (
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                viewTicket.retrievalDurationSeconds <= 840
+                                  ? 'bg-green-200 text-green-800'
+                                  : 'bg-red-200 text-red-800'
+                              }`}>
+                                {viewTicket.retrievalDurationSeconds <= 840 ? '✓ Met' : '✗ Exceeded'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {viewTicket.retrievalDurationSeconds != null && (
+                          <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                viewTicket.retrievalDurationSeconds <= 840 ? 'bg-green-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${Math.min(100, (viewTicket.retrievalDurationSeconds / 840) * 100)}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="border-t pt-4">
                   <h3 className="font-semibold text-regis-navy mb-3">Staff Information</h3>
                   <div className="grid grid-cols-2 gap-4">
