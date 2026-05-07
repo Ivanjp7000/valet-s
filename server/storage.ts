@@ -58,6 +58,7 @@ export interface IStorage {
   // Valet ticket operations
   createValetTicket(ticket: InsertValetTicket): Promise<ValetTicket>;
   getValetTicket(ticketNumber: string): Promise<ValetTicket | undefined>;
+  getValetTicketById(id: string): Promise<ValetTicket | undefined>;
   updateValetTicketStatus(ticketNumber: string, status: string): Promise<ValetTicket | undefined>;
   updateValetTicketDetails(ticketNumber: string, details: Partial<InsertValetTicket>): Promise<ValetTicket | undefined>;
   updateValetTicket(ticketNumber: string, fields: Partial<ValetTicket>): Promise<ValetTicket | undefined>;
@@ -95,6 +96,7 @@ export interface IStorage {
   
   // Guest trip log operations
   getTicketGuestTrips(ticketId: string): Promise<TicketGuestTrip[]>;
+  getGuestTripById(tripId: string): Promise<TicketGuestTrip | undefined>;
   updateGuestTrip(tripId: string, departedAt: Date, returnedAt: Date | null): Promise<TicketGuestTrip | undefined>;
   deleteGuestTrip(tripId: string): Promise<boolean>;
 }
@@ -153,6 +155,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(valetTickets)
       .where(eq(valetTickets.ticketNumber, ticketNumber));
+    return ticket;
+  }
+
+  async getValetTicketById(id: string): Promise<ValetTicket | undefined> {
+    const [ticket] = await db
+      .select()
+      .from(valetTickets)
+      .where(eq(valetTickets.id, id));
     return ticket;
   }
 
@@ -287,6 +297,14 @@ export class DatabaseStorage implements IStorage {
       .from(ticketGuestTrips)
       .where(eq(ticketGuestTrips.ticketId, ticketId))
       .orderBy(desc(ticketGuestTrips.departedAt));
+  }
+
+  async getGuestTripById(tripId: string): Promise<TicketGuestTrip | undefined> {
+    const [trip] = await db
+      .select()
+      .from(ticketGuestTrips)
+      .where(eq(ticketGuestTrips.id, tripId));
+    return trip;
   }
 
   async updateGuestTrip(tripId: string, departedAt: Date, returnedAt: Date | null): Promise<TicketGuestTrip | undefined> {

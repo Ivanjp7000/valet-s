@@ -286,6 +286,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return scopes.map(s => s.locationId);
   };
 
+  // Helper to verify the current user may access/mutate a specific ticket
+  // Returns true when authorized, false when the request must be rejected with 403
+  const isTicketInScope = async (ticket: any, user: any): Promise<boolean> => {
+    if (user.role === 'superadmin') return true;
+    if (ticket.ouId !== user.ouId) return false;
+    const scopedLocationIds = await getUserScopedLocationIds(user);
+    if (scopedLocationIds) {
+      // Scoped users must have an explicit location match — null-location tickets are outside their scope
+      if (!ticket.locationId || !scopedLocationIds.includes(ticket.locationId)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Staff: accept a retrieval request — moves ticket to 'retrieving' and starts the timer
   app.post('/api/tickets/:ticketNumber/accept-retrieval', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
@@ -293,6 +308,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticket = await storage.getValetTicket(ticketNumber);
 
       if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(ticket, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       if (ticket.status !== 'retrieval_requested') {
         return res.status(400).json({ message: "Ticket is not awaiting retrieval" });
       }
@@ -351,11 +369,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Derive ouId from location or from current user
       let ouId: string | null = null;
+
+      // Location-scoped users must always supply a locationId
+      if (['standard_admin', 'standard_user'].includes(currentUser.role)) {
+        const scopedLocationIds = await getUserScopedLocationIds(currentUser);
+        if (scopedLocationIds) {
+          if (!locationId) {
+            return res.status(403).json({ message: "Access denied: a location is required for your account" });
+          }
+          if (!scopedLocationIds.includes(locationId)) {
+            return res.status(403).json({ message: "Access denied: you are not assigned to this location" });
+          }
+        }
+      }
+
       if (locationId) {
         const location = await storage.getLocation(locationId);
-        if (location) {
-          ouId = location.ouId;
+        if (!location) {
+          return res.status(400).json({ message: "Invalid location" });
         }
+        // Non-superadmin users may only create tickets in their own OU
+        if (currentUser.role !== 'superadmin' && location.ouId !== currentUser.ouId) {
+          return res.status(403).json({ message: "Access denied: location is outside your organization" });
+        }
+        ouId = location.ouId;
       }
       // Fallback to user's OU if no location or location has no OU
       if (!ouId && currentUser.ouId) {
@@ -404,6 +441,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { ticketNumber } = req.params;
       const { status } = updateValetTicketStatusSchema.parse(req.body);
+
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       
       const ticket = await storage.updateValetTicketStatus(ticketNumber, status);
       
@@ -428,6 +471,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/staff/tickets/:ticketNumber/guest-returned', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
+
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       
       const ticket = await storage.markGuestReturned(ticketNumber);
       
@@ -454,6 +503,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { ticketNumber } = req.params;
       const ticket = await storage.getValetTicket(ticketNumber);
       if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(ticket, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       const trips = await storage.getTicketGuestTrips(ticket.id);
       res.json(trips);
     } catch (error) {
@@ -468,6 +520,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { tripId } = req.params;
       const { departedAt, returnedAt } = req.body;
       if (!departedAt) return res.status(400).json({ message: "departedAt is required" });
+
+      const tripRecord = await storage.getGuestTripById(tripId);
+      if (!tripRecord) return res.status(404).json({ message: "Trip not found" });
+      const ticketForAuth = await storage.getValetTicketById(tripRecord.ticketId);
+      if (!ticketForAuth || !await isTicketInScope(ticketForAuth, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const trip = await storage.updateGuestTrip(
         tripId,
         new Date(departedAt),
@@ -485,6 +545,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/staff/trips/:tripId', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { tripId } = req.params;
+
+      const tripRecord = await storage.getGuestTripById(tripId);
+      if (!tripRecord) return res.status(404).json({ message: "Trip not found" });
+      const ticketForAuth = await storage.getValetTicketById(tripRecord.ticketId);
+      if (!ticketForAuth || !await isTicketInScope(ticketForAuth, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const deleted = await storage.deleteGuestTrip(tripId);
       if (!deleted) return res.status(404).json({ message: "Trip not found" });
       res.json({ success: true });
@@ -1315,6 +1383,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { ticketNumber } = req.params;
       const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes } = req.body;
+
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       
       const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
         status,
@@ -1347,6 +1421,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { ticketNumber } = req.params;
       const { licensePlate, parkingLocation, parkingSector, staffNotes, carPhoto } = req.body;
+
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       
       const objectStorageService = new ObjectStorageService();
       let normalizedPhotoPath = carPhoto;
