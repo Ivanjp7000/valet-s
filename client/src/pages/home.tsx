@@ -58,9 +58,6 @@ export default function Home() {
               <h1 className="text-xl font-semibold">Valet Management System</h1>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-blue-200 text-sm">Welcome, {user?.firstName || user?.username}</p>
-                <Badge className={`${getRoleColor(user?.role || '')} text-white text-xs`}>
-                  {getRoleLabel(user?.role || '')}
-                </Badge>
               </div>
             </div>
           </div>
