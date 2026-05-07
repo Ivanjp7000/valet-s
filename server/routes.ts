@@ -1458,6 +1458,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Backup export endpoint
+  app.get('/api/backup/export', isAuthenticated, requireReadAccess, async (req: any, res) => {
+    try {
+      const user = req.currentUser;
+      const { range, includeTickets, includeUsers, includeLocations } = req.query;
+
+      const now = new Date();
+      let startDate: Date | null = null;
+      switch (range) {
+        case '1d':  startDate = new Date(now.getTime() - 1   * 24 * 60 * 60 * 1000); break;
+        case '7d':  startDate = new Date(now.getTime() - 7   * 24 * 60 * 60 * 1000); break;
+        case '30d': startDate = new Date(now.getTime() - 30  * 24 * 60 * 60 * 1000); break;
+        case '3m':  startDate = new Date(now.getTime() - 90  * 24 * 60 * 60 * 1000); break;
+        case '6m':  startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000); break;
+        case '1y':  startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); break;
+        default:    startDate = null;
+      }
+
+      const scopedLocationIds = await getUserScopedLocationIds(user);
+      const result: Record<string, any> = {};
+
+      if (includeTickets !== 'false') {
+        const tickets = await storage.getScopedTickets(user, scopedLocationIds);
+        result.tickets = startDate
+          ? tickets.filter(t => t.createdAt && new Date(t.createdAt) >= startDate!)
+          : tickets;
+      }
+
+      if (includeUsers === 'true') {
+        const users = await storage.getScopedUsers(user);
+        result.users = users.map(({ password, ...u }) => u);
+      }
+
+      if (includeLocations === 'true') {
+        const locations = await storage.getScopedLocations(user);
+        result.locations = locations;
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error generating backup:", error);
+      res.status(500).json({ message: "Failed to generate backup" });
+    }
+  });
+
   // Function to broadcast to all connected clients
   function broadcastToAll(message: any) {
     const messageStr = JSON.stringify(message);
