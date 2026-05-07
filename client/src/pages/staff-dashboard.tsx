@@ -1137,9 +1137,19 @@ export default function StaffDashboard() {
                                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
                                         {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
                                       </div>
-                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
-                                        <Eye size={14} className="text-gray-400" />
-                                      </Button>
+                                      <div className="flex items-center gap-1">
+                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
+                                          <Eye size={14} className="text-gray-400" />
+                                        </Button>
+                                        {user?.role === 'superadmin' && (<>
+                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setEditTicketData(ticket)}>
+                                            <Edit size={14} className="text-blue-400" />
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setDeleteTicket(ticket)}>
+                                            <Trash2 size={14} className="text-red-400" />
+                                          </Button>
+                                        </>)}
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -1173,9 +1183,19 @@ export default function StaffDashboard() {
                                         {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
                                         {ticket.updatedAt && <p className="text-xs text-gray-400">Departed: {new Date(ticket.updatedAt).toLocaleDateString()}</p>}
                                       </div>
-                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
-                                        <Eye size={14} className="text-gray-400" />
-                                      </Button>
+                                      <div className="flex items-center gap-1">
+                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
+                                          <Eye size={14} className="text-gray-400" />
+                                        </Button>
+                                        {user?.role === 'superadmin' && (<>
+                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setEditTicketData(ticket)}>
+                                            <Edit size={14} className="text-blue-400" />
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setDeleteTicket(ticket)}>
+                                            <Trash2 size={14} className="text-red-400" />
+                                          </Button>
+                                        </>)}
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -1464,9 +1484,19 @@ export default function StaffDashboard() {
                                       {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
                                       {ticket.updatedAt && <p className="text-xs text-gray-400">Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                                     </div>
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
-                                      <Eye size={16} className="text-gray-400" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                                        <Eye size={16} className="text-gray-400" />
+                                      </Button>
+                                      {user?.role === 'superadmin' && (<>
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditTicketData(ticket)}>
+                                          <Edit size={16} className="text-blue-400" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setDeleteTicket(ticket)}>
+                                          <Trash2 size={16} className="text-red-400" />
+                                        </Button>
+                                      </>)}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -1519,9 +1549,19 @@ export default function StaffDashboard() {
                                       {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
                                       {ticket.updatedAt && <p className="text-xs text-gray-400">Departed: {new Date(ticket.updatedAt).toLocaleDateString()}</p>}
                                     </div>
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
-                                      <Eye size={16} className="text-gray-400" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                                        <Eye size={16} className="text-gray-400" />
+                                      </Button>
+                                      {user?.role === 'superadmin' && (<>
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditTicketData(ticket)}>
+                                          <Edit size={16} className="text-blue-400" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setDeleteTicket(ticket)}>
+                                          <Trash2 size={16} className="text-red-400" />
+                                        </Button>
+                                      </>)}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -1552,9 +1592,19 @@ export default function StaffDashboard() {
                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
                         {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
                       </div>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
-                        <Eye size={16} className="text-gray-400" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                          <Eye size={16} className="text-gray-400" />
+                        </Button>
+                        {user?.role === 'superadmin' && (<>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditTicketData(ticket)}>
+                            <Edit size={16} className="text-blue-400" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setDeleteTicket(ticket)}>
+                            <Trash2 size={16} className="text-red-400" />
+                          </Button>
+                        </>)}
+                      </div>
                     </div>
                     <div className="text-xs text-gray-500">
                       <p><strong>Guest:</strong> {ticket.guestName}</p>
