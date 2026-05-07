@@ -57,6 +57,37 @@ async function prepareForVisionAPI(dataUrl: string): Promise<string> {
 }
 
 /**
+ * Compresses a general car photo to ~30 KB for storage.
+ * Scales to at most 800 px wide and uses low JPEG quality.
+ */
+async function processCarPhoto(dataUrl: string): Promise<{ dataUrl: string; sizeKb: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX_WIDTH = 800;
+      const JPEG_QUALITY = 0.3;
+      const scale = Math.min(1, MAX_WIDTH / img.naturalWidth);
+      const destW = Math.round(img.naturalWidth * scale);
+      const destH = Math.round(img.naturalHeight * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = destW;
+      canvas.height = destH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("canvas not available")); return; }
+
+      ctx.drawImage(img, 0, 0, destW, destH);
+      const result = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+      // Estimate size: base64 string length × 0.75 bytes, divided by 1024 for KB
+      const sizeKb = Math.round((result.length * 0.75) / 1024);
+      resolve({ dataUrl: result, sizeKb });
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Processes a plate photo: crops to the centre band (where the plate lives)
  * and compresses to a very small JPEG. Typical result: 15–50 KB vs 3–8 MB raw.
  */
@@ -155,6 +186,8 @@ interface TicketFormData {
   carColor: string;
   platePhotoUrl: string;
   licensePlate: string;
+  carPhotoUrl: string;
+  carPhotoSize: number;
   guestName: string;
   roomNumber: string;
   ticketNumber: string;
@@ -263,6 +296,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const { recognizePlate } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
+  const [isCarPhotoProcessing, setIsCarPhotoProcessing] = useState(false);
 
   const [formData, setFormData] = useState<TicketFormData>({
     visitorType: "",
@@ -272,6 +306,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     carColor: "",
     platePhotoUrl: "",
     licensePlate: "",
+    carPhotoUrl: "",
+    carPhotoSize: 0,
     guestName: "",
     roomNumber: "",
     ticketNumber: "",
@@ -302,6 +338,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         carColor: data.carColor,
         platePhotoUrl: data.platePhotoUrl || null,
         licensePlate: data.licensePlate || null,
+        carPhoto: data.carPhotoUrl || null,
         createdByUserId: user?.id,
         createdByName: staffName,
         locationId: user?.locationId || null,
@@ -333,6 +370,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       carColor: "",
       platePhotoUrl: "",
       licensePlate: "",
+      carPhotoUrl: "",
+      carPhotoSize: 0,
       guestName: "",
       roomNumber: "",
       ticketNumber: "",
@@ -734,6 +773,78 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         )}
       </div>
 
+      {/* General Car Photo */}
+      <div>
+        <h3 className="text-lg font-semibold text-regis-navy mb-1">General Car Photo</h3>
+        <p className="text-xs text-gray-400 mb-3">Optional — take a photo of the whole car for reference</p>
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center">
+          {formData.carPhotoUrl ? (
+            <div className="space-y-2">
+              <img
+                src={formData.carPhotoUrl}
+                alt="Car photo"
+                className="max-h-36 mx-auto rounded object-cover"
+              />
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {formData.carPhotoSize} KB
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFormData({ ...formData, carPhotoUrl: "", carPhotoSize: 0 })}
+              >
+                Remove Photo
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {isCarPhotoProcessing ? (
+                <p className="text-sm text-regis-navy animate-pulse">Compressing photo…</p>
+              ) : (
+                <>
+                  <Camera className="w-10 h-10 mx-auto text-gray-400" />
+                  <p className="text-sm text-gray-500">Take a general photo of the car</p>
+                  <Button
+                    variant="outline"
+                    className="border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.capture = 'environment';
+                      input.onchange = async (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = async (ev) => {
+                          const rawDataUrl = ev.target?.result as string;
+                          setIsCarPhotoProcessing(true);
+                          try {
+                            const { dataUrl, sizeKb } = await processCarPhoto(rawDataUrl);
+                            setFormData(prev => ({ ...prev, carPhotoUrl: dataUrl, carPhotoSize: sizeKb }));
+                          } catch {
+                            toast({ title: "Photo error", description: "Could not process photo. Try again.", variant: "destructive" });
+                          } finally {
+                            setIsCarPhotoProcessing(false);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      };
+                      input.click();
+                    }}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Take Car Photo
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div>
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Guest Information</h3>
         <div className="space-y-3">
@@ -929,6 +1040,20 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 className="max-h-24 mt-2 rounded"
               />
             )}
+          </div>
+        )}
+
+        {formData.carPhotoUrl && (
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-500 text-sm">Car Photo</span>
+              <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{formData.carPhotoSize} KB</span>
+            </div>
+            <img
+              src={formData.carPhotoUrl}
+              alt="Car"
+              className="w-full max-h-40 object-cover rounded"
+            />
           </div>
         )}
 

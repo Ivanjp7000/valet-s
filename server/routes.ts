@@ -289,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUser = req.currentUser;
       const { 
         ticketNumber, visitorType, visitorSubType, guestName,
-        carMake, carModel, carColor, licensePlate, platePhotoUrl,
+        carMake, carModel, carColor, licensePlate, platePhotoUrl, carPhoto,
         locationId, parkingSector, parkingLocation, 
         createdByUserId, createdByName
       } = req.body;
@@ -336,6 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         carColor,
         licensePlate: licensePlate || null,
         platePhotoUrl: platePhotoUrl || null,
+        carPhoto: carPhoto || null,
         locationId: locationId || null,
         ouId: ouId,
         parkingSector: parkingSector || null,
