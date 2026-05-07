@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car, BarChart2, Database, TrendingUp, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown } from "lucide-react";
+import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car, BarChart2, Database, TrendingUp, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, ShieldCheck } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Link } from "wouter";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
@@ -433,6 +433,16 @@ export default function AdminPanel() {
       toast({ title: "Success", description: "User deleted successfully" });
     },
     onError: (error) => handleError(error, "Failed to delete user"),
+  });
+
+  const toggle2faMutation = useMutation({
+    mutationFn: async (id: string) => await apiRequest("PATCH", `/api/users/${id}/toggle-2fa`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "2FA setting updated" });
+    },
+    onError: (error) => handleError(error, "Failed to update 2FA"),
   });
 
   const createFaqMutation = useMutation({
@@ -902,6 +912,18 @@ export default function AdminPanel() {
                                 data-testid={`button-manage-scopes-${u.id}`}
                               >
                                 <MapPin size={16} className="text-green-600" />
+                              </Button>
+                            )}
+                            {isSuperAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggle2faMutation.mutate(u.id)}
+                                title={u.twoFactorEnabled ? "2FA Enabled — click to disable" : "2FA Disabled — click to enable"}
+                                data-testid={`button-toggle-2fa-${u.id}`}
+                                disabled={toggle2faMutation.isPending}
+                              >
+                                <ShieldCheck size={16} className={u.twoFactorEnabled ? "text-green-600" : "text-gray-400"} />
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" onClick={() => { setEditingUser(u); setEditUserPassword(""); setShowEditPassword(false); }} data-testid={`button-edit-user-${u.id}`}>

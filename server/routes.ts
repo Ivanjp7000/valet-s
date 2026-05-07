@@ -7,6 +7,51 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
+import { Resend } from "resend";
+
+// In-memory OTP store: userId → { code, expiresAt }
+const otpStore = new Map<string, { code: string; expiresAt: number }>();
+
+function generateOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Resend integration — credential proxy (never cached; tokens expire)
+async function getResendClient(): Promise<{ client: Resend; fromEmail: string }> {
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY
+    ? 'repl ' + process.env.REPL_IDENTITY
+    : process.env.WEB_REPL_RENEWAL
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL
+    : null;
+  if (!xReplitToken) throw new Error('X-Replit-Token not found for repl/depl');
+  const connectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
+    { headers: { 'Accept': 'application/json', 'X-Replit-Token': xReplitToken } }
+  ).then(r => r.json()).then((d: any) => d.items?.[0]);
+  if (!connectionSettings?.settings?.api_key) throw new Error('Resend not connected');
+  return {
+    client: new Resend(connectionSettings.settings.api_key),
+    fromEmail: connectionSettings.settings.from_email || 'noreply@resend.dev',
+  };
+}
+
+async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
+  const { client, fromEmail } = await getResendClient();
+  await client.emails.send({
+    from: fromEmail,
+    to: toEmail,
+    subject: "Your Valet System Login Code",
+    html: `
+      <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:32px;border:1px solid #e5e7eb;border-radius:8px">
+        <h2 style="color:#1e3a5f;margin-bottom:8px">Valet Management System</h2>
+        <p style="color:#374151;margin-bottom:24px">Your one-time login code is:</p>
+        <div style="background:#f3f4f6;border-radius:8px;padding:24px;text-align:center;letter-spacing:12px;font-size:32px;font-weight:700;color:#1e3a5f">${code}</div>
+        <p style="color:#6b7280;font-size:13px;margin-top:24px">This code expires in 5 minutes. Do not share it with anyone.</p>
+      </div>
+    `,
+  });
+}
 
 function sanitizeUser<T extends { password?: string | null }>(user: T): Omit<T, 'password'> & { hasPassword: boolean } {
   const { password, ...rest } = user;
@@ -59,7 +104,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      // Create a session for the user
+      // If 2FA is enabled, send OTP and pause — don't create session yet
+      if (user.twoFactorEnabled && user.email) {
+        const code = generateOtp();
+        otpStore.set(user.id, { code, expiresAt: Date.now() + 5 * 60 * 1000 });
+        try {
+          await sendOtpEmail(user.email, code);
+        } catch (emailErr) {
+          console.error("Failed to send OTP email:", emailErr);
+          return res.status(500).json({ message: "Failed to send verification code. Please try again." });
+        }
+        return res.json({ requiresTwoFactor: true, userId: user.id, email: user.email });
+      }
+
+      // No 2FA — create session immediately
       req.session.user = {
         claims: {
           sub: user.id,
@@ -85,6 +143,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error during local authentication:", error);
       res.status(500).json({ message: "Authentication failed" });
+    }
+  });
+
+  // Verify OTP and complete login
+  app.post('/api/auth/verify-otp', async (req: any, res) => {
+    try {
+      const { userId, code } = req.body;
+      if (!userId || !code) return res.status(400).json({ message: "userId and code required" });
+
+      const stored = otpStore.get(userId);
+      if (!stored || Date.now() > stored.expiresAt) {
+        otpStore.delete(userId);
+        return res.status(401).json({ message: "Code expired. Please log in again." });
+      }
+      if (stored.code !== code) {
+        return res.status(401).json({ message: "Invalid code. Please try again." });
+      }
+
+      otpStore.delete(userId);
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      req.session.user = {
+        claims: {
+          sub: user.id,
+          email: user.email,
+          first_name: user.firstName,
+          last_name: user.lastName,
+          profile_image_url: user.profileImageUrl
+        }
+      };
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      res.status(500).json({ message: "Verification failed" });
     }
   });
 
@@ -1055,6 +1149,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting user:", error);
       res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Toggle 2FA for a user (Super Admin only)
+  app.patch('/api/users/:id/toggle-2fa', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUser = req.currentUser;
+      if (!currentUser || currentUser.role !== 'superadmin') {
+        return res.status(403).json({ message: "Only Super Admins can manage 2FA settings" });
+      }
+      const { id } = req.params;
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+      const updated = await storage.updateUser(id, { twoFactorEnabled: !targetUser.twoFactorEnabled });
+      if (!updated) return res.status(500).json({ message: "Failed to update user" });
+      res.json(sanitizeUser(updated));
+    } catch (error) {
+      console.error("Error toggling 2FA:", error);
+      res.status(500).json({ message: "Failed to toggle 2FA" });
     }
   });
 

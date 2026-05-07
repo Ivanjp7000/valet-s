@@ -76,6 +76,7 @@ export const users = pgTable("users", {
   locationId: varchar("location_id").references(() => physicalLocations.id), // Which location this user works at
   createdBy: varchar("created_by"), // ID of user who created this account
   mustChangePassword: boolean("must_change_password").default(false), // Force password change on first login
+  twoFactorEnabled: boolean("two_factor_enabled").default(false), // Super Admin can enable email OTP 2FA
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
