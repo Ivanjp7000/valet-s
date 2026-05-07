@@ -98,9 +98,15 @@ Preferred communication style: Simple, everyday language.
 ## Frontend Libraries
 - **Radix UI**: Comprehensive set of accessible UI primitives
 - **Framer Motion**: Animation library for smooth UI transitions
-- **Tesseract.js**: OCR library for ticket number scanning from camera
+- **Tesseract.js**: OCR library for ticket number scanning from camera (digits only — not used for plates)
 - **Date-fns**: Date manipulation and formatting utilities
 - **pdf-lib**: Client-side PDF generation for thermal label printing
+
+## License Plate OCR
+- **Engine**: Google Cloud Vision API (server-side, `POST /api/ocr/plate`)
+- **API Key**: `GOOGLE_VISION_API_KEY` secret (env var)
+- **Flow**: Frontend crops/resizes plate photo → sends base64 JPEG to server → server calls Vision API with `ja`/`en` language hints → returns raw text → `extractJapanesePlate()` cleans result into `[kanji] [class] [hiragana] [serial]` format
+- **Billing**: Required on Google Cloud project; first 1,000 scans/month free then ~$1.50/1,000
 
 ## Thermal Label Printing
 - **Printer**: Phomemo thermal printer (50mm x 70mm labels)
