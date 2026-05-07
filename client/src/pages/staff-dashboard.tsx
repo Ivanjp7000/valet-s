@@ -24,6 +24,193 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, User as UserType } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
+// Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+}
+
+function TripLogSection({
+  trips,
+  ticketNumber,
+  canEdit,
+  onRefresh,
+}: {
+  trips: { id: string; ticketId: string; departedAt: string; returnedAt: string | null; durationSeconds: number | null; createdAt: string }[];
+  ticketNumber: string;
+  canEdit: boolean;
+  onRefresh: () => void;
+}) {
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDeparted, setEditDeparted] = useState('');
+  const [editReturned, setEditReturned] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (trip: { id: string; departedAt: string; returnedAt: string | null }) => {
+    setEditingId(trip.id);
+    setEditDeparted(toDatetimeLocal(new Date(trip.departedAt)));
+    setEditReturned(trip.returnedAt ? toDatetimeLocal(new Date(trip.returnedAt)) : '');
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || !editDeparted) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/staff/trips/${editingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ departedAt: new Date(editDeparted).toISOString(), returnedAt: editReturned ? new Date(editReturned).toISOString() : null }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setEditingId(null);
+      onRefresh();
+      toast({ title: "Trip updated" });
+    } catch {
+      toast({ title: "Failed to update trip", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = async (tripId: string) => {
+    try {
+      const res = await fetch(`/api/staff/trips/${tripId}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error('Failed');
+      setDeletingId(null);
+      onRefresh();
+      toast({ title: "Trip deleted" });
+    } catch {
+      toast({ title: "Failed to delete trip", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="border-t pt-4">
+      <h3 className="font-semibold text-regis-navy mb-3 flex items-center gap-2">
+        <Car size={16} />
+        Car Out with Guest — Trip Log ({trips.length} trip{trips.length !== 1 ? 's' : ''})
+      </h3>
+      <div className="space-y-2">
+        {trips.map((trip, index) => {
+          const departedAt = new Date(trip.departedAt);
+          const returnedAt = trip.returnedAt ? new Date(trip.returnedAt) : null;
+          const dur = trip.durationSeconds;
+          const isEditing = editingId === trip.id;
+          const isDeleting = deletingId === trip.id;
+
+          return (
+            <div key={trip.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-blue-800 text-xs">Trip #{trips.length - index}</span>
+                <div className="flex items-center gap-1">
+                  {dur != null ? (
+                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-300">
+                      {formatDuration(dur)}
+                    </span>
+                  ) : (
+                    <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                      Still Out
+                    </span>
+                  )}
+                  {canEdit && !isEditing && !isDeleting && (
+                    <>
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0 ml-1" onClick={() => startEdit(trip)}>
+                        <Edit size={12} className="text-gray-500" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setDeletingId(trip.id)}>
+                        <Trash2 size={12} className="text-red-400" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Delete confirmation */}
+              {isDeleting && (
+                <div className="bg-red-50 border border-red-200 rounded p-2 text-xs space-y-2">
+                  <p className="text-red-700 font-medium">Delete this trip record?</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="destructive" className="h-6 text-xs px-3" onClick={() => confirmDelete(trip.id)}>
+                      Delete
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-6 text-xs px-3" onClick={() => setDeletingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Edit form */}
+              {isEditing && (
+                <div className="space-y-2 mt-1">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-0.5">Departed</label>
+                    <input
+                      type="datetime-local"
+                      value={editDeparted}
+                      onChange={e => setEditDeparted(e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-0.5">Returned (leave blank if still out)</label>
+                    <input
+                      type="datetime-local"
+                      value={editReturned}
+                      onChange={e => setEditReturned(e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="h-6 text-xs px-3 bg-regis-gold hover:bg-yellow-600 text-regis-navy" onClick={saveEdit} disabled={saving}>
+                      <Save size={11} className="mr-1" />{saving ? 'Saving…' : 'Save'}
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-6 text-xs px-3" onClick={() => setEditingId(null)}>
+                      <X size={11} className="mr-1" />Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Normal view */}
+              {!isEditing && !isDeleting && (
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-gray-500">Departed</p>
+                    <p className="font-medium text-gray-800">{departedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-gray-400">{departedAt.toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Returned</p>
+                    {returnedAt ? (
+                      <>
+                        <p className="font-medium text-green-700">{returnedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className="text-gray-400">{returnedAt.toLocaleDateString()}</p>
+                      </>
+                    ) : (
+                      <p className="font-medium text-amber-600">Not yet returned</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function GuestOutCard({ ticket, onBack, onView, canEdit = true }: { ticket: ValetTicket; onBack: () => void; onView: () => void; canEdit?: boolean }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -2134,60 +2321,12 @@ export default function StaffDashboard() {
                 )}
 
                 {viewTicketTrips && viewTicketTrips.length > 0 && (
-                  <div className="border-t pt-4">
-                    <h3 className="font-semibold text-regis-navy mb-3 flex items-center gap-2">
-                      <Car size={16} />
-                      Car Out with Guest — Trip Log ({viewTicketTrips.length} trip{viewTicketTrips.length !== 1 ? 's' : ''})
-                    </h3>
-                    <div className="space-y-2">
-                      {viewTicketTrips.map((trip, index) => {
-                        const departeAt = new Date(trip.departedAt);
-                        const returnedAt = trip.returnedAt ? new Date(trip.returnedAt) : null;
-                        const dur = trip.durationSeconds;
-                        const durDisplay = dur != null
-                          ? dur < 60
-                            ? `${dur}s`
-                            : dur < 3600
-                              ? `${Math.floor(dur / 60)}m ${dur % 60}s`
-                              : `${Math.floor(dur / 3600)}h ${Math.floor((dur % 3600) / 60)}m`
-                          : null;
-                        return (
-                          <div key={trip.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-semibold text-blue-800 text-xs">Trip #{viewTicketTrips.length - index}</span>
-                              {durDisplay ? (
-                                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-300">
-                                  {durDisplay}
-                                </span>
-                              ) : (
-                                <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-300">
-                                  Still Out
-                                </span>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div>
-                                <p className="text-gray-500">Departed</p>
-                                <p className="font-medium text-gray-800">{departeAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                <p className="text-gray-400">{departeAt.toLocaleDateString()}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-500">Returned</p>
-                                {returnedAt ? (
-                                  <>
-                                    <p className="font-medium text-green-700">{returnedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                    <p className="text-gray-400">{returnedAt.toLocaleDateString()}</p>
-                                  </>
-                                ) : (
-                                  <p className="font-medium text-amber-600">Not yet returned</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <TripLogSection
+                    trips={viewTicketTrips}
+                    ticketNumber={viewTicket.ticketNumber}
+                    canEdit={canEdit}
+                    onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets", viewTicket.ticketNumber, "trips"] })}
+                  />
                 )}
 
                 <div className="border-t pt-4">

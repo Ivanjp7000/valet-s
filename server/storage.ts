@@ -92,6 +92,8 @@ export interface IStorage {
   
   // Guest trip log operations
   getTicketGuestTrips(ticketId: string): Promise<TicketGuestTrip[]>;
+  updateGuestTrip(tripId: string, departedAt: Date, returnedAt: Date | null): Promise<TicketGuestTrip | undefined>;
+  deleteGuestTrip(tripId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -257,6 +259,26 @@ export class DatabaseStorage implements IStorage {
       .from(ticketGuestTrips)
       .where(eq(ticketGuestTrips.ticketId, ticketId))
       .orderBy(desc(ticketGuestTrips.departedAt));
+  }
+
+  async updateGuestTrip(tripId: string, departedAt: Date, returnedAt: Date | null): Promise<TicketGuestTrip | undefined> {
+    const durationSeconds = returnedAt
+      ? Math.floor((returnedAt.getTime() - departedAt.getTime()) / 1000)
+      : null;
+    const [trip] = await db
+      .update(ticketGuestTrips)
+      .set({ departedAt, returnedAt, durationSeconds })
+      .where(eq(ticketGuestTrips.id, tripId))
+      .returning();
+    return trip;
+  }
+
+  async deleteGuestTrip(tripId: string): Promise<boolean> {
+    const result = await db
+      .delete(ticketGuestTrips)
+      .where(eq(ticketGuestTrips.id, tripId))
+      .returning();
+    return result.length > 0;
   }
 
   async deleteValetTicket(ticketNumber: string): Promise<boolean> {

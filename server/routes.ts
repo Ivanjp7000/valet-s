@@ -420,6 +420,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Edit a specific guest trip
+  app.patch('/api/staff/trips/:tripId', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const { departedAt, returnedAt } = req.body;
+      if (!departedAt) return res.status(400).json({ message: "departedAt is required" });
+      const trip = await storage.updateGuestTrip(
+        tripId,
+        new Date(departedAt),
+        returnedAt ? new Date(returnedAt) : null
+      );
+      if (!trip) return res.status(404).json({ message: "Trip not found" });
+      res.json(trip);
+    } catch (error) {
+      console.error("Error updating guest trip:", error);
+      res.status(500).json({ message: "Failed to update trip" });
+    }
+  });
+
+  // Delete a specific guest trip
+  app.delete('/api/staff/trips/:tripId', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { tripId } = req.params;
+      const deleted = await storage.deleteGuestTrip(tripId);
+      if (!deleted) return res.status(404).json({ message: "Trip not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting guest trip:", error);
+      res.status(500).json({ message: "Failed to delete trip" });
+    }
+  });
+
   app.get('/api/staff/stats', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser;
