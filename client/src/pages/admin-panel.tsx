@@ -788,6 +788,7 @@ export default function AdminPanel() {
                 <p className="text-sm mt-1">Choose an OU above to view its users</p>
               </div>
             ) : (
+            <>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
               <div>
                 <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">
@@ -926,6 +927,7 @@ export default function AdminPanel() {
                 )}
               </CardContent>
             </Card>
+            </>
             )}
           </TabsContent>
 
