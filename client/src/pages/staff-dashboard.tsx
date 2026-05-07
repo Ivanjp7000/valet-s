@@ -730,7 +730,7 @@ export default function StaffDashboard() {
                                 size="sm"
                                 variant="outline"
                                 className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-50"
-                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'pending' })}
+                                onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'active' })}
                               >
                                 ✕
                               </Button>

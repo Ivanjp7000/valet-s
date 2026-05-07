@@ -342,7 +342,7 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
                         size="sm"
                         variant="outline"
                         className="text-xs border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
-                        onClick={() => onStatusChange(ticket.ticketNumber, "pending")}
+                        onClick={() => onStatusChange(ticket.ticketNumber, "active")}
                       >
                         <X size={12} className="mr-1" />
                         Cancel
