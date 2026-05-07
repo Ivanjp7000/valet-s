@@ -351,7 +351,7 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
                         className="flex-1 text-xs border-yellow-400 text-yellow-700 hover:bg-yellow-50"
                         onClick={() => onStatusChange(ticket.ticketNumber, "transit")}
                       >
-                        → Mark In Transit
+                        → In Transit
                       </Button>
                     )}
                     {ticket.status === "transit" && (
@@ -361,14 +361,18 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
                         className="flex-1 text-xs border-purple-400 text-purple-700 hover:bg-purple-50"
                         onClick={() => onStatusChange(ticket.ticketNumber, "preparing")}
                       >
-                        ✦ Final Preparations
+                        ✦ Final Prep
                       </Button>
                     )}
-                    {ticket.status === "preparing" && (
-                      <span className="flex-1 text-xs text-purple-600 font-medium flex items-center gap-1">
-                        <Sparkles size={12} />
-                        Final Preparations in progress…
-                      </span>
+                    {(ticket.status === "retrieving" || ticket.status === "transit" || ticket.status === "preparing") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs border-green-500 text-green-700 hover:bg-green-50 font-semibold"
+                        onClick={() => onStatusChange(ticket.ticketNumber, "ready")}
+                      >
+                        ✓ Ready Now
+                      </Button>
                     )}
                     {ticket.status === "ready" && (
                       <>
