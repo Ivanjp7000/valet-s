@@ -411,7 +411,7 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
 
 // ── Draggable, collapsible dashboard panel ──────────────────────────────────
 const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'guest-out', 'departed-today', 'departed-history'];
-const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed'];
+const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed-today', 'departed-history'];
 
 function SortablePanel({
   id, title, icon, badge, borderClass, headerClass, expanded, onToggle, children, wrapCard = true,
@@ -1102,40 +1102,76 @@ export default function StaffDashboard() {
                           </SortablePanel>
                         );
 
-                        if (panelId === 'departed') return (
-                          <SortablePanel key="departed" id="departed"
-                            title={`Checked Out — Departed (${activeTickets?.filter(t => t.status === 'completed').length || 0})`}
-                            icon={<LogOut size={14} />} headerClass="text-gray-600"
-                            expanded={isExpanded} onToggle={toggle}
-                          >
-                            <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
-                              {activeTickets?.filter(t => t.status === 'completed').map((ticket) => {
-                                const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
-                                const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
-                                return (
-                                  <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
-                                        <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                        if (panelId === 'departed-today') {
+                          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                          const departedToday = activeTickets?.filter(t => t.status === 'completed' && t.updatedAt && new Date(t.updatedAt) >= todayStart) || [];
+                          return (
+                            <SortablePanel key="departed-today" id="departed-today"
+                              title={`Departed Today (${departedToday.length})`}
+                              icon={<LogOut size={14} />} headerClass="text-gray-600"
+                              expanded={isExpanded} onToggle={toggle}
+                            >
+                              <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
+                                {departedToday.map((ticket) => {
+                                  const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                                  const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                                  return (
+                                    <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
+                                          <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                                        {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
                                       </div>
-                                      <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
-                                      {stayHours !== null && (
-                                        <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>
-                                      )}
+                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
+                                        <Eye size={14} className="text-gray-400" />
+                                      </Button>
                                     </div>
-                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
-                                      <Eye size={14} className="text-gray-400" />
-                                    </Button>
-                                  </div>
-                                );
-                              })}
-                              {activeTickets?.filter(t => t.status === 'completed').length === 0 && (
-                                <p className="text-xs text-gray-400 text-center py-2">No departed vehicles</p>
-                              )}
-                            </div>
-                          </SortablePanel>
-                        );
+                                  );
+                                })}
+                                {departedToday.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No departures today yet</p>}
+                              </div>
+                            </SortablePanel>
+                          );
+                        }
+
+                        if (panelId === 'departed-history') {
+                          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                          const departedHistory = activeTickets?.filter(t => t.status === 'completed' && (!t.updatedAt || new Date(t.updatedAt) < todayStart)) || [];
+                          return (
+                            <SortablePanel key="departed-history" id="departed-history"
+                              title={`Departed History (${departedHistory.length})`}
+                              icon={<LogOut size={14} />} headerClass="text-gray-500"
+                              expanded={isExpanded} onToggle={toggle}
+                            >
+                              <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
+                                {departedHistory.map((ticket) => {
+                                  const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                                  const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                                  return (
+                                    <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
+                                          <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                                        {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
+                                        {ticket.updatedAt && <p className="text-xs text-gray-400">Departed: {new Date(ticket.updatedAt).toLocaleDateString()}</p>}
+                                      </div>
+                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
+                                        <Eye size={14} className="text-gray-400" />
+                                      </Button>
+                                    </div>
+                                  );
+                                })}
+                                {departedHistory.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No historical departures</p>}
+                              </div>
+                            </SortablePanel>
+                          );
+                        }
 
                         return null;
                       })}
@@ -1374,6 +1410,116 @@ export default function StaffDashboard() {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Departed Today - Full View */}
+                {(() => {
+                  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                  const departedToday = activeTickets?.filter(t => t.status === 'completed' && t.updatedAt && new Date(t.updatedAt) >= todayStart) || [];
+                  return (
+                    <Card className="shadow-lg border-2 border-gray-200 mt-4">
+                      <CardHeader className="p-4 sm:p-6 pb-2 cursor-pointer" onClick={() => togglePanel('extended-departed-today')}>
+                        <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <LogOut size={20} />
+                            Departed Today
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="bg-gray-200 text-gray-700 text-sm font-bold px-2 py-0.5 rounded-full">{departedToday.length}</span>
+                            <ChevronDown size={20} className={`transition-transform ${expandedPanels.has('extended-departed-today') ? 'rotate-180' : ''}`} />
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      {expandedPanels.has('extended-departed-today') && (
+                        <CardContent className="p-4 sm:p-6 pt-2">
+                          {departedToday.length === 0 ? (
+                            <div className="text-center py-6 text-gray-400">
+                              <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No departures today yet</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {departedToday.map((ticket) => {
+                                const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                                const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                                return (
+                                  <div key={ticket.id} className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-gray-700">#{ticket.ticketNumber}</span>
+                                        <span className="text-sm text-gray-500 truncate">{ticket.guestName}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
+                                      {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
+                                      {ticket.updatedAt && <p className="text-xs text-gray-400">Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                                      <Eye size={16} className="text-gray-400" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })()}
+
+                {/* Departed History - Full View */}
+                {(() => {
+                  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                  const departedHistory = activeTickets?.filter(t => t.status === 'completed' && (!t.updatedAt || new Date(t.updatedAt) < todayStart)) || [];
+                  return (
+                    <Card className="shadow-lg border-2 border-gray-100 mt-4">
+                      <CardHeader className="p-4 sm:p-6 pb-2 cursor-pointer" onClick={() => togglePanel('extended-departed-history')}>
+                        <CardTitle className="flex items-center justify-between text-base sm:text-lg text-gray-500">
+                          <div className="flex items-center gap-2">
+                            <LogOut size={20} />
+                            Departed History
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="bg-gray-200 text-gray-600 text-sm font-bold px-2 py-0.5 rounded-full">{departedHistory.length}</span>
+                            <ChevronDown size={20} className={`transition-transform ${expandedPanels.has('extended-departed-history') ? 'rotate-180' : ''}`} />
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      {expandedPanels.has('extended-departed-history') && (
+                        <CardContent className="p-4 sm:p-6 pt-2">
+                          {departedHistory.length === 0 ? (
+                            <div className="text-center py-6 text-gray-400">
+                              <LogOut size={36} className="mx-auto mb-2 opacity-40" />
+                              <p className="text-sm">No historical departures</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {departedHistory.map((ticket) => {
+                                const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
+                                const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
+                                return (
+                                  <div key={ticket.id} className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-gray-700">#{ticket.ticketNumber}</span>
+                                        <span className="text-sm text-gray-500 truncate">{ticket.guestName}</span>
+                                      </div>
+                                      <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
+                                      {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
+                                      {ticket.updatedAt && <p className="text-xs text-gray-400">Departed: {new Date(ticket.updatedAt).toLocaleDateString()}</p>}
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                                      <Eye size={16} className="text-gray-400" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })()}
               </>
             )}
 
