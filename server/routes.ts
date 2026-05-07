@@ -1153,12 +1153,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Toggle 2FA for a user (Super Admin only)
-  app.patch('/api/users/:id/toggle-2fa', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/users/:id/toggle-2fa', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const currentUser = req.currentUser;
-      if (!currentUser || currentUser.role !== 'superadmin') {
-        return res.status(403).json({ message: "Only Super Admins can manage 2FA settings" });
-      }
       const { id } = req.params;
       const targetUser = await storage.getUser(id);
       if (!targetUser) return res.status(404).json({ message: "User not found" });

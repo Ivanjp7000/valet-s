@@ -877,6 +877,7 @@ export default function AdminPanel() {
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">User</th>
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden sm:table-cell">Username</th>
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Role</th>
+                          {isSuperAdmin && <th className="text-center p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">2FA</th>}
                           {isSuperAdmin && <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Org</th>}
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Location</th>
                           <th className="text-right p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Actions</th>
@@ -897,6 +898,19 @@ export default function AdminPanel() {
                                 {getRoleLabel(u.role)}
                               </Badge>
                             </td>
+                            {isSuperAdmin && (
+                              <td className="p-2 sm:p-4 text-center">
+                                <button
+                                  onClick={() => toggle2faMutation.mutate(u.id)}
+                                  title={u.twoFactorEnabled ? "2FA Enabled — click to disable" : "2FA Disabled — click to enable"}
+                                  data-testid={`button-toggle-2fa-${u.id}`}
+                                  disabled={toggle2faMutation.isPending}
+                                  className="inline-flex items-center justify-center rounded-full w-8 h-8 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                                >
+                                  <ShieldCheck size={18} className={u.twoFactorEnabled ? "text-green-600" : "text-gray-300"} />
+                                </button>
+                              </td>
+                            )}
                             {isSuperAdmin && <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell truncate max-w-[80px]">{getOUName(u.ouId)}</td>}
                             <td className="p-2 sm:p-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell truncate max-w-[80px]">{getLocationName(u.locationId)}</td>
                             <td className="p-2 sm:p-4 text-right flex justify-end gap-1">
@@ -912,18 +926,6 @@ export default function AdminPanel() {
                                 data-testid={`button-manage-scopes-${u.id}`}
                               >
                                 <MapPin size={16} className="text-green-600" />
-                              </Button>
-                            )}
-                            {isSuperAdmin && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => toggle2faMutation.mutate(u.id)}
-                                title={u.twoFactorEnabled ? "2FA Enabled — click to disable" : "2FA Disabled — click to enable"}
-                                data-testid={`button-toggle-2fa-${u.id}`}
-                                disabled={toggle2faMutation.isPending}
-                              >
-                                <ShieldCheck size={16} className={u.twoFactorEnabled ? "text-green-600" : "text-gray-400"} />
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" onClick={() => { setEditingUser(u); setEditUserPassword(""); setShowEditPassword(false); }} data-testid={`button-edit-user-${u.id}`}>
