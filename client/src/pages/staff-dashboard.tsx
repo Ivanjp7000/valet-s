@@ -1050,10 +1050,6 @@ export default function StaffDashboard() {
             <div className="min-w-0">
               <h1 className="text-base sm:text-xl font-bold text-regis-navy truncate">Staff Dashboard</h1>
               <p className="text-xs sm:text-sm text-gray-600 truncate">Hotel St. Regis Osaka</p>
-              <p className="text-xs text-gray-500 truncate">
-                <span className="hidden sm:inline">Role: </span>{user?.role || 'Loading...'}
-                <span className="hidden sm:inline"> | User: {user?.email}</span>
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
