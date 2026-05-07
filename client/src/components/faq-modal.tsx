@@ -58,11 +58,6 @@ export function FAQModal({ isOpen, onClose }: FAQModalProps) {
       question: "What are the parking sectors?",
       answer: "Our vehicles are parked in different sectors: A, B, C (main levels), T (tower), and E (east wing). Each sector has numbered spots like A3, C12, T21, etc."
     },
-    {
-      id: 6,
-      question: "Is the camera scanner secure?",
-      answer: "Yes, our camera scanner only reads your ticket number and doesn't store any images. All data is processed securely and encrypted."
-    }
   ];
 
   const displayFAQs = faqs && faqs.length > 0 ? faqs : defaultFAQs;
