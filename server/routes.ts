@@ -1943,12 +1943,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const due = await storage.getDueScheduledDepartures();
       for (const ticket of due) {
+        const now = new Date();
+
+        // Simulate full SLA retrieval process: random 5–8 min total
+        const totalSLASec = Math.floor(Math.random() * (480 - 300 + 1)) + 300; // 300–480 s
+        // Split into 3 stages (retrieving, transit, preparing) with random proportions
+        const r1 = Math.random(), r2 = Math.random(), r3 = Math.random();
+        const sum = r1 + r2 + r3;
+        const retrievingSec = Math.round((r1 / sum) * totalSLASec);
+        const transitSec    = Math.round((r2 / sum) * totalSLASec);
+        const preparingSec  = totalSLASec - retrievingSec - transitSec;
+
+        const retrievalStartedAt = new Date(now.getTime() - totalSLASec * 1000);
+        const transitAt          = new Date(retrievalStartedAt.getTime() + retrievingSec * 1000);
+        const preparingAt        = new Date(transitAt.getTime() + transitSec * 1000);
+        const retrievalReadyAt   = new Date(preparingAt.getTime() + preparingSec * 1000);
+
+        // Mark completed (sets status, departedAt, totalStaySeconds)
         let updated = await storage.updateValetTicketStatus(ticket.ticketNumber, 'completed');
         if (!updated) continue;
+
+        // Overlay simulated SLA fields
         const depCategory = (ticket.visitorType === 'restaurant' || ticket.visitorType === 'event' || ticket.visitorType === 'others') ? 'events' : 'departing';
-        updated = await storage.updateValetTicket(ticket.ticketNumber, { rosterCategory: depCategory, inRoster: true, scheduledDepartureAt: null }) ?? updated;
+        updated = await storage.updateValetTicket(ticket.ticketNumber, {
+          rosterCategory: depCategory,
+          inRoster: true,
+          scheduledDepartureAt: null,
+          retrievalStartedAt,
+          retrievalReadyAt,
+          retrievalDurationSeconds: totalSLASec,
+        }) ?? updated;
+
         broadcastToOU(updated.ouId, { type: 'ticket_status_updated', data: updated });
-        console.log(`[Auto-Close] Ticket ${ticket.ticketNumber} departed at scheduled time`);
+        console.log(`[Auto-Close] Ticket ${ticket.ticketNumber} departed — simulated SLA ${Math.round(totalSLASec/60)}m (retrieving ${retrievingSec}s / transit ${transitSec}s / preparing ${preparingSec}s)`);
       }
     } catch (e) {
       console.error('[Auto-Close] Error processing scheduled departures:', e);
