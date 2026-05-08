@@ -45,6 +45,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run DB migrations for new columns that may not exist yet
+  const { pool } = await import("./db");
+  await pool.query(`
+    ALTER TABLE valet_tickets
+    ADD COLUMN IF NOT EXISTS scheduled_departure_at TIMESTAMPTZ;
+  `).catch((e: any) => console.error('[Migration] scheduled_departure_at:', e.message));
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

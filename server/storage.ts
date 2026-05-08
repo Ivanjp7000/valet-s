@@ -24,7 +24,7 @@ import {
   type InsertSystemSetting,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, asc, and, or, inArray, isNull } from "drizzle-orm";
+import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -99,6 +99,9 @@ export interface IStorage {
   getGuestTripById(tripId: string): Promise<TicketGuestTrip | undefined>;
   updateGuestTrip(tripId: string, departedAt: Date, returnedAt: Date | null): Promise<TicketGuestTrip | undefined>;
   deleteGuestTrip(tripId: string): Promise<boolean>;
+
+  // Scheduled departure
+  getDueScheduledDepartures(): Promise<ValetTicket[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -327,6 +330,20 @@ export class DatabaseStorage implements IStorage {
       [tripId]
     );
     return (rowCount ?? 0) > 0;
+  }
+
+  async getDueScheduledDepartures(): Promise<ValetTicket[]> {
+    const now = new Date();
+    return await db
+      .select()
+      .from(valetTickets)
+      .where(
+        and(
+          eq(valetTickets.status, 'active'),
+          isNotNull(valetTickets.scheduledDepartureAt),
+          lte(valetTickets.scheduledDepartureAt, now)
+        )
+      );
   }
 
   async deleteValetTicket(ticketNumber: string): Promise<boolean> {

@@ -303,8 +303,22 @@ function useParkedTimers(createdAt: Date | string | undefined | null) {
   return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; canEdit?: boolean }) {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAutoClose, canEdit = true }: {
+  ticket: ValetTicket;
+  onRetrieve: () => void;
+  onEdit: () => void;
+  onView: () => void;
+  onDepart: () => void;
+  onAutoClose: () => void;
+  canEdit?: boolean;
+}) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
+  const scheduled = (ticket as any).scheduledDepartureAt;
+
+  const fmtScheduled = (dt: string) => {
+    const d = new Date(dt);
+    return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  };
 
   return (
     <div className={`rounded-lg p-2 space-y-1 ${isOvernight ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
@@ -335,36 +349,49 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true
             <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
             PL: {ticket.parkingLocation || 'Unassigned'}
           </span>
+          {scheduled && (
+            <p className="text-[10px] text-purple-600 font-semibold mt-0.5">
+              ⏰ Auto-close: {fmtScheduled(scheduled)}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-1">
-          <Button 
-            size="sm" 
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            onClick={onView}
-          >
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={onView}>
             <Eye size={14} className="text-gray-500" />
           </Button>
           {canEdit && (
-            <Button 
-              size="sm" 
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              onClick={onEdit}
-            >
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={onEdit}>
               <Edit size={14} className="text-gray-500" />
             </Button>
           )}
         </div>
       </div>
       {canEdit && (
-        <Button 
-          size="sm" 
-          className="h-7 w-full text-xs bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
-          onClick={onRetrieve}
-        >
-          <Play size={12} className="mr-1" />Retrieve
-        </Button>
+        <div className="space-y-1">
+          <Button
+            size="sm"
+            className="h-7 w-full text-xs bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold"
+            onClick={onRetrieve}
+          >
+            <Play size={12} className="mr-1" />Retrieve
+          </Button>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              className="h-7 flex-1 text-xs bg-red-500 hover:bg-red-600 text-white font-semibold"
+              onClick={onDepart}
+            >
+              <LogOut size={12} className="mr-1" />Departed
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 flex-1 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+              onClick={onAutoClose}
+            >
+              <Timer size={12} className="mr-1" />Auto Close
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -533,6 +560,11 @@ export default function StaffDashboard() {
     forceChange: true
   });
   
+  // Auto Close dialog state
+  const [autoCloseTicket, setAutoCloseTicket] = useState<ValetTicket | null>(null);
+  const [autoCloseDate, setAutoCloseDate] = useState('');
+  const [autoCloseTime, setAutoCloseTime] = useState('12:00');
+
   // Ticket management modals state
   const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
   const [editTicketData, setEditTicketData] = useState<ValetTicket | null>(null);
@@ -653,6 +685,40 @@ export default function StaffDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+    },
+  });
+
+  const departMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      await apiRequest("POST", `/api/staff/tickets/${ticketNumber}/depart`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+      toast({ title: "Departed", description: "Ticket closed — guest has departed." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to mark as departed.", variant: "destructive" }),
+  });
+
+  const scheduleDepMutation = useMutation({
+    mutationFn: async ({ ticketNumber, scheduledDepartureAt }: { ticketNumber: string; scheduledDepartureAt: string }) => {
+      await apiRequest("POST", `/api/staff/tickets/${ticketNumber}/schedule-departure`, { scheduledDepartureAt });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      setAutoCloseTicket(null);
+      toast({ title: "Auto Close Scheduled", description: "Ticket will close automatically at the chosen time." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to schedule departure.", variant: "destructive" }),
+  });
+
+  const cancelSchedDepMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      await apiRequest("DELETE", `/api/staff/tickets/${ticketNumber}/schedule-departure`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      toast({ title: "Cancelled", description: "Scheduled auto-close removed." });
     },
   });
 
@@ -1684,6 +1750,13 @@ export default function StaffDashboard() {
                                   onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
                                   onEdit={() => setEditTicketData(ticket)}
                                   onView={() => setViewTicket(ticket)}
+                                  onDepart={() => departMutation.mutate(ticket.ticketNumber)}
+                                  onAutoClose={() => {
+                                    setAutoCloseTicket(ticket);
+                                    const today = new Date();
+                                    setAutoCloseDate(today.toISOString().slice(0, 10));
+                                    setAutoCloseTime('12:00');
+                                  }}
                                   canEdit={canEdit} />
                               ))}
                               {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -3743,6 +3816,78 @@ export default function StaffDashboard() {
                     className="flex-1"
                   >
                     Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Auto Close (Scheduled Departure) Dialog */}
+        <Dialog open={!!autoCloseTicket} onOpenChange={(o) => { if (!o) setAutoCloseTicket(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Timer size={18} className="text-purple-600" />
+                Auto Close — #{autoCloseTicket?.ticketNumber}
+              </DialogTitle>
+            </DialogHeader>
+            {autoCloseTicket && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Choose the date and time to automatically close this ticket. The system will mark the guest as departed at that exact moment.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Date</label>
+                    <input
+                      type="date"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      value={autoCloseDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      max={(() => { const d = new Date(); d.setDate(d.getDate() + 10); return d.toISOString().slice(0, 10); })()}
+                      onChange={e => setAutoCloseDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 block mb-1">Time</label>
+                    <input
+                      type="time"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      value={autoCloseTime}
+                      onChange={e => setAutoCloseTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+                {(autoCloseTicket as any).scheduledDepartureAt && (
+                  <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
+                    <p className="text-xs text-purple-700">
+                      Currently scheduled: {new Date((autoCloseTicket as any).scheduledDepartureAt).toLocaleString()}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs text-red-500 hover:text-red-700 px-2"
+                      onClick={() => { cancelSchedDepMutation.mutate(autoCloseTicket.ticketNumber); setAutoCloseTicket(null); }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                    disabled={!autoCloseDate || !autoCloseTime || scheduleDepMutation.isPending}
+                    onClick={() => {
+                      const iso = new Date(`${autoCloseDate}T${autoCloseTime}:00`).toISOString();
+                      scheduleDepMutation.mutate({ ticketNumber: autoCloseTicket.ticketNumber, scheduledDepartureAt: iso });
+                    }}
+                  >
+                    <Timer size={14} className="mr-1" />
+                    {scheduleDepMutation.isPending ? "Scheduling..." : "Confirm Schedule"}
+                  </Button>
+                  <Button variant="outline" onClick={() => setAutoCloseTicket(null)}>
+                    Close
                   </Button>
                 </div>
               </div>

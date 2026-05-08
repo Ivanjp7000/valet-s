@@ -1868,6 +1868,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Immediately close a ticket as departed (guest left without retrieval process)
+  app.post('/api/staff/tickets/:ticketNumber/depart', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      let ticket = await storage.updateValetTicketStatus(ticketNumber, 'completed');
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      const depCategory = (existing.visitorType === 'restaurant' || existing.visitorType === 'event' || existing.visitorType === 'others') ? 'events' : 'departing';
+      ticket = await storage.updateValetTicket(ticketNumber, { rosterCategory: depCategory, inRoster: true, scheduledDepartureAt: null }) ?? ticket;
+      broadcastToOU(ticket!.ouId, { type: 'ticket_status_updated', data: ticket });
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error departing ticket:", error);
+      res.status(500).json({ message: "Failed to depart ticket" });
+    }
+  });
+
+  // Schedule auto-close departure for a future time
+  app.post('/api/staff/tickets/:ticketNumber/schedule-departure', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { scheduledDepartureAt } = req.body;
+      if (!scheduledDepartureAt) return res.status(400).json({ message: "scheduledDepartureAt is required" });
+      const scheduledTime = new Date(scheduledDepartureAt);
+      if (isNaN(scheduledTime.getTime())) return res.status(400).json({ message: "Invalid date" });
+      const maxDate = new Date();
+      maxDate.setDate(maxDate.getDate() + 10);
+      if (scheduledTime > maxDate) return res.status(400).json({ message: "Cannot schedule more than 10 days in advance" });
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ticket = await storage.updateValetTicket(ticketNumber, { scheduledDepartureAt: scheduledTime });
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      broadcastToOU(ticket.ouId, { type: 'ticket_status_updated', data: ticket });
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error scheduling departure:", error);
+      res.status(500).json({ message: "Failed to schedule departure" });
+    }
+  });
+
+  // Cancel a scheduled departure
+  app.delete('/api/staff/tickets/:ticketNumber/schedule-departure', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ticket = await storage.updateValetTicket(ticketNumber, { scheduledDepartureAt: null });
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      broadcastToOU(ticket.ouId, { type: 'ticket_status_updated', data: ticket });
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error cancelling scheduled departure:", error);
+      res.status(500).json({ message: "Failed to cancel scheduled departure" });
+    }
+  });
+
+  // Auto-close tickets whose scheduledDepartureAt has passed — runs every minute
+  setInterval(async () => {
+    try {
+      const due = await storage.getDueScheduledDepartures();
+      for (const ticket of due) {
+        let updated = await storage.updateValetTicketStatus(ticket.ticketNumber, 'completed');
+        if (!updated) continue;
+        const depCategory = (ticket.visitorType === 'restaurant' || ticket.visitorType === 'event' || ticket.visitorType === 'others') ? 'events' : 'departing';
+        updated = await storage.updateValetTicket(ticket.ticketNumber, { rosterCategory: depCategory, inRoster: true, scheduledDepartureAt: null }) ?? updated;
+        broadcastToOU(updated.ouId, { type: 'ticket_status_updated', data: updated });
+        console.log(`[Auto-Close] Ticket ${ticket.ticketNumber} departed at scheduled time`);
+      }
+    } catch (e) {
+      console.error('[Auto-Close] Error processing scheduled departures:', e);
+    }
+  }, 60 * 1000);
+
   // Broadcast to clients in the same OU (super admins receive all broadcasts)
   function broadcastToOU(ouId: string | null | undefined, message: any) {
     const messageStr = JSON.stringify(message);

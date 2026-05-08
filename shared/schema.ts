@@ -137,6 +137,9 @@ export const valetTickets = pgTable("valet_tickets", {
   scheduledRetrievalAt: timestamp("scheduled_retrieval_at"), // Guest-chosen future retrieval time
   reminderEmail: varchar("reminder_email"),                  // Email to send reminder to
 
+  // Scheduled departure (Auto Close)
+  scheduledDepartureAt: timestamp("scheduled_departure_at"), // Staff-set future time to auto-close ticket
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
