@@ -16,7 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -303,7 +303,7 @@ function useParkedTimers(createdAt: Date | string | undefined | null) {
   return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onPopulateRoster, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; onPopulateRoster?: () => void; canEdit?: boolean }) {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; canEdit?: boolean }) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
 
   return (
@@ -365,21 +365,6 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onPopulateRost
         >
           <Play size={12} className="mr-1" />Retrieve
         </Button>
-      )}
-      {onPopulateRoster && !ticket.inRoster && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-          onClick={onPopulateRoster}
-        >
-          <List size={12} className="mr-1" />Populate Vehicle Roster
-        </Button>
-      )}
-      {ticket.inRoster && (
-        <div className="h-6 w-full flex items-center justify-center gap-1 text-[10px] text-green-700 font-semibold">
-          <CheckSquare size={11} />In Roster
-        </div>
       )}
     </div>
   );
@@ -520,6 +505,7 @@ export default function StaffDashboard() {
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [showVehicleRoster, setShowVehicleRoster] = useState(false);
   const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
+  const [rosterDate, setRosterDate] = useState<Date>(new Date());
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -732,27 +718,6 @@ export default function StaffDashboard() {
     },
   });
 
-  // Auto-detect which roster tab a ticket belongs to
-  const getRosterCategory = (ticket: ValetTicket): 'arriving' | 'departing' | 'events' => {
-    if (ticket.visitorType === 'restaurant' || ticket.visitorType === 'others') return 'events';
-    return ticket.status === 'completed' ? 'departing' : 'arriving';
-  };
-
-  // Populate ticket into Vehicle Roster
-  const populateRosterMutation = useMutation({
-    mutationFn: async ({ ticketNumber, category }: { ticketNumber: string; category: 'arriving' | 'departing' | 'events' }) => {
-      return apiRequest("PATCH", `/api/staff/tickets/${ticketNumber}/roster`, { inRoster: true, rosterCategory: category });
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-      setShowVehicleRoster(true);
-      setRosterTab(variables.category);
-      toast({ title: "Added to Roster", description: "Ticket has been added to the Vehicle Roster." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to add ticket to roster.", variant: "destructive" });
-    },
-  });
 
   // Check if user must change password on mount
   useEffect(() => {
@@ -1247,19 +1212,32 @@ export default function StaffDashboard() {
 
             {/* Vehicle Roster Panel */}
             {showVehicleRoster && (() => {
-              const allRosterTickets = (activeTickets || []).filter(t => t.inRoster === true);
-              const tabDefs: { key: 'arriving' | 'departing' | 'events'; label: string; sublabel: string }[] = [
-                { key: 'arriving',  label: 'Visitors Arriving Today',   sublabel: 'ARRIVAL' },
-                { key: 'departing', label: 'Visitors Departing Today',  sublabel: 'DEPARTURE' },
-                { key: 'events',    label: 'Restaurants & Events',      sublabel: 'R&E' },
-              ];
-              const rosterTickets = allRosterTickets
-                .filter(t => (t.rosterCategory || 'arriving') === rosterTab)
+              const allTickets = activeTickets || [];
+              const selDateStr = rosterDate.toDateString(); // e.g. "Thu May 08 2026"
+              const fmtDateDisplay = (d: Date) =>
+                `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
+              const isToday = rosterDate.toDateString() === new Date().toDateString();
+              const prevDay = () => { const d = new Date(rosterDate); d.setDate(d.getDate()-1); setRosterDate(d); };
+              const nextDay = () => { const d = new Date(rosterDate); d.setDate(d.getDate()+1); setRosterDate(d); };
+
+              // Date-based filtering per tab
+              const arrivingTickets = allTickets
+                .filter(t => t.visitorType === 'hotel_guest' && new Date(t.createdAt!).toDateString() === selDateStr)
                 .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
-              const todayStr = (() => {
-                const d = new Date();
-                return `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
-              })();
+              const departingTickets = allTickets
+                .filter(t => t.visitorType === 'hotel_guest' && t.status === 'completed' && t.departedAt && new Date(t.departedAt).toDateString() === selDateStr)
+                .sort((a, b) => new Date(a.departedAt!).getTime() - new Date(b.departedAt!).getTime());
+              const eventsTickets = allTickets
+                .filter(t => (t.visitorType === 'restaurant' || t.visitorType === 'others') && new Date(t.createdAt!).toDateString() === selDateStr)
+                .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+
+              const tabDefs: { key: 'arriving' | 'departing' | 'events'; label: string; sublabel: string; tickets: typeof arrivingTickets }[] = [
+                { key: 'arriving',  label: 'Visitors Arriving Today',  sublabel: 'ARRIVAL',   tickets: arrivingTickets },
+                { key: 'departing', label: 'Visitors Departing Today', sublabel: 'DEPARTURE', tickets: departingTickets },
+                { key: 'events',    label: 'Restaurants & Events',     sublabel: 'R&E',       tickets: eventsTickets },
+              ];
+              const rosterTickets = tabDefs.find(t => t.key === rosterTab)?.tickets ?? [];
+              const todayStr = fmtDateDisplay(rosterDate);
               const fmtTime = (dt: Date | string | null | undefined) => {
                 if (!dt) return '';
                 const d = new Date(dt);
@@ -1390,36 +1368,62 @@ export default function StaffDashboard() {
 
               return (
                 <div>
+                  {/* ── DATE NAVIGATION BAR ── */}
+                  <div className="flex items-center justify-between gap-2 px-1 py-2 border-b border-gray-200 bg-gray-50 mb-0">
+                    <div className="flex items-center gap-1">
+                      <button onClick={prevDay} className="h-7 w-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-100 transition-colors">
+                        <ChevronLeft size={14} />
+                      </button>
+                      <div className="flex items-center gap-1.5 px-2">
+                        <CalendarDays size={14} className="text-regis-navy" />
+                        <input
+                          type="date"
+                          value={`${rosterDate.getFullYear()}-${(rosterDate.getMonth()+1).toString().padStart(2,'0')}-${rosterDate.getDate().toString().padStart(2,'0')}`}
+                          onChange={e => { const d = new Date(e.target.value + 'T00:00:00'); if (!isNaN(d.getTime())) setRosterDate(d); }}
+                          className="text-xs font-mono border-0 bg-transparent outline-none cursor-pointer w-[120px]"
+                        />
+                        {isToday && <span className="text-[10px] font-bold bg-regis-navy text-white px-1.5 py-0.5 rounded">TODAY</span>}
+                      </div>
+                      <button onClick={nextDay} disabled={isToday} className="h-7 w-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => window.print()}
+                      className="flex items-center gap-1.5 h-7 px-3 text-xs font-semibold border border-regis-navy text-regis-navy rounded hover:bg-regis-navy/10 transition-colors"
+                    >
+                      <Printer size={13} />
+                      Print
+                    </button>
+                  </div>
+
                   {/* ── SUB-TABS ── */}
                   <div className="flex gap-0 mb-0 border-b border-black overflow-x-auto">
                     {tabDefs.map(tab => {
-                      const count = allRosterTickets.filter(t => (t.rosterCategory || 'arriving') === tab.key).length;
                       const isActive = rosterTab === tab.key;
                       return (
                         <button
                           key={tab.key}
                           onClick={() => setRosterTab(tab.key)}
                           className={`flex-1 min-w-[140px] px-3 py-2 text-xs font-semibold border-t border-l border-r border-black -mb-px transition-colors ${
-                            isActive
-                              ? 'bg-regis-navy text-white border-b-regis-navy'
-                              : 'bg-white text-regis-navy hover:bg-regis-navy/5'
+                            isActive ? 'bg-regis-navy text-white' : 'bg-white text-regis-navy hover:bg-regis-navy/5'
                           }`}
-                          style={{ borderBottom: isActive ? `2px solid var(--regis-navy, #1a2744)` : '1px solid black' }}
+                          style={{ borderBottom: isActive ? '2px solid #1a2744' : '1px solid black' }}
                         >
                           <div className="leading-tight">{tab.label}</div>
-                          <div className={`text-[10px] mt-0.5 ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>{count} 台</div>
+                          <div className={`text-[10px] mt-0.5 ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>{tab.tickets.length} 台</div>
                         </button>
                       );
                     })}
                   </div>
 
                   {/* ── DESKTOP TABLE ── */}
-                  <div className="hidden sm:block overflow-x-auto">
+                  <div className="hidden sm:block overflow-x-auto print:block">
                     <RosterTable tickets={rosterTickets} />
                   </div>
 
                   {/* ── MOBILE CARDS ── */}
-                  <div className="sm:hidden space-y-2 mt-2">
+                  <div className="sm:hidden print:hidden space-y-2 mt-2">
                     <div className="flex items-center justify-between py-1 border-b border-gray-200">
                       <h3 className="font-bold text-regis-navy text-sm">{tabDefs.find(t => t.key === rosterTab)?.label}</h3>
                       <span className="text-[11px] text-gray-500">{todayStr} · {rosterTickets.length}台</span>
@@ -1434,10 +1438,9 @@ export default function StaffDashboard() {
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-gray-400 font-bold w-4">{index + 1}</span>
-                            <span className={`font-bold text-xs ${
-                              ticket.status === 'cancelled' ? 'text-red-600' :
-                              ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
-                            }`}>{ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}</span>
+                            <span className={`font-bold text-xs ${ticket.status === 'cancelled' ? 'text-red-600' : ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'}`}>
+                              {ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}
+                            </span>
                             <span className="font-bold text-regis-navy text-sm">#{ticket.ticketNumber}</span>
                             {ticket.status === 'cancelled' && <span className="text-red-600 font-bold text-[10px]">VOID</span>}
                             {ticket.status === 'completed' && <span className="text-green-700 font-bold text-[10px]">転記</span>}
@@ -1467,7 +1470,7 @@ export default function StaffDashboard() {
                     {rosterTickets.length === 0 && (
                       <div className="text-center py-8 text-gray-400 text-xs">
                         <Car size={28} className="mx-auto mb-2 opacity-30" />
-                        No entries in this roster
+                        No entries for this date
                       </div>
                     )}
                   </div>
@@ -1607,7 +1610,6 @@ export default function StaffDashboard() {
                                   onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
                                   onEdit={() => setEditTicketData(ticket)}
                                   onView={() => setViewTicket(ticket)}
-                                  onPopulateRoster={canEdit ? () => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) }) : undefined}
                                   canEdit={canEdit} />
                               ))}
                               {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -1637,7 +1639,6 @@ export default function StaffDashboard() {
                                           <div className="flex items-center gap-2">
                                             <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
                                             <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
-                                            {ticket.inRoster && <span className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 px-1 rounded">In Roster</span>}
                                           </div>
                                           <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
                                           {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
@@ -1656,12 +1657,6 @@ export default function StaffDashboard() {
                                           </>)}
                                         </div>
                                       </div>
-                                      {canEdit && !ticket.inRoster && (
-                                        <Button size="sm" variant="outline" className="h-6 w-full text-[11px] mt-1 border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-                                          onClick={() => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) })}>
-                                          <List size={11} className="mr-1" />Populate Vehicle Roster
-                                        </Button>
-                                      )}
                                     </div>
                                   );
                                 })}
@@ -1772,7 +1767,6 @@ export default function StaffDashboard() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
-                          {ticket.inRoster && <span className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">✓ In Roster</span>}
                         </div>
                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
                         {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
@@ -1797,12 +1791,6 @@ export default function StaffDashboard() {
                       {stayHours !== null && <p className="text-blue-600 font-medium mt-1">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
                       {ticket.updatedAt && <p className="text-gray-400 mt-0.5">Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                     </div>
-                    {canEdit && !ticket.inRoster && (
-                      <Button size="sm" variant="outline" className="w-full text-xs mt-2 border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-                        onClick={() => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) })}>
-                        <List size={13} className="mr-1" />Populate Vehicle Roster
-                      </Button>
-                    )}
                   </div>
                 );
               };
@@ -1862,17 +1850,6 @@ export default function StaffDashboard() {
                                       >
                                         <Play size={14} className="mr-1" /> Retrieve
                                       </Button>
-                                    )}
-                                    {canEdit && !ticket.inRoster && (
-                                      <Button size="sm" variant="outline" className="w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy/10 mt-1"
-                                        onClick={() => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) })}>
-                                        <List size={13} className="mr-1" />Populate Vehicle Roster
-                                      </Button>
-                                    )}
-                                    {ticket.inRoster && (
-                                      <div className="flex items-center justify-center gap-1 text-[11px] text-green-700 font-semibold mt-1">
-                                        <CheckSquare size={12} />In Roster
-                                      </div>
                                     )}
                                   </div>
                                 ))}

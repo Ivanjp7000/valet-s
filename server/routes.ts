@@ -575,6 +575,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot determine organization. Please select a location or ensure your account is assigned to an organization." });
       }
 
+      // Auto-determine roster category from visitorType
+      const autoRosterCategory = (visitorType === 'restaurant' || visitorType === 'others') ? 'events' : 'arriving';
+
       const ticket = await storage.createValetTicket({
         ticketNumber,
         visitorType,
@@ -593,6 +596,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId: createdByUserId || null,
         createdByName: createdByName || null,
         status: 'active',
+        inRoster: true,
+        rosterCategory: autoRosterCategory,
       });
 
       // Broadcast to all connected WebSocket clients in the same OU
@@ -619,10 +624,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const ticket = await storage.updateValetTicketStatus(ticketNumber, status);
+      let ticket = await storage.updateValetTicketStatus(ticketNumber, status);
       
       if (!ticket) {
         return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Auto-update rosterCategory when ticket is completed (departed, no coming back)
+      if (status === 'completed') {
+        const depCategory = (existing.visitorType === 'restaurant' || existing.visitorType === 'others') ? 'events' : 'departing';
+        ticket = await storage.updateValetTicket(ticketNumber, { rosterCategory: depCategory, inRoster: true }) ?? ticket;
       }
 
       // Broadcast status update to clients in the same OU
