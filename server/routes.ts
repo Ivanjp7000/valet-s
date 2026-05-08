@@ -1603,6 +1603,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle ticket in/out of Vehicle Roster
+  app.patch('/api/staff/tickets/:ticketNumber/roster', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { inRoster } = req.body;
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const updated = await storage.updateValetTicket(ticketNumber, { inRoster: !!inRoster });
+      broadcastToOU(updated?.ouId, { type: 'ticket_updated', data: updated });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating roster flag:", error);
+      res.status(500).json({ message: "Failed to update roster flag" });
+    }
+  });
+
   // Enhanced Staff Routes for Car Management
   app.patch('/api/staff/tickets/:ticketNumber/car-details', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {

@@ -303,7 +303,7 @@ function useParkedTimers(createdAt: Date | string | undefined | null) {
   return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; canEdit?: boolean }) {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onPopulateRoster, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; onPopulateRoster?: () => void; canEdit?: boolean }) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
 
   return (
@@ -365,6 +365,21 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true
         >
           <Play size={12} className="mr-1" />Retrieve
         </Button>
+      )}
+      {onPopulateRoster && !ticket.inRoster && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy/10"
+          onClick={onPopulateRoster}
+        >
+          <List size={12} className="mr-1" />Populate Vehicle Roster
+        </Button>
+      )}
+      {ticket.inRoster && (
+        <div className="h-6 w-full flex items-center justify-center gap-1 text-[10px] text-green-700 font-semibold">
+          <CheckSquare size={11} />In Roster
+        </div>
       )}
     </div>
   );
@@ -713,6 +728,21 @@ export default function StaffDashboard() {
         description: error?.message || "Failed to reset password", 
         variant: "destructive" 
       });
+    },
+  });
+
+  // Populate ticket into Vehicle Roster
+  const populateRosterMutation = useMutation({
+    mutationFn: async (ticketNumber: string) => {
+      return apiRequest("PATCH", `/api/staff/tickets/${ticketNumber}/roster`, { inRoster: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      setShowVehicleRoster(true);
+      toast({ title: "Added to Roster", description: "Ticket has been added to the Vehicle Roster." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to add ticket to roster.", variant: "destructive" });
     },
   });
 
@@ -1209,9 +1239,8 @@ export default function StaffDashboard() {
 
             {/* Vehicle Roster Panel */}
             {showVehicleRoster && (() => {
-              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
               const rosterTickets = (activeTickets || [])
-                .filter(t => t.createdAt && new Date(t.createdAt) >= todayStart)
+                .filter(t => t.inRoster === true)
                 .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
               const todayStr = (() => {
                 const d = new Date();
@@ -1305,9 +1334,10 @@ export default function StaffDashboard() {
                                     <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
                                     <ColorDisplay color={ticket.carColor || ''} />
                                   </td>
-                                  {/* 部屋番号 */}
+                                  {/* 部屋番号 — always Hotel Guest */}
                                   <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
-                                    {ticket.roomNumber || ''}
+                                    <div className="text-[10px] font-semibold text-regis-navy leading-tight">Hotel Guest</div>
+                                    {ticket.roomNumber && <div className="text-[10px] text-gray-600">{ticket.roomNumber}</div>}
                                   </td>
                                   {/* 車輌 */}
                                   <td className="border border-black px-1 py-1 text-[11px] align-middle">
@@ -1579,7 +1609,9 @@ export default function StaffDashboard() {
                                 <CompactInHouseCard key={ticket.id} ticket={ticket}
                                   onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
                                   onEdit={() => setEditTicketData(ticket)}
-                                  onView={() => setViewTicket(ticket)} canEdit={canEdit} />
+                                  onView={() => setViewTicket(ticket)}
+                                  onPopulateRoster={canEdit ? () => populateRosterMutation.mutate(ticket.ticketNumber) : undefined}
+                                  canEdit={canEdit} />
                               ))}
                               {activeTickets?.filter(t => t.status === 'active').length === 0 && (
                                 <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
@@ -1602,28 +1634,37 @@ export default function StaffDashboard() {
                                   const stayHours = ticket.totalStaySeconds ? Math.floor(ticket.totalStaySeconds / 3600) : null;
                                   const stayMins = ticket.totalStaySeconds ? Math.floor((ticket.totalStaySeconds % 3600) / 60) : null;
                                   return (
-                                    <div key={ticket.id} className="bg-gray-50 rounded p-2 flex items-center justify-between">
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
-                                          <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                                    <div key={ticket.id} className="bg-gray-50 rounded p-2">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-medium text-sm text-gray-600">#{ticket.ticketNumber}</span>
+                                            <span className="text-xs text-gray-500 truncate">{ticket.guestName}</span>
+                                            {ticket.inRoster && <span className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 px-1 rounded">In Roster</span>}
+                                          </div>
+                                          <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
+                                          {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
                                         </div>
-                                        <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
-                                        {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
+                                        <div className="flex items-center gap-1">
+                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
+                                            <Eye size={14} className="text-gray-400" />
+                                          </Button>
+                                          {user?.role === 'superadmin' && (<>
+                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setEditTicketData(ticket)}>
+                                              <Edit size={14} className="text-blue-400" />
+                                            </Button>
+                                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setDeleteTicket(ticket)}>
+                                              <Trash2 size={14} className="text-red-400" />
+                                            </Button>
+                                          </>)}
+                                        </div>
                                       </div>
-                                      <div className="flex items-center gap-1">
-                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setViewTicket(ticket)}>
-                                          <Eye size={14} className="text-gray-400" />
+                                      {canEdit && !ticket.inRoster && (
+                                        <Button size="sm" variant="outline" className="h-6 w-full text-[11px] mt-1 border-regis-navy text-regis-navy hover:bg-regis-navy/10"
+                                          onClick={() => populateRosterMutation.mutate(ticket.ticketNumber)}>
+                                          <List size={11} className="mr-1" />Populate Vehicle Roster
                                         </Button>
-                                        {user?.role === 'superadmin' && (<>
-                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setEditTicketData(ticket)}>
-                                            <Edit size={14} className="text-blue-400" />
-                                          </Button>
-                                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setDeleteTicket(ticket)}>
-                                            <Trash2 size={14} className="text-red-400" />
-                                          </Button>
-                                        </>)}
-                                      </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1732,7 +1773,10 @@ export default function StaffDashboard() {
                   <div className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-gray-50 shadow-sm">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-base text-gray-600">#{ticket.ticketNumber}</p>
+                          {ticket.inRoster && <span className="text-[10px] text-green-700 font-semibold bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">✓ In Roster</span>}
+                        </div>
                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel} • {ticket.carColor}</p>
                         {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
                       </div>
@@ -1756,6 +1800,12 @@ export default function StaffDashboard() {
                       {stayHours !== null && <p className="text-blue-600 font-medium mt-1">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
                       {ticket.updatedAt && <p className="text-gray-400 mt-0.5">Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
                     </div>
+                    {canEdit && !ticket.inRoster && (
+                      <Button size="sm" variant="outline" className="w-full text-xs mt-2 border-regis-navy text-regis-navy hover:bg-regis-navy/10"
+                        onClick={() => populateRosterMutation.mutate(ticket.ticketNumber)}>
+                        <List size={13} className="mr-1" />Populate Vehicle Roster
+                      </Button>
+                    )}
                   </div>
                 );
               };
@@ -1815,6 +1865,17 @@ export default function StaffDashboard() {
                                       >
                                         <Play size={14} className="mr-1" /> Retrieve
                                       </Button>
+                                    )}
+                                    {canEdit && !ticket.inRoster && (
+                                      <Button size="sm" variant="outline" className="w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy/10 mt-1"
+                                        onClick={() => populateRosterMutation.mutate(ticket.ticketNumber)}>
+                                        <List size={13} className="mr-1" />Populate Vehicle Roster
+                                      </Button>
+                                    )}
+                                    {ticket.inRoster && (
+                                      <div className="flex items-center justify-center gap-1 text-[11px] text-green-700 font-semibold mt-1">
+                                        <CheckSquare size={12} />In Roster
+                                      </div>
                                     )}
                                   </div>
                                 ))}
