@@ -386,7 +386,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const canProceedStep2 = formData.guestName.trim().length > 0 && formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
 
-  const canProceedStep3 = formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber);
+  const PSEUDO_TICKET = 'X7777';
+  const canProceedStep3 = formData.ticketNumber === PSEUDO_TICKET || (formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber));
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -890,11 +891,12 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 <Input
                   value={formData.ticketNumber}
                   onChange={(e) => {
+                    if (formData.ticketNumber === PSEUDO_TICKET) return;
                     const value = e.target.value.replace(/\D/g, '').slice(0, 5);
                     setFormData({ ...formData, ticketNumber: value });
                   }}
                   placeholder="12345"
-                  className="text-center text-2xl font-bold tracking-widest"
+                  className={`text-center text-2xl font-bold tracking-widest ${formData.ticketNumber === PSEUDO_TICKET ? 'text-purple-600 bg-purple-50 border-purple-300' : ''}`}
                   maxLength={5}
                   disabled={isTicketOcrRunning}
                   data-testid="input-ticket-number"
@@ -946,7 +948,24 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   )}
                 </Button>
               </div>
-              {formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed border-purple-400 text-purple-600 hover:bg-purple-50 hover:border-purple-500 text-sm font-medium"
+                onClick={() => setFormData({ ...formData, ticketNumber: PSEUDO_TICKET })}
+              >
+                + Add Pseudo Ticket
+              </Button>
+              {formData.ticketNumber === PSEUDO_TICKET && (
+                <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
+                  <p className="text-xs text-purple-700 font-medium">Pseudo ticket <strong>X7777</strong> — can be reused unlimited times</p>
+                  <button
+                    className="text-xs text-gray-400 hover:text-gray-600 ml-2"
+                    onClick={() => setFormData({ ...formData, ticketNumber: '' })}
+                  >✕</button>
+                </div>
+              )}
+              {formData.ticketNumber !== PSEUDO_TICKET && formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
                 <p className="text-sm text-orange-600 mt-1">
                   Enter {5 - formData.ticketNumber.length} more digit(s)
                 </p>

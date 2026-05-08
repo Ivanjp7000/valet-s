@@ -524,18 +524,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId, createdByName
       } = req.body;
 
+      const PSEUDO_TICKET = 'X7777';
+
       // Validate required fields
-      if (!ticketNumber || !/^\d{5}$/.test(ticketNumber)) {
+      if (!ticketNumber || (ticketNumber !== PSEUDO_TICKET && !/^\d{5}$/.test(ticketNumber))) {
         return res.status(400).json({ message: "Invalid ticket number. Must be 5 digits." });
       }
       if (!visitorType || !guestName || !carMake || !carModel || !carColor) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Check if ticket already exists
-      const existingTicket = await storage.getValetTicket(ticketNumber);
-      if (existingTicket) {
-        return res.status(400).json({ message: "Ticket number already exists" });
+      // Check if ticket already exists — pseudo ticket X7777 is exempt from uniqueness
+      if (ticketNumber !== PSEUDO_TICKET) {
+        const existingTicket = await storage.getValetTicket(ticketNumber);
+        if (existingTicket) {
+          return res.status(400).json({ message: "Ticket number already exists" });
+        }
       }
 
       // Derive ouId from location or from current user
