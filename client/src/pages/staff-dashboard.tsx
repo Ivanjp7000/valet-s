@@ -16,7 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -503,6 +503,7 @@ export default function StaffDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showAddUser, setShowAddUser] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
+  const [showVehicleRoster, setShowVehicleRoster] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -1171,8 +1172,8 @@ export default function StaffDashboard() {
               );
             })()}
 
-            {/* Header with New Ticket Button */}
-            <div className="flex justify-between items-center gap-2">
+            {/* Header with New Ticket Button + Vehicle Roster Toggle */}
+            <div className="flex items-center gap-2 flex-wrap">
               {canEdit && (
                 <Button 
                   onClick={() => setShowTicketWizard(true)}
@@ -1184,7 +1185,117 @@ export default function StaffDashboard() {
                   New Valet Ticket
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant={showVehicleRoster ? "default" : "outline"}
+                className={showVehicleRoster ? "bg-regis-navy text-white hover:bg-regis-navy/90" : "border-regis-navy text-regis-navy hover:bg-regis-navy/10"}
+                onClick={() => setShowVehicleRoster(v => !v)}
+              >
+                <List size={16} className="mr-1 sm:mr-2" />
+                Vehicle Roster
+              </Button>
             </div>
+
+            {/* Vehicle Roster Panel */}
+            {showVehicleRoster && (
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-regis-navy/5">
+                  <List size={16} className="text-regis-navy" />
+                  <h3 className="font-semibold text-regis-navy text-sm">Vehicle Roster</h3>
+                  <span className="ml-auto text-xs text-gray-500 font-medium">
+                    {activeTickets?.filter(t => !['completed', 'cancelled'].includes(t.status)).length || 0} vehicles
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                        <th className="text-left px-3 py-2 font-semibold">Ticket</th>
+                        <th className="text-left px-3 py-2 font-semibold">Guest</th>
+                        <th className="text-left px-3 py-2 font-semibold hidden sm:table-cell">Room</th>
+                        <th className="text-left px-3 py-2 font-semibold">Vehicle</th>
+                        <th className="text-left px-3 py-2 font-semibold hidden md:table-cell">Plate</th>
+                        <th className="text-left px-3 py-2 font-semibold">Parking</th>
+                        <th className="text-left px-3 py-2 font-semibold">Time In</th>
+                        <th className="text-left px-3 py-2 font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {activeTickets
+                        ?.filter(t => !['completed', 'cancelled'].includes(t.status))
+                        .map(ticket => {
+                          const elapsedMs = ticket.createdAt ? Date.now() - new Date(ticket.createdAt).getTime() : 0;
+                          const totalSecs = Math.floor(elapsedMs / 1000);
+                          const tDays = Math.floor(totalSecs / 86400);
+                          const tHours = Math.floor((totalSecs % 86400) / 3600);
+                          const tMins = Math.floor((totalSecs % 3600) / 60);
+                          const timeIn = tDays > 0 ? `${tDays}d ${tHours}h ${tMins}m` : tHours > 0 ? `${tHours}h ${tMins}m` : `${tMins}m`;
+                          const isOvernight = elapsedMs >= 24 * 60 * 60 * 1000;
+
+                          const statusColors: Record<string, string> = {
+                            active: 'bg-blue-100 text-blue-700',
+                            retrieving: 'bg-yellow-100 text-yellow-700',
+                            transit: 'bg-orange-100 text-orange-700',
+                            preparing: 'bg-purple-100 text-purple-700',
+                            ready: 'bg-green-100 text-green-700',
+                            out_with_guest: 'bg-cyan-100 text-cyan-700',
+                          };
+                          const statusLabel: Record<string, string> = {
+                            active: 'In House',
+                            retrieving: 'Retrieving',
+                            transit: 'In Transit',
+                            preparing: 'Final Prep',
+                            ready: 'Ready',
+                            out_with_guest: 'Out w/ Guest',
+                          };
+
+                          return (
+                            <tr key={ticket.id} className={`hover:bg-gray-50 transition-colors ${isOvernight ? 'bg-amber-50/40' : ''}`}>
+                              <td className="px-3 py-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-regis-navy">#{ticket.ticketNumber}</span>
+                                  {isOvernight && <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1">OVN</span>}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2">
+                                <p className="font-medium text-gray-800 truncate max-w-[100px]">{ticket.guestName}</p>
+                              </td>
+                              <td className="px-3 py-2 hidden sm:table-cell text-gray-500">{ticket.roomNumber || '—'}</td>
+                              <td className="px-3 py-2">
+                                <p className="text-gray-700 truncate max-w-[120px]">{ticket.carColor} {ticket.carMake} {ticket.carModel}</p>
+                              </td>
+                              <td className="px-3 py-2 hidden md:table-cell">
+                                <span className="font-mono text-xs text-gray-600">{ticket.licensePlate || '—'}</span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                                  {ticket.parkingLocation || 'N/A'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`text-xs font-semibold tabular-nums ${isOvernight ? 'text-amber-600' : 'text-gray-700'}`}>{timeIn}</span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[ticket.status] || 'bg-gray-100 text-gray-600'}`}>
+                                  {statusLabel[ticket.status] || ticket.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {(activeTickets?.filter(t => !['completed', 'cancelled'].includes(t.status)).length === 0) && (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-sm">
+                            <Car size={28} className="mx-auto mb-2 opacity-30" />
+                            No vehicles currently on the roster
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Standard View for Mobile */}
             <div className="space-y-3 sm:hidden">
