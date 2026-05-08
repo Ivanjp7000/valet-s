@@ -1780,8 +1780,10 @@ export default function StaffDashboard() {
                                   onAutoClose={() => {
                                     setAutoCloseTicket(ticket);
                                     const today = new Date();
-                                    setAutoCloseDate(today.toISOString().slice(0, 10));
-                                    setAutoCloseTime('12:00');
+                                    const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                                    const localTime = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
+                                    setAutoCloseDate(localDate);
+                                    setAutoCloseTime(localTime);
                                   }}
                                   canEdit={canEdit} />
                               ))}
@@ -2041,8 +2043,10 @@ export default function StaffDashboard() {
                                             onClick={() => {
                                               setAutoCloseTicket(ticket);
                                               const today = new Date();
-                                              setAutoCloseDate(today.toISOString().slice(0, 10));
-                                              setAutoCloseTime('12:00');
+                                              const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                                              const localTime = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
+                                              setAutoCloseDate(localDate);
+                                              setAutoCloseTime(localTime);
                                             }}
                                           >
                                             <Timer size={13} className="mr-1" /> Auto Close
@@ -3896,8 +3900,8 @@ export default function StaffDashboard() {
                       type="date"
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                       value={autoCloseDate}
-                      min={new Date().toISOString().slice(0, 10)}
-                      max={(() => { const d = new Date(); d.setDate(d.getDate() + 10); return d.toISOString().slice(0, 10); })()}
+                      min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
+                      max={(() => { const d = new Date(); d.setDate(d.getDate() + 10); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
                       onChange={e => setAutoCloseDate(e.target.value)}
                     />
                   </div>
