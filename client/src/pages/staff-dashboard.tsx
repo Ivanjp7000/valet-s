@@ -681,6 +681,8 @@ export default function StaffDashboard() {
     avgTime: string;
   }>({
     queryKey: ["/api/staff/stats"],
+    refetchInterval: 30000,
+    staleTime: 0,
   });
 
   const { data: allUsers, isLoading: usersLoading } = useQuery<UserType[]>({
@@ -2277,7 +2279,7 @@ export default function StaffDashboard() {
                   <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
                     <Timer className="text-purple-600" size={18} />
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
+                  <p className="text-xl font-bold text-gray-900">{statsLoading ? '-' : stats?.avgTime || '—'}</p>
                   <p className="text-xs text-gray-600">Avg. Time</p>
                 </CardContent>
               </Card>
