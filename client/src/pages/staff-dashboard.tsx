@@ -1335,10 +1335,18 @@ export default function StaffDashboard() {
               ];
               const rosterTickets = tabDefs.find(t => t.key === rosterTab)?.tickets ?? [];
               const todayStr = fmtDateDisplay(rosterDate);
+              const fmtRosterDate = (dt: Date | string | null | undefined) => {
+                if (!dt) return '';
+                const d = new Date(dt);
+                const dd = d.getDate().toString().padStart(2, '0');
+                const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+                const yy = d.getFullYear().toString().slice(2);
+                return `${dd}/${mm}/${yy}`;
+              };
               const fmtTime = (dt: Date | string | null | undefined) => {
                 if (!dt) return '';
                 const d = new Date(dt);
-                return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+                return `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
               };
               const ColorDisplay = ({ color }: { color: string }) => {
                 return (
@@ -1367,8 +1375,8 @@ export default function StaffDashboard() {
                 `${ticket.carMake} ${ticket.carModel}`,
                 ticket.carColor ? `(${ticket.carColor})` : '',
                 ticket.licensePlate || '',
-                `C/IN ${fmtTime(ticket.createdAt)}`,
-                ticket.status === 'completed' ? `C/OUT ${fmtTime(ticket.departedAt)}` : '',
+                `C/IN ${fmtRosterDate(ticket.createdAt)} ${fmtTime(ticket.createdAt)}`,
+                ticket.status === 'completed' ? `C/OUT ${fmtRosterDate(ticket.departedAt)} ${fmtTime(ticket.departedAt)}` : '',
                 ticket.parkingLocation || '',
               ].filter(Boolean).join('  ');
 
@@ -1458,8 +1466,16 @@ export default function StaffDashboard() {
                                 <ColorDisplay color={ticket.carColor || ''} />
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-mono align-middle">{ticket.licensePlate || ''}</td>
-                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle">{fmtTime(ticket.createdAt)}</td>
-                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle">{ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle leading-tight">
+                                <div className="text-[9px]">{fmtRosterDate(ticket.createdAt)}</div>
+                                <div>{fmtTime(ticket.createdAt)}</div>
+                              </td>
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle leading-tight">
+                                {ticket.status === 'completed' && ticket.departedAt ? (<>
+                                  <div className="text-[9px]">{fmtRosterDate(ticket.departedAt)}</div>
+                                  <div>{fmtTime(ticket.departedAt)}</div>
+                                </>) : ''}
+                              </td>
                               <td className="border border-black text-center px-1 py-1 font-bold align-middle">{ticket.parkingLocation || ''}</td>
                               <td className="border border-black text-center px-1 py-1 align-middle"><RosterNotes ticket={ticket} /></td>
                             </tr>
@@ -1601,8 +1617,8 @@ export default function StaffDashboard() {
                             {ticket.status === 'completed' && <span className="text-green-700 font-bold text-[10px]">転記</span>}
                           </div>
                           <div className="text-right font-mono text-[10px] text-gray-500">
-                            <div>C/IN {fmtTime(ticket.createdAt)}</div>
-                            {ticket.status === 'completed' && ticket.departedAt && <div>C/OUT {fmtTime(ticket.departedAt)}</div>}
+                            <div>C/IN <span className="font-mono">{fmtRosterDate(ticket.createdAt)}</span><br/><span className="font-mono">{fmtTime(ticket.createdAt)}</span></div>
+                            {ticket.status === 'completed' && ticket.departedAt && <div>C/OUT <span className="font-mono">{fmtRosterDate(ticket.departedAt)}</span><br/><span className="font-mono">{fmtTime(ticket.departedAt)}</span></div>}
                           </div>
                         </div>
                         <div className="flex items-baseline gap-1 mb-0.5">
