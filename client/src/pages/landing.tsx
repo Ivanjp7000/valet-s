@@ -544,24 +544,13 @@ export default function Landing() {
         {/* Quick FAQ Preview */}
         <Card className="shadow-sm">
           <CardContent className="p-6">
-            <h3 className="font-medium text-regis-navy mb-4 flex items-center">
+            <h3 className="font-medium text-regis-navy mb-3 flex items-center">
               <HelpCircle className="mr-2 text-regis-gold" size={18} />
               Quick Help
             </h3>
-            <div className="space-y-3 text-sm text-gray-600">
-              {faqs?.slice(0, 3).map((faq, index) => (
-                <div key={index}>• {faq.question}</div>
-              )) || (
-                <>
-                  <div>• Where do I find my ticket number?</div>
-                  <div>• How long does vehicle retrieval take?</div>
-                  <div>• What if I lost my ticket?</div>
-                </>
-              )}
-            </div>
             <button 
               onClick={() => setShowFAQModal(true)}
-              className="text-regis-gold text-sm font-medium mt-3 hover:underline"
+              className="text-regis-gold text-sm font-medium hover:underline"
             >
               View all FAQs →
             </button>
