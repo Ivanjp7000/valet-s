@@ -266,41 +266,62 @@ function GuestOutCard({ ticket, onBack, onView, canEdit = true }: { ticket: Vale
   );
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; canEdit?: boolean }) {
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
+function useParkedTimers(createdAt: Date | string | undefined | null) {
+  const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
-    if (!ticket.createdAt) return;
-    
-    const createdAt = new Date(ticket.createdAt).getTime();
-    const maxMs = 24 * 60 * 60 * 1000; // 24 hours
-    
-    const updateTimer = () => {
-      const elapsed = Date.now() - createdAt;
-      const remaining = Math.max(0, maxMs - elapsed);
-      setRemainingSeconds(Math.floor(remaining / 1000));
-    };
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    if (!createdAt) return;
+    const created = new Date(createdAt).getTime();
+    const update = () => setElapsedMs(Date.now() - created);
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [ticket.createdAt]);
+  }, [createdAt]);
 
-  const hours = Math.floor(remainingSeconds / 3600);
-  const mins = Math.floor((remainingSeconds % 3600) / 60);
-  const secs = remainingSeconds % 60;
-  const timeDisplay = `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  const isUrgent = remainingSeconds < 3600; // Less than 1 hour
+  const maxMs = 24 * 60 * 60 * 1000;
+  const cycleElapsed = elapsedMs % maxMs;
+  const remainingInCycle = maxMs - cycleElapsed;
+  const dayNumber = Math.floor(elapsedMs / maxMs) + 1;
+  const isOvernight = elapsedMs >= maxMs;
+
+  const rh = Math.floor(remainingInCycle / 3600000);
+  const rm = Math.floor((remainingInCycle % 3600000) / 60000);
+  const rs = Math.floor((remainingInCycle % 60000) / 1000);
+  const countdownDisplay = `${rh}:${rm.toString().padStart(2, '0')}:${rs.toString().padStart(2, '0')}`;
+  const isUrgent = remainingInCycle < 3600000 && !isOvernight;
+
+  const totalSecs = Math.floor(elapsedMs / 1000);
+  const tDays = Math.floor(totalSecs / 86400);
+  const tHours = Math.floor((totalSecs % 86400) / 3600);
+  const tMins = Math.floor((totalSecs % 3600) / 60);
+  const totalDisplay = tDays > 0
+    ? `${tDays}d ${tHours}h ${tMins}m`
+    : tHours > 0
+    ? `${tHours}h ${tMins}m`
+    : `${tMins}m`;
+
+  return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
+}
+
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, canEdit = true }: { ticket: ValetTicket; onRetrieve: () => void; onEdit: () => void; onView: () => void; canEdit?: boolean }) {
+  const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
 
   return (
-    <div className="bg-gray-50 rounded-lg p-2 space-y-1">
+    <div className={`rounded-lg p-2 space-y-1 ${isOvernight ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-bold text-sm text-regis-navy">#{ticket.ticketNumber}</span>
-            <span className={`text-xs font-mono ${isUrgent ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-              {timeDisplay}
+            {isOvernight && (
+              <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1 leading-tight">
+                Day {dayNumber}
+              </span>
+            )}
+            <span className={`text-xs font-mono ${isUrgent ? 'text-red-600 font-bold' : isOvernight ? 'text-amber-600' : 'text-gray-500'}`}>
+              {countdownDisplay}
             </span>
           </div>
+          <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
           <p className="text-xs text-gray-700 truncate">{ticket.guestName}</p>
           {ticket.roomNumber && (
             <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
