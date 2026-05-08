@@ -1260,15 +1260,9 @@ export default function StaffDashboard() {
                 return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
               };
               const ColorDisplay = ({ color }: { color: string }) => {
-                const c = (color || '').toLowerCase();
-                const isBlack  = c === 'black'  || c === '黒';
-                const isWhite  = c === 'white'  || c === '白';
-                const isSilver = c === 'silver' || c === '銀' || c === 'grey' || c === 'gray';
                 return (
                   <span className="text-xs whitespace-nowrap">
-                    <span className={isBlack  ? 'font-bold underline' : 'text-gray-400'}>黒</span>
-                    <span className={isWhite  ? 'font-bold underline' : 'text-gray-400'}>白</span>
-                    <span className={isSilver ? 'font-bold underline' : 'text-gray-400'}>銀</span>
+                    <span className="text-gray-400">色</span>
                     {color
                       ? <span className="font-bold text-regis-navy ml-1">（{color}）</span>
                       : <span className="text-gray-300">（　）</span>
