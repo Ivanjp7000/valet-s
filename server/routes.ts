@@ -576,7 +576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Auto-determine roster category from visitorType
-      const autoRosterCategory = (visitorType === 'restaurant' || visitorType === 'others') ? 'events' : 'arriving';
+      const autoRosterCategory = (visitorType === 'restaurant' || visitorType === 'event' || visitorType === 'others') ? 'events' : 'arriving';
 
       const ticket = await storage.createValetTicket({
         ticketNumber,
@@ -632,7 +632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Auto-update rosterCategory when ticket is completed (departed, no coming back)
       if (status === 'completed') {
-        const depCategory = (existing.visitorType === 'restaurant' || existing.visitorType === 'others') ? 'events' : 'departing';
+        const depCategory = (existing.visitorType === 'restaurant' || existing.visitorType === 'event' || existing.visitorType === 'others') ? 'events' : 'departing';
         ticket = await storage.updateValetTicket(ticketNumber, { rosterCategory: depCategory, inRoster: true }) ?? ticket;
       }
 

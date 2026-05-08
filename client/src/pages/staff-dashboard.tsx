@@ -1221,14 +1221,26 @@ export default function StaffDashboard() {
               const nextDay = () => { const d = new Date(rosterDate); d.setDate(d.getDate()+1); setRosterDate(d); };
 
               // Date-based filtering per tab
-              const arrivingTickets = allTickets
-                .filter(t => t.visitorType === 'hotel_guest' && new Date(t.createdAt!).toDateString() === selDateStr)
-                .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+              // Arriving: hotel guests who arrived on selected date.
+              // For TODAY also include any active hotel guests still in-house from a previous day.
+              const arrivingTickets = (() => {
+                const byId = new Map<string, ValetTicket>();
+                allTickets
+                  .filter(t => t.visitorType === 'hotel_guest' && new Date(t.createdAt!).toDateString() === selDateStr)
+                  .forEach(t => byId.set(t.id, t));
+                if (isToday) {
+                  allTickets
+                    .filter(t => t.visitorType === 'hotel_guest' && t.status === 'active')
+                    .forEach(t => byId.set(t.id, t));
+                }
+                return Array.from(byId.values())
+                  .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+              })();
               const departingTickets = allTickets
                 .filter(t => t.visitorType === 'hotel_guest' && t.status === 'completed' && t.departedAt && new Date(t.departedAt).toDateString() === selDateStr)
                 .sort((a, b) => new Date(a.departedAt!).getTime() - new Date(b.departedAt!).getTime());
               const eventsTickets = allTickets
-                .filter(t => (t.visitorType === 'restaurant' || t.visitorType === 'others') && new Date(t.createdAt!).toDateString() === selDateStr)
+                .filter(t => ['restaurant', 'event', 'others'].includes(t.visitorType || '') && new Date(t.createdAt!).toDateString() === selDateStr)
                 .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
 
               const tabDefs: { key: 'arriving' | 'departing' | 'events'; label: string; sublabel: string; tickets: typeof arrivingTickets }[] = [
