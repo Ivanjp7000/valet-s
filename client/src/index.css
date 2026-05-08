@@ -157,4 +157,20 @@
   animation: bounce 2s infinite;
 }
 
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body > * { visibility: hidden !important; }
+  #roster-printable,
+  #roster-printable * { visibility: visible !important; }
+  #roster-printable {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .print\:break-before-page { break-before: page; }
+  button { display: none !important; }
+  #roster-printable button { display: none !important; }
+}
+
 

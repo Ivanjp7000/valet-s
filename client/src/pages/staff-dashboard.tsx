@@ -1298,11 +1298,14 @@ export default function StaffDashboard() {
                 });
               };
 
-              const RosterTable = ({ tickets }: { tickets: ValetTicket[] }) => (
-                <div style={{minWidth: 960}}>
+              const RosterTable = ({ tickets, pageNum = 1, totalPages = 1 }: { tickets: ValetTicket[]; pageNum?: number; totalPages?: number }) => (
+                <div>
                   {/* Title bar */}
                   <div className="border border-black flex items-center justify-between px-4 py-2 bg-white">
-                    <h2 className="text-lg font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-semibold text-gray-500 border-r border-black pr-4">Page {pageNum}{totalPages > 1 ? ` / ${totalPages}` : ''}</span>
+                      <h2 className="text-lg font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
+                    </div>
                     <div className="flex items-center gap-6 text-sm font-semibold">
                       <span className="border-l border-black pl-4">{tabDefs.find(t => t.key === rosterTab)?.sublabel}</span>
                       <span>DATE: {todayStr}</span>
@@ -1447,29 +1450,50 @@ export default function StaffDashboard() {
                     </button>
                   </div>
 
-                  {/* ── SUB-TABS ── */}
-                  <div className="flex gap-0 mb-0 border-b border-black overflow-x-auto">
-                    {tabDefs.map(tab => {
-                      const isActive = rosterTab === tab.key;
-                      return (
-                        <button
-                          key={tab.key}
-                          onClick={() => setRosterTab(tab.key)}
-                          className={`flex-1 min-w-[140px] px-3 py-2 text-xs font-semibold border-t border-l border-r border-black -mb-px transition-colors ${
-                            isActive ? 'bg-regis-navy text-white' : 'bg-white text-regis-navy hover:bg-regis-navy/5'
-                          }`}
-                          style={{ borderBottom: isActive ? '2px solid #1a2744' : '1px solid black' }}
-                        >
-                          <div className="leading-tight">{tab.label}</div>
-                          <div className={`text-[10px] mt-0.5 ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>{tab.tickets.length} 台</div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {/* ── SHARED SCROLL CONTAINER: tabs + table share same minWidth ── */}
+                  <div className="overflow-x-auto print:overflow-visible">
+                    <div style={{minWidth: 960}}>
 
-                  {/* ── DESKTOP TABLE ── */}
-                  <div className="hidden sm:block overflow-x-auto print:block">
-                    <RosterTable tickets={rosterTickets} />
+                      {/* SUB-TABS */}
+                      <div className="flex print:hidden">
+                        {tabDefs.map(tab => {
+                          const isActive = rosterTab === tab.key;
+                          return (
+                            <button
+                              key={tab.key}
+                              onClick={() => setRosterTab(tab.key)}
+                              style={{ borderBottom: isActive ? '2px solid #1a2744' : '1px solid black', flex: 1 }}
+                              className={`px-3 py-2 text-xs font-semibold border-t border-l border-r border-black -mb-px transition-colors ${
+                                isActive ? 'bg-regis-navy text-white' : 'bg-white text-regis-navy hover:bg-regis-navy/5'
+                              }`}
+                            >
+                              <div className="leading-tight">{tab.label}</div>
+                              <div className={`text-[10px] mt-0.5 ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>{tab.tickets.length} 台</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* DESKTOP TABLE — split into pages of 10 */}
+                      {(() => {
+                        const PAGE_SIZE = 10;
+                        const chunks: ValetTicket[][] = [];
+                        for (let i = 0; i < Math.max(rosterTickets.length, 1); i += PAGE_SIZE) {
+                          chunks.push(rosterTickets.slice(i, i + PAGE_SIZE));
+                        }
+                        const totalPages = chunks.length;
+                        return (
+                          <div id="roster-printable" className="hidden sm:block print:block">
+                            {chunks.map((chunk, pageIdx) => (
+                              <div key={pageIdx} className={pageIdx > 0 ? 'mt-10 print:mt-0 print:break-before-page' : ''}>
+                                <RosterTable tickets={chunk} pageNum={pageIdx + 1} totalPages={totalPages} />
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
+                    </div>
                   </div>
 
                   {/* ── MOBILE CARDS ── */}
