@@ -26,6 +26,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, SafeUser as UserType } from "@shared/schema";
+import { RESTAURANT_SUB_TYPES } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
 // Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
@@ -1030,14 +1031,31 @@ export default function StaffDashboard() {
       const data = await res.json();
       const departed: any[] = (data.tickets || []).filter((t: any) => t.status === 'completed');
 
-      // pdf-lib StandardFonts only support WinAnsi (Latin-1). Strip non-encodable characters.
-      const sanitize = (s: string) => (s || '-')
-        .replace(/\u2014/g, '-').replace(/\u2013/g, '-').replace(/\u2012/g, '-')
-        .replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
-
       const doc = await PDFDocument.create();
+
+      // Try to fetch Noto Sans CJK JP for proper Japanese character support
+      let jpFont: PDFFont | null = null;
+      try {
+        const fontResp = await fetch(
+          'https://cdn.jsdelivr.net/npm/noto-sans-japanese@1.0.0/fonts/NotoSansJP-Regular.otf'
+        );
+        if (fontResp.ok) {
+          jpFont = await doc.embedFont(await fontResp.arrayBuffer());
+        }
+      } catch (e) {
+        console.warn('[PDF] Japanese font unavailable, falling back to Helvetica');
+      }
+
+      // Use JP font for all text when available (it includes Latin too); else strip non-Latin
+      const sanitize = (s: string) => {
+        const clean = (s || '-').replace(/\u2014/g, '-').replace(/\u2013/g, '-').replace(/\u2012/g, '-');
+        return jpFont ? clean : clean.replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+      };
+
       const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
       const font = await doc.embedFont(StandardFonts.Helvetica);
+      // Primary text font: JP-capable when available, else Helvetica
+      const textFont: PDFFont = jpFont ?? font;
       const W = 595, H = 842, M = 40;
       let page = doc.addPage([W, H]);
       let y = H - M;
@@ -1083,16 +1101,23 @@ export default function StaffDashboard() {
         const checkedIn = t.createdAt ? new Date(t.createdAt).toLocaleString('en-GB', { hour12: false }) : '-';
         const departedStr = t.departedAt ? new Date(t.departedAt).toLocaleString('en-GB', { hour12: false }) : '-';
         const stay = t.totalStaySeconds ? `${Math.floor(t.totalStaySeconds/3600)}h ${Math.floor((t.totalStaySeconds%3600)/60)}m` : '-';
-        const visitor = t.visitorType === 'hotel_guest' ? 'Hotel' : t.visitorType === 'restaurant' ? 'Restaurant' : 'Other';
+        const subTypeLabel = t.visitorSubType
+          ? RESTAURANT_SUB_TYPES[t.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]
+          : null;
+        const visitor = t.visitorType === 'hotel_guest'
+          ? 'Hotel Staying Guest'
+          : t.visitorType === 'restaurant'
+            ? subTypeLabel ? `Restaurant - ${subTypeLabel}` : 'Restaurant'
+            : t.visitorType === 'event' ? 'Event' : 'Others';
         const guestName = sanitize(t.guestName || '-');
 
         page.drawText(`#${t.ticketNumber}`, { x: M, y, font: fontBold, size: 11, color: rgb(0.15,0.15,0.15) });
-        page.drawText(guestName, { x: M + 54, y, font, size: 11, color: rgb(0.15,0.15,0.15) });
-        page.drawText(visitor, { x: W - M - 60, y, font, size: 9, color: rgb(0.5,0.5,0.5) });
+        page.drawText(guestName, { x: M + 54, y, font: textFont, size: 11, color: rgb(0.15,0.15,0.15) });
+        page.drawText(visitor, { x: W - M - 120, y, font: textFont, size: 9, color: rgb(0.5,0.5,0.5) });
         y -= 14;
-        page.drawText(car, { x: M + 10, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
-        page.drawText(`Plate: ${plate}`, { x: M + 220, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
-        page.drawText(`Stay: ${stay}`, { x: W - M - 80, y, font, size: 9, color: rgb(0.3,0.3,0.3) });
+        page.drawText(car, { x: M + 10, y, font: textFont, size: 9, color: rgb(0.3,0.3,0.3) });
+        page.drawText(`Plate: ${plate}`, { x: M + 220, y, font: textFont, size: 9, color: rgb(0.3,0.3,0.3) });
+        page.drawText(`Stay: ${stay}`, { x: W - M - 80, y, font: textFont, size: 9, color: rgb(0.3,0.3,0.3) });
         y -= 12;
         page.drawText(`In: ${checkedIn}`, { x: M + 10, y, font, size: 8, color: rgb(0.5,0.5,0.5) });
         page.drawText(`Out: ${departedStr}`, { x: M + 200, y, font, size: 8, color: rgb(0.5,0.5,0.5) });
