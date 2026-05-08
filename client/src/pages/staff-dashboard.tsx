@@ -1329,8 +1329,8 @@ export default function StaffDashboard() {
                 .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
 
               const tabDefs: { key: 'arriving' | 'departing' | 'events'; label: string; sublabel: string; tickets: typeof arrivingTickets }[] = [
-                { key: 'arriving',  label: 'Visitors Arriving Today',  sublabel: 'ARRIVAL',   tickets: arrivingTickets },
-                { key: 'departing', label: 'Visitors Departing Today', sublabel: 'DEPARTURE', tickets: departingTickets },
+                { key: 'arriving',  label: 'Cars Arriving Today & Staying Cars',  sublabel: 'ARRIVAL',   tickets: arrivingTickets },
+                { key: 'departing', label: 'Departed Cars Today', sublabel: 'DEPARTURE', tickets: departingTickets },
                 { key: 'events',    label: 'Restaurants & Events',     sublabel: 'R&E',       tickets: eventsTickets },
               ];
               const rosterTickets = tabDefs.find(t => t.key === rosterTab)?.tickets ?? [];
