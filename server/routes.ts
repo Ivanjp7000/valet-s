@@ -758,15 +758,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
+      const completedToday = allTickets.filter(t =>
+        t.status === 'completed' &&
+        t.updatedAt && new Date(t.updatedAt) >= today
+      );
+
+      // Calculate real average retrieval duration (retrieving → ready) from today's completed tickets
+      const withSLA = completedToday.filter(t => t.retrievalDurationSeconds && t.retrievalDurationSeconds > 0);
+      let avgTime = '—';
+      if (withSLA.length > 0) {
+        const avgSec = withSLA.reduce((sum, t) => sum + (t.retrievalDurationSeconds ?? 0), 0) / withSLA.length;
+        const mins = Math.floor(avgSec / 60);
+        const secs = Math.round(avgSec % 60);
+        avgTime = secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+      }
+
       const stats = {
         pending: allTickets.filter(t => t.status === 'active' || t.status === 'retrieving').length,
         transit: allTickets.filter(t => t.status === 'transit').length,
         ready: allTickets.filter(t => t.status === 'ready').length,
-        completed: allTickets.filter(t => 
-          t.status === 'completed' && 
-          t.updatedAt && new Date(t.updatedAt) >= today
-        ).length,
-        avgTime: '4.2m'
+        completed: completedToday.length,
+        avgTime,
       };
 
       res.json(stats);
