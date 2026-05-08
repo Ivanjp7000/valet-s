@@ -1640,7 +1640,7 @@ export default function StaffDashboard() {
                         onClick={() => scrollToPanel('in-house')}
                       >
                         <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
-                        <p className="text-xs text-blue-500 font-medium leading-tight">In House</p>
+                        <p className="text-xs text-blue-500 font-medium leading-tight">Current Cars In House</p>
                       </button>
                       <button
                         className="bg-blue-50 active:bg-blue-100 rounded-lg p-2 text-center w-full focus:outline-none"
