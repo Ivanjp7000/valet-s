@@ -332,7 +332,18 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <p className="font-bold text-regis-navy">#{ticket.ticketNumber}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-regis-navy">#{ticket.ticketNumber}</p>
+                      {canEdit && onStatusChange && (ticket.status === "retrieving" || ticket.status === "transit" || ticket.status === "preparing") && (
+                        <Button
+                          size="sm"
+                          className="h-6 px-2 text-[11px] bg-green-600 hover:bg-green-700 text-white font-bold rounded"
+                          onClick={() => onStatusChange(ticket.ticketNumber, "ready")}
+                        >
+                          ✓ Ready Now
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500">
                       {ticket.carMake} {ticket.carModel} • {ticket.carColor}
                     </p>
@@ -362,16 +373,6 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
                         onClick={() => onStatusChange(ticket.ticketNumber, "preparing")}
                       >
                         ✦ Final Prep
-                      </Button>
-                    )}
-                    {(ticket.status === "retrieving" || ticket.status === "transit" || ticket.status === "preparing") && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs border-green-500 text-green-700 hover:bg-green-50 font-semibold"
-                        onClick={() => onStatusChange(ticket.ticketNumber, "ready")}
-                      >
-                        ✓ Ready Now
                       </Button>
                     )}
                     {ticket.status === "ready" && (
