@@ -1327,13 +1327,14 @@ export default function StaffDashboard() {
                               <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">#{ticket.ticketNumber}</td>
                               <td className="border border-black px-2 py-1 align-middle">
                                 <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
-                                <ColorDisplay color={ticket.carColor || ''} />
                               </td>
                               <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
-                                <div className="text-[10px] font-semibold text-regis-navy leading-tight">Hotel Guest</div>
-                                {ticket.roomNumber && <div className="text-[10px] text-gray-600">{ticket.roomNumber}</div>}
+                                {ticket.roomNumber && <div className="font-semibold">{ticket.roomNumber}</div>}
                               </td>
-                              <td className="border border-black px-1 py-1 text-[11px] align-middle">{ticket.carMake} {ticket.carModel}</td>
+                              <td className="border border-black px-1 py-1 text-[11px] align-middle">
+                                <div>{ticket.carMake} {ticket.carModel}</div>
+                                <ColorDisplay color={ticket.carColor || ''} />
+                              </td>
                               <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">{ticket.licensePlate || ''}</td>
                               <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">{fmtTime(ticket.createdAt)}</td>
                               <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">{ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}</td>
