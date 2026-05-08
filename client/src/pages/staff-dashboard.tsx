@@ -337,7 +337,12 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             </span>
           </div>
           <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
-          <p className="text-xs text-gray-700 truncate">{ticket.guestName}</p>
+          <p className="text-xs text-gray-700 truncate">
+            {ticket.guestName}
+            {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+              <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 align-middle">Room Pending</span>
+            )}
+          </p>
           {ticket.roomNumber && (
             <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
           )}
@@ -1459,6 +1464,9 @@ export default function StaffDashboard() {
                               <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle text-sm">#{ticket.ticketNumber}</td>
                               <td className="border border-black px-2 py-1 align-middle">
                                 <span className="font-semibold">{ticket.guestName}</span><span className="text-xs ml-0.5">様</span>
+                                {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                                  <span className="ml-1 text-[8px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
+                                )}
                               </td>
                               <td className="border border-black text-center px-1 py-1 align-middle">
                                 {ticket.roomNumber && <div className="font-bold text-sm">{ticket.roomNumber}</div>}
@@ -1623,10 +1631,13 @@ export default function StaffDashboard() {
                             {ticket.status === 'completed' && ticket.departedAt && <div>C/OUT <span className="font-mono">{fmtRosterDate(ticket.departedAt)}</span><br/><span className="font-mono">{fmtTime(ticket.departedAt)}</span></div>}
                           </div>
                         </div>
-                        <div className="flex items-baseline gap-1 mb-0.5">
+                        <div className="flex items-baseline gap-1 mb-0.5 flex-wrap">
                           <span className="text-sm font-medium text-gray-800">{ticket.guestName}</span>
                           <span className="text-[10px] text-gray-500">様</span>
                           {ticket.roomNumber && <span className="text-[10px] text-gray-400 ml-1">Rm {ticket.roomNumber}</span>}
+                          {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                            <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
+                          )}
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -1987,7 +1998,9 @@ export default function StaffDashboard() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                      <p><strong>Guest:</strong> {ticket.guestName}</p>
+                      <p><strong>Guest:</strong> {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                        <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
+                      )}</p>
                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
                       {stayHours !== null && <p className="text-blue-600 font-medium mt-1">⏱️ Total Stay: {stayHours}h {stayMins}m</p>}
                       {ticket.updatedAt && <p className="text-gray-400 mt-0.5">Departed: {new Date(ticket.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
@@ -2040,7 +2053,9 @@ export default function StaffDashboard() {
                                       </div>
                                     </div>
                                     <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                                      <p><strong>Guest:</strong> {ticket.guestName}</p>
+                                      <p><strong>Guest:</strong> {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                                        <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
+                                      )}</p>
                                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
                                       <p><strong>Color:</strong> {ticket.carColor}</p>
                                     </div>
