@@ -1174,6 +1174,17 @@ export default function StaffDashboard() {
 
             {/* Header with New Ticket Button + Vehicle Roster Toggle */}
             <div className="flex items-center gap-2 flex-wrap">
+              {showVehicleRoster && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-regis-navy text-regis-navy hover:bg-regis-navy/10"
+                  onClick={() => setShowVehicleRoster(false)}
+                >
+                  <Home size={16} className="mr-1 sm:mr-2" />
+                  Home
+                </Button>
+              )}
               {canEdit && (
                 <Button 
                   onClick={() => setShowTicketWizard(true)}
@@ -1267,67 +1278,109 @@ export default function StaffDashboard() {
                           </tr>
                         </thead>
                         <tbody>
-                          {rosterTickets.map((ticket, index) => (
-                            <tr key={ticket.id} className={
-                              ticket.status === 'cancelled' ? 'bg-red-50' :
-                              ticket.status === 'completed' ? 'bg-gray-50' : 'bg-white'
-                            }>
-                              {/* チェック */}
-                              <td className="border border-black text-center px-1 py-1 align-middle">
-                                <div className="font-bold text-[11px]">{index + 1}</div>
-                                <div className={`text-base font-bold leading-none ${
-                                  ticket.status === 'cancelled' ? 'text-red-600' :
-                                  ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
-                                }`}>
-                                  {ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}
-                                </div>
-                              </td>
-                              {/* チケット */}
-                              <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">
-                                #{ticket.ticketNumber}
-                              </td>
-                              {/* ゲストフルネーム + color */}
-                              <td className="border border-black px-2 py-1 align-middle">
-                                <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
-                                <ColorDisplay color={ticket.carColor || ''} />
-                              </td>
-                              {/* 部屋番号 */}
-                              <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
-                                {ticket.roomNumber || '—'}
-                              </td>
-                              {/* 車輌 */}
-                              <td className="border border-black px-1 py-1 text-[11px] align-middle">
-                                {ticket.carMake} {ticket.carModel}
-                              </td>
-                              {/* ナンバー */}
-                              <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">
-                                {ticket.licensePlate || '—'}
-                              </td>
-                              {/* C/IN */}
-                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
-                                {fmtTime(ticket.createdAt)}
-                              </td>
-                              {/* C/OUT */}
-                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
-                                {ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}
-                              </td>
-                              {/* 駐車場所 */}
-                              <td className="border border-black text-center px-1 py-1 font-bold text-[11px] align-middle">
-                                {ticket.parkingLocation || '—'}
-                              </td>
-                              {/* 備考 */}
-                              <td className="border border-black text-center px-1 py-1 align-middle">
-                                <RosterNotes ticket={ticket} />
-                              </td>
-                            </tr>
-                          ))}
-                          {rosterTickets.length === 0 && (
-                            <tr>
-                              <td colSpan={10} className="border border-black text-center py-6 text-gray-400 text-xs">
-                                本日のチケットはまだありません
-                              </td>
-                            </tr>
-                          )}
+                          {Array.from({ length: Math.max(10, rosterTickets.length) }, (_, index) => {
+                            const ticket = rosterTickets[index] ?? null;
+                            if (ticket) {
+                              return (
+                                <tr key={ticket.id} className={
+                                  ticket.status === 'cancelled' ? 'bg-red-50' :
+                                  ticket.status === 'completed' ? 'bg-gray-50' : 'bg-white'
+                                } style={{height: 52}}>
+                                  {/* チェック */}
+                                  <td className="border border-black text-center px-1 py-1 align-middle">
+                                    <div className="font-bold text-[11px]">{index + 1}</div>
+                                    <div className={`text-base font-bold leading-none ${
+                                      ticket.status === 'cancelled' ? 'text-red-600' :
+                                      ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
+                                    }`}>
+                                      {ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}
+                                    </div>
+                                  </td>
+                                  {/* チケット */}
+                                  <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">
+                                    #{ticket.ticketNumber}
+                                  </td>
+                                  {/* ゲストフルネーム + color */}
+                                  <td className="border border-black px-2 py-1 align-middle">
+                                    <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
+                                    <ColorDisplay color={ticket.carColor || ''} />
+                                  </td>
+                                  {/* 部屋番号 */}
+                                  <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
+                                    {ticket.roomNumber || ''}
+                                  </td>
+                                  {/* 車輌 */}
+                                  <td className="border border-black px-1 py-1 text-[11px] align-middle">
+                                    {ticket.carMake} {ticket.carModel}
+                                  </td>
+                                  {/* ナンバー */}
+                                  <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">
+                                    {ticket.licensePlate || ''}
+                                  </td>
+                                  {/* C/IN */}
+                                  <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
+                                    {fmtTime(ticket.createdAt)}
+                                  </td>
+                                  {/* C/OUT */}
+                                  <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
+                                    {ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}
+                                  </td>
+                                  {/* 駐車場所 */}
+                                  <td className="border border-black text-center px-1 py-1 font-bold text-[11px] align-middle">
+                                    {ticket.parkingLocation || ''}
+                                  </td>
+                                  {/* 備考 */}
+                                  <td className="border border-black text-center px-1 py-1 align-middle">
+                                    <RosterNotes ticket={ticket} />
+                                  </td>
+                                </tr>
+                              );
+                            }
+                            /* Empty row — matches PDF blank entry style */
+                            return (
+                              <tr key={`empty-${index}`} className="bg-white" style={{height: 52}}>
+                                {/* チェック — row number + blank ✓ × */}
+                                <td className="border border-black text-center px-1 align-top pt-1">
+                                  <div className="font-bold text-[11px]">{index + 1}</div>
+                                  <div className="text-[10px] text-gray-300 leading-tight">✓</div>
+                                  <div className="text-[10px] text-gray-300 leading-tight">×</div>
+                                </td>
+                                {/* チケット — # placeholder */}
+                                <td className="border border-black px-1 py-1 align-top">
+                                  <div className="text-[10px] text-gray-300">#</div>
+                                </td>
+                                {/* ゲストフルネーム — 様 placeholder + 黒白銀 */}
+                                <td className="border border-black px-2 align-bottom pb-1">
+                                  <div className="text-[10px] text-gray-300">様</div>
+                                  <div className="text-[10px] text-gray-300 whitespace-nowrap">黒白銀（　）</div>
+                                </td>
+                                {/* 部屋番号 */}
+                                <td className="border border-black"></td>
+                                {/* 車輌 */}
+                                <td className="border border-black"></td>
+                                {/* ナンバー — dash placeholder */}
+                                <td className="border border-black text-center align-middle">
+                                  <span className="text-[10px] text-gray-300">—</span>
+                                </td>
+                                {/* C/IN — colon placeholder */}
+                                <td className="border border-black text-center align-middle">
+                                  <span className="text-[10px] text-gray-300 font-mono">：</span>
+                                </td>
+                                {/* C/OUT — colon placeholder */}
+                                <td className="border border-black text-center align-middle">
+                                  <span className="text-[10px] text-gray-300 font-mono">：</span>
+                                </td>
+                                {/* 駐車場所 */}
+                                <td className="border border-black"></td>
+                                {/* 備考 — 転記 VOID NC Comp placeholders */}
+                                <td className="border border-black px-1 align-top pt-1">
+                                  <div className="text-[9px] text-gray-200 leading-tight">転記</div>
+                                  <div className="text-[9px] text-gray-200 leading-tight">VOID　NC</div>
+                                  <div className="text-[9px] text-gray-200 leading-tight">Comp</div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                       {/* Footer totals */}
