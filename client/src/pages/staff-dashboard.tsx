@@ -506,6 +506,7 @@ export default function StaffDashboard() {
   const [showVehicleRoster, setShowVehicleRoster] = useState(false);
   const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
   const [rosterDate, setRosterDate] = useState<Date>(new Date());
+  const [copiedRowId, setCopiedRowId] = useState<string | null>(null);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -1277,94 +1278,130 @@ export default function StaffDashboard() {
                 </div>
               );
 
+              const buildRowText = (ticket: ValetTicket, index: number) => [
+                `${index + 1}.`,
+                `#${ticket.ticketNumber}`,
+                `${ticket.guestName}様`,
+                ticket.roomNumber ? `Rm${ticket.roomNumber}` : '',
+                `${ticket.carMake} ${ticket.carModel}`,
+                ticket.carColor ? `(${ticket.carColor})` : '',
+                ticket.licensePlate || '',
+                `C/IN ${fmtTime(ticket.createdAt)}`,
+                ticket.status === 'completed' ? `C/OUT ${fmtTime(ticket.departedAt)}` : '',
+                ticket.parkingLocation || '',
+              ].filter(Boolean).join('  ');
+
+              const handleCopyRow = (ticket: ValetTicket, index: number) => {
+                navigator.clipboard.writeText(buildRowText(ticket, index)).then(() => {
+                  setCopiedRowId(ticket.id);
+                  setTimeout(() => setCopiedRowId(prev => prev === ticket.id ? null : prev), 2000);
+                });
+              };
+
               const RosterTable = ({ tickets }: { tickets: ValetTicket[] }) => (
-                <div style={{minWidth: 920}}>
+                <div style={{minWidth: 960}}>
                   {/* Title bar */}
-                  <div className="border border-black flex items-center justify-between px-4 py-1 bg-white">
-                    <h2 className="text-base font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
+                  <div className="border border-black flex items-center justify-between px-4 py-2 bg-white">
+                    <h2 className="text-lg font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
                     <div className="flex items-center gap-6 text-sm font-semibold">
                       <span className="border-l border-black pl-4">{tabDefs.find(t => t.key === rosterTab)?.sublabel}</span>
                       <span>DATE: {todayStr}</span>
                     </div>
                   </div>
                   {/* Table */}
-                  <table className="w-full border-collapse border border-black" style={{fontSize: 11, fontFamily: 'sans-serif'}}>
+                  <table className="w-full border-collapse border border-black" style={{fontSize: 13, fontFamily: 'sans-serif'}}>
                     <thead>
                       <tr className="bg-gray-100">
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-10" style={{writingMode: 'vertical-rl', letterSpacing: '0.15em', fontSize: 10}}>チェック</th>
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">チケット</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-12" style={{writingMode: 'vertical-rl', letterSpacing: '0.15em', fontSize: 11}}>コピー</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-8 text-[11px]">No.</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">チケット</th>
                         <th rowSpan={2} className="border border-black px-2 py-1 text-center align-middle">ゲストフルネーム</th>
-                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">ＶＩＰ</th>
-                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">社名</th>
-                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">（地域）</th>
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/IN</th>
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/OUT</th>
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">駐車場所</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[11px]">ＶＩＰ</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[11px]">社名</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[11px]">（地域）</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">C/IN</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">C/OUT</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">駐車場所</th>
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">備考</th>
                       </tr>
                       <tr className="bg-gray-100">
-                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">部屋番号</th>
-                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">車輌／位</th>
-                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">ナンバー</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[11px]">部屋番号</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[11px]">車輌／位</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[11px]">ナンバー</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Array.from({ length: Math.max(10, tickets.length) }, (_, index) => {
                         const ticket = tickets[index] ?? null;
                         if (ticket) {
+                          const isCopied = copiedRowId === ticket.id;
                           return (
                             <tr key={ticket.id} className={
                               ticket.status === 'cancelled' ? 'bg-red-50' :
                               ticket.status === 'completed' ? 'bg-gray-50' : 'bg-white'
-                            } style={{height: 52}}>
+                            } style={{height: 58}}>
+                              {/* Copy checkbox */}
                               <td className="border border-black text-center px-1 py-1 align-middle">
-                                <div className="font-bold text-[11px]">{index + 1}</div>
+                                <button
+                                  onClick={() => handleCopyRow(ticket, index)}
+                                  title="Click to copy row"
+                                  className={`w-6 h-6 rounded border-2 flex items-center justify-center mx-auto transition-all ${
+                                    isCopied
+                                      ? 'bg-green-500 border-green-500 text-white'
+                                      : 'border-gray-400 hover:border-regis-navy hover:bg-regis-navy/5'
+                                  }`}
+                                >
+                                  {isCopied && <Check size={14} />}
+                                </button>
+                              </td>
+                              {/* Row number + status */}
+                              <td className="border border-black text-center px-1 py-1 align-middle">
+                                <div className="font-bold text-xs">{index + 1}</div>
                                 <div className={`text-base font-bold leading-none ${
                                   ticket.status === 'cancelled' ? 'text-red-600' :
                                   ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
                                 }`}>{ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}</div>
                               </td>
-                              <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">#{ticket.ticketNumber}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle text-sm">#{ticket.ticketNumber}</td>
                               <td className="border border-black px-2 py-1 align-middle">
-                                <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
+                                <span className="font-semibold">{ticket.guestName}</span><span className="text-xs ml-0.5">様</span>
                               </td>
-                              <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
-                                {ticket.roomNumber && <div className="font-semibold">{ticket.roomNumber}</div>}
+                              <td className="border border-black text-center px-1 py-1 align-middle">
+                                {ticket.roomNumber && <div className="font-bold text-sm">{ticket.roomNumber}</div>}
                               </td>
-                              <td className="border border-black px-1 py-1 text-[11px] align-middle">
-                                <div>{ticket.carMake} {ticket.carModel}</div>
+                              <td className="border border-black px-1 py-1 align-middle">
+                                <div className="font-medium">{ticket.carMake} {ticket.carModel}</div>
                                 <ColorDisplay color={ticket.carColor || ''} />
                               </td>
-                              <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">{ticket.licensePlate || ''}</td>
-                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">{fmtTime(ticket.createdAt)}</td>
-                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">{ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}</td>
-                              <td className="border border-black text-center px-1 py-1 font-bold text-[11px] align-middle">{ticket.parkingLocation || ''}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono align-middle">{ticket.licensePlate || ''}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle">{fmtTime(ticket.createdAt)}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle">{ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}</td>
+                              <td className="border border-black text-center px-1 py-1 font-bold align-middle">{ticket.parkingLocation || ''}</td>
                               <td className="border border-black text-center px-1 py-1 align-middle"><RosterNotes ticket={ticket} /></td>
                             </tr>
                           );
                         }
                         return (
-                          <tr key={`empty-${index}`} className="bg-white" style={{height: 52}}>
-                            <td className="border border-black text-center px-1 align-top pt-1">
-                              <div className="font-bold text-[11px]">{index + 1}</div>
-                              <div className="text-[10px] text-gray-300 leading-tight">✓</div>
-                              <div className="text-[10px] text-gray-300 leading-tight">×</div>
+                          <tr key={`empty-${index}`} className="bg-white" style={{height: 58}}>
+                            <td className="border border-black text-center px-1 align-middle">
+                              <div className="w-6 h-6 rounded border-2 border-gray-200 mx-auto" />
                             </td>
-                            <td className="border border-black px-1 py-1 align-top"><div className="text-[10px] text-gray-300">#</div></td>
+                            <td className="border border-black text-center px-1 align-middle">
+                              <div className="font-bold text-xs text-gray-300">{index + 1}</div>
+                            </td>
+                            <td className="border border-black px-1 py-1 align-top"><div className="text-xs text-gray-300">#</div></td>
                             <td className="border border-black px-2 align-bottom pb-1">
-                              <div className="text-[10px] text-gray-300">様</div>
-                              <div className="text-[10px] text-gray-300 whitespace-nowrap">黒白銀（　）</div>
+                              <div className="text-xs text-gray-300">様</div>
                             </td>
                             <td className="border border-black"></td>
-                            <td className="border border-black"></td>
-                            <td className="border border-black text-center align-middle"><span className="text-[10px] text-gray-300">—</span></td>
-                            <td className="border border-black text-center align-middle"><span className="text-[10px] text-gray-300 font-mono">：</span></td>
-                            <td className="border border-black text-center align-middle"><span className="text-[10px] text-gray-300 font-mono">：</span></td>
+                            <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 whitespace-nowrap">黒白銀（　）</span></td>
+                            <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300">—</span></td>
+                            <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 font-mono">：</span></td>
+                            <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 font-mono">：</span></td>
                             <td className="border border-black"></td>
                             <td className="border border-black px-1 align-top pt-1">
-                              <div className="text-[9px] text-gray-200 leading-tight">転記</div>
-                              <div className="text-[9px] text-gray-200 leading-tight">VOID　NC</div>
-                              <div className="text-[9px] text-gray-200 leading-tight">Comp</div>
+                              <div className="text-[10px] text-gray-200 leading-tight">転記</div>
+                              <div className="text-[10px] text-gray-200 leading-tight">VOID</div>
                             </td>
                           </tr>
                         );
@@ -1372,7 +1409,7 @@ export default function StaffDashboard() {
                     </tbody>
                   </table>
                   {/* Footer totals */}
-                  <div className="border border-t-0 border-black px-3 py-1 bg-gray-50 flex justify-between text-[11px] text-gray-500">
+                  <div className="border border-t-0 border-black px-3 py-1 bg-gray-50 flex justify-between text-xs text-gray-500">
                     <span>合計 Total: {tickets.length} 台</span>
                     <span>In House: {tickets.filter(t => !['completed','cancelled'].includes(t.status)).length} · Departed: {tickets.filter(t => t.status === 'completed').length}</span>
                   </div>
