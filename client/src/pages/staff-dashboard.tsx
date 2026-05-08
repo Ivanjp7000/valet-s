@@ -621,6 +621,9 @@ export default function StaffDashboard() {
 
   const { data: activeTickets, isLoading: ticketsLoading } = useQuery<ValetTicket[]>({
     queryKey: ["/api/staff/tickets"],
+    refetchInterval: 20000,
+    refetchOnWindowFocus: true,
+    staleTime: 10000,
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
@@ -1261,12 +1264,16 @@ export default function StaffDashboard() {
                 const isBlack  = c === 'black'  || c === '黒';
                 const isWhite  = c === 'white'  || c === '白';
                 const isSilver = c === 'silver' || c === '銀' || c === 'grey' || c === 'gray';
+                const isOther  = !isBlack && !isWhite && !isSilver && !!color;
                 return (
-                  <span className="text-[10px] whitespace-nowrap">
-                    <span className={isBlack  ? 'font-bold underline' : ''}>黒</span>
-                    <span className={isWhite  ? 'font-bold underline' : ''}>白</span>
-                    <span className={isSilver ? 'font-bold underline' : ''}>銀</span>
-                    （{(!isBlack && !isWhite && !isSilver && color) ? color : '\u3000'}）
+                  <span className="text-xs whitespace-nowrap">
+                    <span className={isBlack  ? 'font-bold underline' : 'text-gray-400'}>黒</span>
+                    <span className={isWhite  ? 'font-bold underline' : 'text-gray-400'}>白</span>
+                    <span className={isSilver ? 'font-bold underline' : 'text-gray-400'}>銀</span>
+                    {isOther
+                      ? <span className="font-bold text-regis-navy ml-1">（{color}）</span>
+                      : <span className="text-gray-300">（　）</span>
+                    }
                   </span>
                 );
               };
