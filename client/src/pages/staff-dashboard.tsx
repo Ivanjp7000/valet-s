@@ -493,7 +493,7 @@ function SortablePanel({
   }
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} id={`panel-${id}`}>
       <Card className={`border-2 ${borderClass || 'border-gray-200'} shadow-sm`}>
         <CardHeader className="p-4 cursor-pointer select-none" onClick={onToggle}>
           <div className="flex items-center justify-between">
@@ -606,6 +606,14 @@ export default function StaffDashboard() {
     } catch { return MOBILE_PANELS_DEFAULT; }
   });
   const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set()); // all start collapsed
+
+  const scrollToPanel = (panelId: string) => {
+    setExpandedPanels(prev => { const next = new Set(prev); next.add(panelId); return next; });
+    setTimeout(() => {
+      const el = document.getElementById(`panel-${panelId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
 
   const togglePanel = (id: string) => setExpandedPanels(prev => {
     const next = new Set(prev);
@@ -1621,25 +1629,43 @@ export default function StaffDashboard() {
             {!showVehicleRoster && (<>
             {/* Standard View for Mobile */}
             <div className="space-y-3 sm:hidden">
-                {/* Compact Stats Row */}
-                <div className="flex gap-2">
-                  <div className="flex-1 bg-blue-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
-                    <p className="text-xs text-gray-500">In House</p>
-                  </div>
-                  <div className="flex-1 bg-orange-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-orange-600">{activeTickets?.filter(t => ['retrieving', 'transit', 'preparing', 'ready'].includes(t.status)).length || 0}</p>
-                    <p className="text-xs text-gray-500">Retrieving</p>
-                  </div>
-                  <div className="flex-1 bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-gray-900">{activeTickets?.filter(t => t.status === 'completed').length || 0}</p>
-                    <p className="text-xs text-gray-500">Departed</p>
-                  </div>
-                  <div className="flex-1 bg-purple-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-purple-600">{statsLoading ? '-' : stats?.avgTime || '0m'}</p>
-                    <p className="text-xs text-gray-500">Avg</p>
-                  </div>
-                </div>
+                {/* Compact Stats Row — tap any to jump to that section */}
+                {(() => {
+                  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                  const departedTodayCount = activeTickets?.filter(t => t.status === 'completed' && t.updatedAt && new Date(t.updatedAt) >= todayStart).length || 0;
+                  return (
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <button
+                        className="bg-blue-50 active:bg-blue-100 rounded-lg p-2 text-center w-full focus:outline-none"
+                        onClick={() => scrollToPanel('in-house')}
+                      >
+                        <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
+                        <p className="text-xs text-blue-500 font-medium leading-tight">In House</p>
+                      </button>
+                      <button
+                        className="bg-blue-50 active:bg-blue-100 rounded-lg p-2 text-center w-full focus:outline-none"
+                        onClick={() => scrollToPanel('guest-out')}
+                      >
+                        <p className="text-lg font-bold text-blue-700">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</p>
+                        <p className="text-xs text-blue-500 font-medium leading-tight">Car Will Return</p>
+                      </button>
+                      <button
+                        className="bg-green-50 active:bg-green-100 rounded-lg p-2 text-center w-full focus:outline-none"
+                        onClick={() => scrollToPanel('ready')}
+                      >
+                        <p className="text-lg font-bold text-green-600">{activeTickets?.filter(t => t.status === 'ready').length || 0}</p>
+                        <p className="text-xs text-green-600 font-medium leading-tight">Ready for Collection</p>
+                      </button>
+                      <button
+                        className="bg-gray-50 active:bg-gray-100 rounded-lg p-2 text-center w-full focus:outline-none"
+                        onClick={() => scrollToPanel('departed-today')}
+                      >
+                        <p className="text-lg font-bold text-gray-700">{departedTodayCount}</p>
+                        <p className="text-xs text-gray-500 font-medium leading-tight">Departed Today</p>
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {/* Draggable Mobile Compact Panels - all start collapsed */}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleMobileDragEnd}>
