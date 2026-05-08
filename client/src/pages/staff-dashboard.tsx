@@ -303,13 +303,14 @@ function useParkedTimers(createdAt: Date | string | undefined | null) {
   return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAutoClose, canEdit = true }: {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAutoClose, onCancelAutoClose, canEdit = true }: {
   ticket: ValetTicket;
   onRetrieve: () => void;
   onEdit: () => void;
   onView: () => void;
   onDepart: () => void;
   onAutoClose: () => void;
+  onCancelAutoClose: () => void;
   canEdit?: boolean;
 }) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
@@ -350,9 +351,15 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             PL: {ticket.parkingLocation || 'Unassigned'}
           </span>
           {scheduled && (
-            <p className="text-[10px] text-purple-600 font-semibold mt-0.5">
-              ⏰ Auto-close: {fmtScheduled(scheduled)}
-            </p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <p className="text-[10px] text-purple-600 font-semibold">
+                ⏰ Auto-close: {fmtScheduled(scheduled)}
+              </p>
+              <button
+                className="text-[9px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1 leading-tight"
+                onClick={onCancelAutoClose}
+              >✕ Cancel</button>
+            </div>
           )}
         </div>
         <div className="flex flex-col gap-1">
@@ -1785,6 +1792,7 @@ export default function StaffDashboard() {
                                     setAutoCloseDate(localDate);
                                     setAutoCloseTime(localTime);
                                   }}
+                                  onCancelAutoClose={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
                                   canEdit={canEdit} />
                               ))}
                               {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -2019,9 +2027,15 @@ export default function StaffDashboard() {
                                       <p><strong>Color:</strong> {ticket.carColor}</p>
                                     </div>
                                     {(ticket as any).scheduledDepartureAt && (
-                                      <p className="text-xs text-purple-600 font-semibold mb-1.5">
-                                        ⏰ Auto-close: {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
-                                      </p>
+                                      <div className="flex items-center gap-2 mb-1.5">
+                                        <p className="text-xs text-purple-600 font-semibold">
+                                          ⏰ Auto-close: {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
+                                        </p>
+                                        <button
+                                          className="text-[10px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1.5 py-0.5 leading-tight"
+                                          onClick={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
+                                        >✕ Cancel</button>
+                                      </div>
                                     )}
                                     {canEdit && (
                                       <div className="space-y-1.5">
