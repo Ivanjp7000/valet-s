@@ -1197,106 +1197,205 @@ export default function StaffDashboard() {
             </div>
 
             {/* Vehicle Roster Panel */}
-            {showVehicleRoster && (
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-regis-navy/5">
-                  <List size={16} className="text-regis-navy" />
-                  <h3 className="font-semibold text-regis-navy text-sm">Vehicle Roster</h3>
-                  <span className="ml-auto text-xs text-gray-500 font-medium">
-                    {activeTickets?.filter(t => !['completed', 'cancelled'].includes(t.status)).length || 0} vehicles
+            {showVehicleRoster && (() => {
+              const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+              const rosterTickets = (activeTickets || [])
+                .filter(t => t.createdAt && new Date(t.createdAt) >= todayStart)
+                .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+              const todayStr = (() => {
+                const d = new Date();
+                return `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
+              })();
+              const fmtTime = (dt: Date | string | null | undefined) => {
+                if (!dt) return '';
+                const d = new Date(dt);
+                return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+              };
+              const ColorDisplay = ({ color }: { color: string }) => {
+                const c = (color || '').toLowerCase();
+                const isBlack  = c === 'black'  || c === '黒';
+                const isWhite  = c === 'white'  || c === '白';
+                const isSilver = c === 'silver' || c === '銀' || c === 'grey' || c === 'gray';
+                return (
+                  <span className="text-[10px] whitespace-nowrap">
+                    <span className={isBlack  ? 'font-bold underline' : ''}>黒</span>
+                    <span className={isWhite  ? 'font-bold underline' : ''}>白</span>
+                    <span className={isSilver ? 'font-bold underline' : ''}>銀</span>
+                    （{(!isBlack && !isWhite && !isSilver && color) ? color : '\u3000'}）
                   </span>
+                );
+              };
+              const RosterNotes = ({ ticket }: { ticket: ValetTicket }) => (
+                <div className="flex flex-col items-center gap-0.5 text-[10px] leading-tight">
+                  {ticket.status === 'completed'  && <span className="font-semibold">転記</span>}
+                  {ticket.status === 'cancelled'  && <span className="text-red-600 font-bold">VOID</span>}
+                  {ticket.staffNotes              && <span className="text-gray-400 truncate max-w-[64px]" title={ticket.staffNotes}>{ticket.staffNotes}</span>}
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                        <th className="text-left px-3 py-2 font-semibold">Ticket</th>
-                        <th className="text-left px-3 py-2 font-semibold">Guest</th>
-                        <th className="text-left px-3 py-2 font-semibold hidden sm:table-cell">Room</th>
-                        <th className="text-left px-3 py-2 font-semibold">Vehicle</th>
-                        <th className="text-left px-3 py-2 font-semibold hidden md:table-cell">Plate</th>
-                        <th className="text-left px-3 py-2 font-semibold">Parking</th>
-                        <th className="text-left px-3 py-2 font-semibold">Time In</th>
-                        <th className="text-left px-3 py-2 font-semibold">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {activeTickets
-                        ?.filter(t => !['completed', 'cancelled'].includes(t.status))
-                        .map(ticket => {
-                          const elapsedMs = ticket.createdAt ? Date.now() - new Date(ticket.createdAt).getTime() : 0;
-                          const totalSecs = Math.floor(elapsedMs / 1000);
-                          const tDays = Math.floor(totalSecs / 86400);
-                          const tHours = Math.floor((totalSecs % 86400) / 3600);
-                          const tMins = Math.floor((totalSecs % 3600) / 60);
-                          const timeIn = tDays > 0 ? `${tDays}d ${tHours}h ${tMins}m` : tHours > 0 ? `${tHours}h ${tMins}m` : `${tMins}m`;
-                          const isOvernight = elapsedMs >= 24 * 60 * 60 * 1000;
-
-                          const statusColors: Record<string, string> = {
-                            active: 'bg-blue-100 text-blue-700',
-                            retrieving: 'bg-yellow-100 text-yellow-700',
-                            transit: 'bg-orange-100 text-orange-700',
-                            preparing: 'bg-purple-100 text-purple-700',
-                            ready: 'bg-green-100 text-green-700',
-                            out_with_guest: 'bg-cyan-100 text-cyan-700',
-                          };
-                          const statusLabel: Record<string, string> = {
-                            active: 'In House',
-                            retrieving: 'Retrieving',
-                            transit: 'In Transit',
-                            preparing: 'Final Prep',
-                            ready: 'Ready',
-                            out_with_guest: 'Out w/ Guest',
-                          };
-
-                          return (
-                            <tr key={ticket.id} className={`hover:bg-gray-50 transition-colors ${isOvernight ? 'bg-amber-50/40' : ''}`}>
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-regis-navy">#{ticket.ticketNumber}</span>
-                                  {isOvernight && <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1">OVN</span>}
+              );
+              return (
+                <div>
+                  {/* ── DESKTOP TABLE ── */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <div style={{minWidth: 920}}>
+                      {/* Title bar */}
+                      <div className="border border-black flex items-center justify-between px-4 py-1 bg-white">
+                        <h2 className="text-base font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
+                        <div className="flex items-center gap-6 text-sm font-semibold">
+                          <span className="border-l border-black pl-4">STAY</span>
+                          <span>DATE: {todayStr}</span>
+                        </div>
+                      </div>
+                      {/* Table */}
+                      <table className="w-full border-collapse border border-black" style={{fontSize: 11, fontFamily: 'sans-serif'}}>
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-10" style={{writingMode: 'vertical-rl', letterSpacing: '0.15em', fontSize: 10}}>チェック</th>
+                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">チケット</th>
+                            <th rowSpan={2} className="border border-black px-2 py-1 text-center align-middle">ゲストフルネーム</th>
+                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">ＶＩＰ</th>
+                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">社名</th>
+                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">（地域）</th>
+                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/IN</th>
+                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/OUT</th>
+                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">駐車場所</th>
+                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">備考</th>
+                          </tr>
+                          <tr className="bg-gray-100">
+                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">部屋番号</th>
+                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">車輌／位</th>
+                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">ナンバー</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rosterTickets.map((ticket, index) => (
+                            <tr key={ticket.id} className={
+                              ticket.status === 'cancelled' ? 'bg-red-50' :
+                              ticket.status === 'completed' ? 'bg-gray-50' : 'bg-white'
+                            }>
+                              {/* チェック */}
+                              <td className="border border-black text-center px-1 py-1 align-middle">
+                                <div className="font-bold text-[11px]">{index + 1}</div>
+                                <div className={`text-base font-bold leading-none ${
+                                  ticket.status === 'cancelled' ? 'text-red-600' :
+                                  ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
+                                }`}>
+                                  {ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}
                                 </div>
                               </td>
-                              <td className="px-3 py-2">
-                                <p className="font-medium text-gray-800 truncate max-w-[100px]">{ticket.guestName}</p>
+                              {/* チケット */}
+                              <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">
+                                #{ticket.ticketNumber}
                               </td>
-                              <td className="px-3 py-2 hidden sm:table-cell text-gray-500">{ticket.roomNumber || '—'}</td>
-                              <td className="px-3 py-2">
-                                <p className="text-gray-700 truncate max-w-[120px]">{ticket.carColor} {ticket.carMake} {ticket.carModel}</p>
+                              {/* ゲストフルネーム + color */}
+                              <td className="border border-black px-2 py-1 align-middle">
+                                <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
+                                <ColorDisplay color={ticket.carColor || ''} />
                               </td>
-                              <td className="px-3 py-2 hidden md:table-cell">
-                                <span className="font-mono text-xs text-gray-600">{ticket.licensePlate || '—'}</span>
+                              {/* 部屋番号 */}
+                              <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
+                                {ticket.roomNumber || '—'}
                               </td>
-                              <td className="px-3 py-2">
-                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                                  {ticket.parkingLocation || 'N/A'}
-                                </span>
+                              {/* 車輌 */}
+                              <td className="border border-black px-1 py-1 text-[11px] align-middle">
+                                {ticket.carMake} {ticket.carModel}
                               </td>
-                              <td className="px-3 py-2">
-                                <span className={`text-xs font-semibold tabular-nums ${isOvernight ? 'text-amber-600' : 'text-gray-700'}`}>{timeIn}</span>
+                              {/* ナンバー */}
+                              <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">
+                                {ticket.licensePlate || '—'}
                               </td>
-                              <td className="px-3 py-2">
-                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[ticket.status] || 'bg-gray-100 text-gray-600'}`}>
-                                  {statusLabel[ticket.status] || ticket.status}
-                                </span>
+                              {/* C/IN */}
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
+                                {fmtTime(ticket.createdAt)}
+                              </td>
+                              {/* C/OUT */}
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
+                                {ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}
+                              </td>
+                              {/* 駐車場所 */}
+                              <td className="border border-black text-center px-1 py-1 font-bold text-[11px] align-middle">
+                                {ticket.parkingLocation || '—'}
+                              </td>
+                              {/* 備考 */}
+                              <td className="border border-black text-center px-1 py-1 align-middle">
+                                <RosterNotes ticket={ticket} />
                               </td>
                             </tr>
-                          );
-                        })}
-                      {(activeTickets?.filter(t => !['completed', 'cancelled'].includes(t.status)).length === 0) && (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-sm">
-                            <Car size={28} className="mx-auto mb-2 opacity-30" />
-                            No vehicles currently on the roster
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+                          ))}
+                          {rosterTickets.length === 0 && (
+                            <tr>
+                              <td colSpan={10} className="border border-black text-center py-6 text-gray-400 text-xs">
+                                本日のチケットはまだありません
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                      {/* Footer totals */}
+                      <div className="border border-t-0 border-black px-3 py-1 bg-gray-50 flex justify-between text-[11px] text-gray-500">
+                        <span>合計 Total: {rosterTickets.length} 台</span>
+                        <span>In House: {rosterTickets.filter(t => !['completed','cancelled'].includes(t.status)).length} · Departed: {rosterTickets.filter(t => t.status === 'completed').length}</span>
+                      </div>
+                    </div>
+                  </div>
 
+                  {/* ── MOBILE CARDS ── */}
+                  <div className="sm:hidden space-y-2">
+                    <div className="flex items-center justify-between py-1 border-b border-gray-200">
+                      <h3 className="font-bold text-regis-navy text-sm tracking-widest">VALET PARKING LIST</h3>
+                      <span className="text-[11px] text-gray-500">{todayStr} · {rosterTickets.length}台</span>
+                    </div>
+                    {rosterTickets.map((ticket, index) => (
+                      <div key={ticket.id} className={`border rounded-lg p-2.5 ${
+                        ticket.status === 'cancelled' ? 'border-red-300 bg-red-50' :
+                        ticket.status === 'completed' ? 'border-gray-300 bg-gray-50' :
+                        ticket.status === 'ready'     ? 'border-green-400 bg-green-50' :
+                        'border-blue-200 bg-white'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-gray-400 font-bold w-4">{index + 1}</span>
+                            <span className={`font-bold text-xs ${
+                              ticket.status === 'cancelled' ? 'text-red-600' :
+                              ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
+                            }`}>{ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}</span>
+                            <span className="font-bold text-regis-navy text-sm">#{ticket.ticketNumber}</span>
+                            {ticket.status === 'cancelled' && <span className="text-red-600 font-bold text-[10px]">VOID</span>}
+                            {ticket.status === 'completed' && <span className="text-green-700 font-bold text-[10px]">転記</span>}
+                          </div>
+                          <div className="text-right font-mono text-[10px] text-gray-500">
+                            <div>C/IN {fmtTime(ticket.createdAt)}</div>
+                            {ticket.status === 'completed' && ticket.departedAt && <div>C/OUT {fmtTime(ticket.departedAt)}</div>}
+                          </div>
+                        </div>
+                        <div className="flex items-baseline gap-1 mb-0.5">
+                          <span className="text-sm font-medium text-gray-800">{ticket.guestName}</span>
+                          <span className="text-[10px] text-gray-500">様</span>
+                          {ticket.roomNumber && <span className="text-[10px] text-gray-400 ml-1">Rm {ticket.roomNumber}</span>}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ColorDisplay color={ticket.carColor || ''} />
+                            <span className="text-[10px] text-gray-400">{ticket.carMake} {ticket.carModel}</span>
+                          </div>
+                          <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded ${ticket.parkingLocation ? 'border-gray-400 text-gray-700' : 'border-red-300 text-red-500'}`}>
+                            {ticket.parkingLocation || 'N/A'}
+                          </span>
+                        </div>
+                        {ticket.licensePlate && <p className="text-[10px] font-mono text-gray-400 mt-0.5">{ticket.licensePlate}</p>}
+                      </div>
+                    ))}
+                    {rosterTickets.length === 0 && (
+                      <div className="text-center py-8 text-gray-400 text-xs">
+                        <Car size={28} className="mx-auto mb-2 opacity-30" />
+                        本日のチケットはまだありません
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {!showVehicleRoster && (<>
             {/* Standard View for Mobile */}
             <div className="space-y-3 sm:hidden">
                 {/* Compact Stats Row */}
@@ -1862,6 +1961,7 @@ export default function StaffDashboard() {
                 </CardContent>
               </Card>
             </div>
+            </>)}
 
           </TabsContent>
 
