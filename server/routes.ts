@@ -1607,13 +1607,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/staff/tickets/:ticketNumber/roster', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
-      const { inRoster } = req.body;
+      const { inRoster, rosterCategory } = req.body;
       const existing = await storage.getValetTicket(ticketNumber);
       if (!existing) return res.status(404).json({ message: "Ticket not found" });
       if (!await isTicketInScope(existing, req.currentUser)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      const updated = await storage.updateValetTicket(ticketNumber, { inRoster: !!inRoster });
+      const updateData: any = { inRoster: !!inRoster };
+      if (rosterCategory) updateData.rosterCategory = rosterCategory;
+      const updated = await storage.updateValetTicket(ticketNumber, updateData);
       broadcastToOU(updated?.ouId, { type: 'ticket_updated', data: updated });
       res.json(updated);
     } catch (error) {

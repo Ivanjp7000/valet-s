@@ -131,6 +131,7 @@ export const valetTickets = pgTable("valet_tickets", {
 
   // Vehicle Roster
   inRoster: boolean("in_roster").default(false), // Whether this ticket has been added to the Vehicle Roster
+  rosterCategory: text("roster_category"), // 'arriving' | 'departing' | 'events'
 
   // Scheduled retrieval
   scheduledRetrievalAt: timestamp("scheduled_retrieval_at"), // Guest-chosen future retrieval time

@@ -519,6 +519,7 @@ export default function StaffDashboard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [showVehicleRoster, setShowVehicleRoster] = useState(false);
+  const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -731,14 +732,21 @@ export default function StaffDashboard() {
     },
   });
 
+  // Auto-detect which roster tab a ticket belongs to
+  const getRosterCategory = (ticket: ValetTicket): 'arriving' | 'departing' | 'events' => {
+    if (ticket.visitorType === 'restaurant' || ticket.visitorType === 'others') return 'events';
+    return ticket.status === 'completed' ? 'departing' : 'arriving';
+  };
+
   // Populate ticket into Vehicle Roster
   const populateRosterMutation = useMutation({
-    mutationFn: async (ticketNumber: string) => {
-      return apiRequest("PATCH", `/api/staff/tickets/${ticketNumber}/roster`, { inRoster: true });
+    mutationFn: async ({ ticketNumber, category }: { ticketNumber: string; category: 'arriving' | 'departing' | 'events' }) => {
+      return apiRequest("PATCH", `/api/staff/tickets/${ticketNumber}/roster`, { inRoster: true, rosterCategory: category });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
       setShowVehicleRoster(true);
+      setRosterTab(variables.category);
       toast({ title: "Added to Roster", description: "Ticket has been added to the Vehicle Roster." });
     },
     onError: () => {
@@ -1239,8 +1247,14 @@ export default function StaffDashboard() {
 
             {/* Vehicle Roster Panel */}
             {showVehicleRoster && (() => {
-              const rosterTickets = (activeTickets || [])
-                .filter(t => t.inRoster === true)
+              const allRosterTickets = (activeTickets || []).filter(t => t.inRoster === true);
+              const tabDefs: { key: 'arriving' | 'departing' | 'events'; label: string; sublabel: string }[] = [
+                { key: 'arriving',  label: 'Visitors Arriving Today',   sublabel: 'ARRIVAL' },
+                { key: 'departing', label: 'Visitors Departing Today',  sublabel: 'DEPARTURE' },
+                { key: 'events',    label: 'Restaurants & Events',      sublabel: 'R&E' },
+              ];
+              const rosterTickets = allRosterTickets
+                .filter(t => (t.rosterCategory || 'arriving') === rosterTab)
                 .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
               const todayStr = (() => {
                 const d = new Date();
@@ -1272,159 +1286,142 @@ export default function StaffDashboard() {
                   {ticket.staffNotes              && <span className="text-gray-400 truncate max-w-[64px]" title={ticket.staffNotes}>{ticket.staffNotes}</span>}
                 </div>
               );
+
+              const RosterTable = ({ tickets }: { tickets: ValetTicket[] }) => (
+                <div style={{minWidth: 920}}>
+                  {/* Title bar */}
+                  <div className="border border-black flex items-center justify-between px-4 py-1 bg-white">
+                    <h2 className="text-base font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
+                    <div className="flex items-center gap-6 text-sm font-semibold">
+                      <span className="border-l border-black pl-4">{tabDefs.find(t => t.key === rosterTab)?.sublabel}</span>
+                      <span>DATE: {todayStr}</span>
+                    </div>
+                  </div>
+                  {/* Table */}
+                  <table className="w-full border-collapse border border-black" style={{fontSize: 11, fontFamily: 'sans-serif'}}>
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-10" style={{writingMode: 'vertical-rl', letterSpacing: '0.15em', fontSize: 10}}>チェック</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">チケット</th>
+                        <th rowSpan={2} className="border border-black px-2 py-1 text-center align-middle">ゲストフルネーム</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">ＶＩＰ</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">社名</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">（地域）</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/IN</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/OUT</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">駐車場所</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">備考</th>
+                      </tr>
+                      <tr className="bg-gray-100">
+                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">部屋番号</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">車輌／位</th>
+                        <th className="border border-black px-1 py-0.5 text-center text-[10px]">ナンバー</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: Math.max(10, tickets.length) }, (_, index) => {
+                        const ticket = tickets[index] ?? null;
+                        if (ticket) {
+                          return (
+                            <tr key={ticket.id} className={
+                              ticket.status === 'cancelled' ? 'bg-red-50' :
+                              ticket.status === 'completed' ? 'bg-gray-50' : 'bg-white'
+                            } style={{height: 52}}>
+                              <td className="border border-black text-center px-1 py-1 align-middle">
+                                <div className="font-bold text-[11px]">{index + 1}</div>
+                                <div className={`text-base font-bold leading-none ${
+                                  ticket.status === 'cancelled' ? 'text-red-600' :
+                                  ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
+                                }`}>{ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}</div>
+                              </td>
+                              <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">#{ticket.ticketNumber}</td>
+                              <td className="border border-black px-2 py-1 align-middle">
+                                <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
+                                <ColorDisplay color={ticket.carColor || ''} />
+                              </td>
+                              <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
+                                <div className="text-[10px] font-semibold text-regis-navy leading-tight">Hotel Guest</div>
+                                {ticket.roomNumber && <div className="text-[10px] text-gray-600">{ticket.roomNumber}</div>}
+                              </td>
+                              <td className="border border-black px-1 py-1 text-[11px] align-middle">{ticket.carMake} {ticket.carModel}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">{ticket.licensePlate || ''}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">{fmtTime(ticket.createdAt)}</td>
+                              <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">{ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}</td>
+                              <td className="border border-black text-center px-1 py-1 font-bold text-[11px] align-middle">{ticket.parkingLocation || ''}</td>
+                              <td className="border border-black text-center px-1 py-1 align-middle"><RosterNotes ticket={ticket} /></td>
+                            </tr>
+                          );
+                        }
+                        return (
+                          <tr key={`empty-${index}`} className="bg-white" style={{height: 52}}>
+                            <td className="border border-black text-center px-1 align-top pt-1">
+                              <div className="font-bold text-[11px]">{index + 1}</div>
+                              <div className="text-[10px] text-gray-300 leading-tight">✓</div>
+                              <div className="text-[10px] text-gray-300 leading-tight">×</div>
+                            </td>
+                            <td className="border border-black px-1 py-1 align-top"><div className="text-[10px] text-gray-300">#</div></td>
+                            <td className="border border-black px-2 align-bottom pb-1">
+                              <div className="text-[10px] text-gray-300">様</div>
+                              <div className="text-[10px] text-gray-300 whitespace-nowrap">黒白銀（　）</div>
+                            </td>
+                            <td className="border border-black"></td>
+                            <td className="border border-black"></td>
+                            <td className="border border-black text-center align-middle"><span className="text-[10px] text-gray-300">—</span></td>
+                            <td className="border border-black text-center align-middle"><span className="text-[10px] text-gray-300 font-mono">：</span></td>
+                            <td className="border border-black text-center align-middle"><span className="text-[10px] text-gray-300 font-mono">：</span></td>
+                            <td className="border border-black"></td>
+                            <td className="border border-black px-1 align-top pt-1">
+                              <div className="text-[9px] text-gray-200 leading-tight">転記</div>
+                              <div className="text-[9px] text-gray-200 leading-tight">VOID　NC</div>
+                              <div className="text-[9px] text-gray-200 leading-tight">Comp</div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {/* Footer totals */}
+                  <div className="border border-t-0 border-black px-3 py-1 bg-gray-50 flex justify-between text-[11px] text-gray-500">
+                    <span>合計 Total: {tickets.length} 台</span>
+                    <span>In House: {tickets.filter(t => !['completed','cancelled'].includes(t.status)).length} · Departed: {tickets.filter(t => t.status === 'completed').length}</span>
+                  </div>
+                </div>
+              );
+
               return (
                 <div>
+                  {/* ── SUB-TABS ── */}
+                  <div className="flex gap-0 mb-0 border-b border-black overflow-x-auto">
+                    {tabDefs.map(tab => {
+                      const count = allRosterTickets.filter(t => (t.rosterCategory || 'arriving') === tab.key).length;
+                      const isActive = rosterTab === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => setRosterTab(tab.key)}
+                          className={`flex-1 min-w-[140px] px-3 py-2 text-xs font-semibold border-t border-l border-r border-black -mb-px transition-colors ${
+                            isActive
+                              ? 'bg-regis-navy text-white border-b-regis-navy'
+                              : 'bg-white text-regis-navy hover:bg-regis-navy/5'
+                          }`}
+                          style={{ borderBottom: isActive ? `2px solid var(--regis-navy, #1a2744)` : '1px solid black' }}
+                        >
+                          <div className="leading-tight">{tab.label}</div>
+                          <div className={`text-[10px] mt-0.5 ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>{count} 台</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   {/* ── DESKTOP TABLE ── */}
                   <div className="hidden sm:block overflow-x-auto">
-                    <div style={{minWidth: 920}}>
-                      {/* Title bar */}
-                      <div className="border border-black flex items-center justify-between px-4 py-1 bg-white">
-                        <h2 className="text-base font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
-                        <div className="flex items-center gap-6 text-sm font-semibold">
-                          <span className="border-l border-black pl-4">STAY</span>
-                          <span>DATE: {todayStr}</span>
-                        </div>
-                      </div>
-                      {/* Table */}
-                      <table className="w-full border-collapse border border-black" style={{fontSize: 11, fontFamily: 'sans-serif'}}>
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-10" style={{writingMode: 'vertical-rl', letterSpacing: '0.15em', fontSize: 10}}>チェック</th>
-                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">チケット</th>
-                            <th rowSpan={2} className="border border-black px-2 py-1 text-center align-middle">ゲストフルネーム</th>
-                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">ＶＩＰ</th>
-                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">社名</th>
-                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">（地域）</th>
-                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/IN</th>
-                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-14">C/OUT</th>
-                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">駐車場所</th>
-                            <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">備考</th>
-                          </tr>
-                          <tr className="bg-gray-100">
-                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">部屋番号</th>
-                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">車輌／位</th>
-                            <th className="border border-black px-1 py-0.5 text-center text-[10px]">ナンバー</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.from({ length: Math.max(10, rosterTickets.length) }, (_, index) => {
-                            const ticket = rosterTickets[index] ?? null;
-                            if (ticket) {
-                              return (
-                                <tr key={ticket.id} className={
-                                  ticket.status === 'cancelled' ? 'bg-red-50' :
-                                  ticket.status === 'completed' ? 'bg-gray-50' : 'bg-white'
-                                } style={{height: 52}}>
-                                  {/* チェック */}
-                                  <td className="border border-black text-center px-1 py-1 align-middle">
-                                    <div className="font-bold text-[11px]">{index + 1}</div>
-                                    <div className={`text-base font-bold leading-none ${
-                                      ticket.status === 'cancelled' ? 'text-red-600' :
-                                      ticket.status === 'completed' ? 'text-green-600' : 'text-blue-500'
-                                    }`}>
-                                      {ticket.status === 'cancelled' ? '×' : ticket.status === 'completed' ? '✓' : '●'}
-                                    </div>
-                                  </td>
-                                  {/* チケット */}
-                                  <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle">
-                                    #{ticket.ticketNumber}
-                                  </td>
-                                  {/* ゲストフルネーム + color */}
-                                  <td className="border border-black px-2 py-1 align-middle">
-                                    <div><span className="font-medium">{ticket.guestName}</span><span className="text-[10px] ml-0.5">様</span></div>
-                                    <ColorDisplay color={ticket.carColor || ''} />
-                                  </td>
-                                  {/* 部屋番号 — always Hotel Guest */}
-                                  <td className="border border-black text-center px-1 py-1 text-[11px] align-middle">
-                                    <div className="text-[10px] font-semibold text-regis-navy leading-tight">Hotel Guest</div>
-                                    {ticket.roomNumber && <div className="text-[10px] text-gray-600">{ticket.roomNumber}</div>}
-                                  </td>
-                                  {/* 車輌 */}
-                                  <td className="border border-black px-1 py-1 text-[11px] align-middle">
-                                    {ticket.carMake} {ticket.carModel}
-                                  </td>
-                                  {/* ナンバー */}
-                                  <td className="border border-black text-center px-1 py-1 font-mono text-[11px] align-middle">
-                                    {ticket.licensePlate || ''}
-                                  </td>
-                                  {/* C/IN */}
-                                  <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
-                                    {fmtTime(ticket.createdAt)}
-                                  </td>
-                                  {/* C/OUT */}
-                                  <td className="border border-black text-center px-1 py-1 font-mono tabular-nums text-[11px] align-middle">
-                                    {ticket.status === 'completed' ? fmtTime(ticket.departedAt) : ''}
-                                  </td>
-                                  {/* 駐車場所 */}
-                                  <td className="border border-black text-center px-1 py-1 font-bold text-[11px] align-middle">
-                                    {ticket.parkingLocation || ''}
-                                  </td>
-                                  {/* 備考 */}
-                                  <td className="border border-black text-center px-1 py-1 align-middle">
-                                    <RosterNotes ticket={ticket} />
-                                  </td>
-                                </tr>
-                              );
-                            }
-                            /* Empty row — matches PDF blank entry style */
-                            return (
-                              <tr key={`empty-${index}`} className="bg-white" style={{height: 52}}>
-                                {/* チェック — row number + blank ✓ × */}
-                                <td className="border border-black text-center px-1 align-top pt-1">
-                                  <div className="font-bold text-[11px]">{index + 1}</div>
-                                  <div className="text-[10px] text-gray-300 leading-tight">✓</div>
-                                  <div className="text-[10px] text-gray-300 leading-tight">×</div>
-                                </td>
-                                {/* チケット — # placeholder */}
-                                <td className="border border-black px-1 py-1 align-top">
-                                  <div className="text-[10px] text-gray-300">#</div>
-                                </td>
-                                {/* ゲストフルネーム — 様 placeholder + 黒白銀 */}
-                                <td className="border border-black px-2 align-bottom pb-1">
-                                  <div className="text-[10px] text-gray-300">様</div>
-                                  <div className="text-[10px] text-gray-300 whitespace-nowrap">黒白銀（　）</div>
-                                </td>
-                                {/* 部屋番号 */}
-                                <td className="border border-black"></td>
-                                {/* 車輌 */}
-                                <td className="border border-black"></td>
-                                {/* ナンバー — dash placeholder */}
-                                <td className="border border-black text-center align-middle">
-                                  <span className="text-[10px] text-gray-300">—</span>
-                                </td>
-                                {/* C/IN — colon placeholder */}
-                                <td className="border border-black text-center align-middle">
-                                  <span className="text-[10px] text-gray-300 font-mono">：</span>
-                                </td>
-                                {/* C/OUT — colon placeholder */}
-                                <td className="border border-black text-center align-middle">
-                                  <span className="text-[10px] text-gray-300 font-mono">：</span>
-                                </td>
-                                {/* 駐車場所 */}
-                                <td className="border border-black"></td>
-                                {/* 備考 — 転記 VOID NC Comp placeholders */}
-                                <td className="border border-black px-1 align-top pt-1">
-                                  <div className="text-[9px] text-gray-200 leading-tight">転記</div>
-                                  <div className="text-[9px] text-gray-200 leading-tight">VOID　NC</div>
-                                  <div className="text-[9px] text-gray-200 leading-tight">Comp</div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                      {/* Footer totals */}
-                      <div className="border border-t-0 border-black px-3 py-1 bg-gray-50 flex justify-between text-[11px] text-gray-500">
-                        <span>合計 Total: {rosterTickets.length} 台</span>
-                        <span>In House: {rosterTickets.filter(t => !['completed','cancelled'].includes(t.status)).length} · Departed: {rosterTickets.filter(t => t.status === 'completed').length}</span>
-                      </div>
-                    </div>
+                    <RosterTable tickets={rosterTickets} />
                   </div>
 
                   {/* ── MOBILE CARDS ── */}
-                  <div className="sm:hidden space-y-2">
+                  <div className="sm:hidden space-y-2 mt-2">
                     <div className="flex items-center justify-between py-1 border-b border-gray-200">
-                      <h3 className="font-bold text-regis-navy text-sm tracking-widest">VALET PARKING LIST</h3>
+                      <h3 className="font-bold text-regis-navy text-sm">{tabDefs.find(t => t.key === rosterTab)?.label}</h3>
                       <span className="text-[11px] text-gray-500">{todayStr} · {rosterTickets.length}台</span>
                     </div>
                     {rosterTickets.map((ticket, index) => (
@@ -1470,7 +1467,7 @@ export default function StaffDashboard() {
                     {rosterTickets.length === 0 && (
                       <div className="text-center py-8 text-gray-400 text-xs">
                         <Car size={28} className="mx-auto mb-2 opacity-30" />
-                        本日のチケットはまだありません
+                        No entries in this roster
                       </div>
                     )}
                   </div>
@@ -1610,7 +1607,7 @@ export default function StaffDashboard() {
                                   onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
                                   onEdit={() => setEditTicketData(ticket)}
                                   onView={() => setViewTicket(ticket)}
-                                  onPopulateRoster={canEdit ? () => populateRosterMutation.mutate(ticket.ticketNumber) : undefined}
+                                  onPopulateRoster={canEdit ? () => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) }) : undefined}
                                   canEdit={canEdit} />
                               ))}
                               {activeTickets?.filter(t => t.status === 'active').length === 0 && (
@@ -1661,7 +1658,7 @@ export default function StaffDashboard() {
                                       </div>
                                       {canEdit && !ticket.inRoster && (
                                         <Button size="sm" variant="outline" className="h-6 w-full text-[11px] mt-1 border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-                                          onClick={() => populateRosterMutation.mutate(ticket.ticketNumber)}>
+                                          onClick={() => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) })}>
                                           <List size={11} className="mr-1" />Populate Vehicle Roster
                                         </Button>
                                       )}
@@ -1802,7 +1799,7 @@ export default function StaffDashboard() {
                     </div>
                     {canEdit && !ticket.inRoster && (
                       <Button size="sm" variant="outline" className="w-full text-xs mt-2 border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-                        onClick={() => populateRosterMutation.mutate(ticket.ticketNumber)}>
+                        onClick={() => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) })}>
                         <List size={13} className="mr-1" />Populate Vehicle Roster
                       </Button>
                     )}
@@ -1868,7 +1865,7 @@ export default function StaffDashboard() {
                                     )}
                                     {canEdit && !ticket.inRoster && (
                                       <Button size="sm" variant="outline" className="w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy/10 mt-1"
-                                        onClick={() => populateRosterMutation.mutate(ticket.ticketNumber)}>
+                                        onClick={() => populateRosterMutation.mutate({ ticketNumber: ticket.ticketNumber, category: getRosterCategory(ticket) })}>
                                         <List size={13} className="mr-1" />Populate Vehicle Roster
                                       </Button>
                                     )}
