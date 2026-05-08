@@ -1990,13 +1990,39 @@ export default function StaffDashboard() {
                                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
                                       <p><strong>Color:</strong> {ticket.carColor}</p>
                                     </div>
+                                    {(ticket as any).scheduledDepartureAt && (
+                                      <p className="text-xs text-purple-600 font-semibold mb-1.5">
+                                        ⏰ Auto-close: {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
+                                      </p>
+                                    )}
                                     {canEdit && (
-                                      <Button size="sm" className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
-                                        onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                                        data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
-                                      >
-                                        <Play size={14} className="mr-1" /> Retrieve
-                                      </Button>
+                                      <div className="space-y-1.5">
+                                        <Button size="sm" className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
+                                          onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                                          data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
+                                        >
+                                          <Play size={14} className="mr-1" /> Retrieve
+                                        </Button>
+                                        <div className="flex gap-1.5">
+                                          <Button size="sm"
+                                            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold text-xs"
+                                            onClick={() => departMutation.mutate(ticket.ticketNumber)}
+                                          >
+                                            <LogOut size={13} className="mr-1" /> Departed
+                                          </Button>
+                                          <Button size="sm"
+                                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs"
+                                            onClick={() => {
+                                              setAutoCloseTicket(ticket);
+                                              const today = new Date();
+                                              setAutoCloseDate(today.toISOString().slice(0, 10));
+                                              setAutoCloseTime('12:00');
+                                            }}
+                                          >
+                                            <Timer size={13} className="mr-1" /> Auto Close
+                                          </Button>
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 ))}
