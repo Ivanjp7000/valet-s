@@ -88,7 +88,7 @@ export function FAQModal({ isOpen, onClose }: FAQModalProps) {
           ) : (
             displayFAQs.map((faq, index) => (
               <Card key={faq.id || index} className="shadow-sm">
-                <Collapsible>
+                <Collapsible open={openItems.includes(index)}>
                   <CollapsibleTrigger
                     onClick={() => toggleItem(index)}
                     className="w-full"
