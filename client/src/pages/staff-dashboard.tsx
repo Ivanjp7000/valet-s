@@ -389,8 +389,8 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                 <span className="text-[10px] text-slate-400 italic">No plate</span>
               )}
             </div>
-            <CarColorBadge color={ticket.carColor || ''} />
           </div>
+          <CarColorBadge color={ticket.carColor || ''} />
           {ticket.visitorType && (
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight border ${
@@ -2192,8 +2192,8 @@ export default function StaffDashboard() {
                                             <span className="text-[10px] text-slate-400 italic">No plate</span>
                                           )}
                                         </div>
-                                        <CarColorBadge color={ticket.carColor || ''} />
                                       </div>
+                                      <CarColorBadge color={ticket.carColor || ''} />
                                       {ticket.visitorType && (
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border ${
