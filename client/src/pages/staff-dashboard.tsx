@@ -366,7 +366,14 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
           {ticket.roomNumber && (
             <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
           )}
-          <p className="text-xs font-semibold text-gray-700 tracking-wide truncate">{ticket.carMake} {ticket.carModel}</p>
+          <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest truncate leading-none">{ticket.carMake} {ticket.carModel}</p>
+            {ticket.licensePlate ? (
+              <span className="inline-block text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+            ) : (
+              <span className="inline-block text-[10px] text-slate-400 italic">No plate</span>
+            )}
+          </div>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
             ticket.parkingLocation
               ? 'bg-green-100 text-green-700 border border-green-300'
@@ -2117,8 +2124,14 @@ export default function StaffDashboard() {
                                             PL: {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
-                                        <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.carMake} {ticket.carModel}</p>
-                                        {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
+                                        <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
+                                          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest leading-none">{ticket.carMake} {ticket.carModel}</p>
+                                          {ticket.licensePlate ? (
+                                            <span className="inline-block text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+                                          ) : (
+                                            <span className="inline-block text-[10px] text-slate-400 italic">No plate</span>
+                                          )}
+                                        </div>
                                       </div>
                                       <div className="flex items-start gap-2">
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
