@@ -567,12 +567,18 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
 const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'guest-out', 'departed-today', 'departed-history'];
 const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed-today', 'departed-history'];
 
+const SECTION_FONT_MIN = 10;
+const SECTION_FONT_MAX = 22;
+const SECTION_FONT_DEFAULT = 14;
+
 function SortablePanel({
   id, title, icon, badge, borderClass, headerClass, expanded, onToggle, children, wrapCard = true,
+  fontSize, onFontSizeChange,
 }: {
   id: string; title?: string; icon?: React.ReactNode; badge?: React.ReactNode;
   borderClass?: string; headerClass?: string; expanded?: boolean; onToggle?: () => void;
   children: React.ReactNode; wrapCard?: boolean;
+  fontSize?: number; onFontSizeChange?: (size: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -587,6 +593,22 @@ function SortablePanel({
       <GripVertical size={16} className="text-gray-400" />
     </button>
   );
+
+  const fontControls = onFontSizeChange ? (
+    <div className="flex items-center gap-0.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => onFontSizeChange(Math.max(SECTION_FONT_MIN, (fontSize ?? SECTION_FONT_DEFAULT) - 1))}
+        className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700 font-bold text-sm leading-none select-none"
+        title="Decrease text size"
+      >−</button>
+      <span className="text-[10px] text-gray-400 w-6 text-center tabular-nums">{fontSize ?? SECTION_FONT_DEFAULT}</span>
+      <button
+        onClick={() => onFontSizeChange(Math.min(SECTION_FONT_MAX, (fontSize ?? SECTION_FONT_DEFAULT) + 1))}
+        className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-700 font-bold text-sm leading-none select-none"
+        title="Increase text size"
+      >+</button>
+    </div>
+  ) : null;
 
   if (!wrapCard) {
     return (
@@ -608,10 +630,17 @@ function SortablePanel({
               <span className={`font-semibold text-sm sm:text-base truncate ${headerClass || 'text-regis-navy'}`}>{title}</span>
               {badge}
             </div>
-            <ChevronDown size={18} className={`text-gray-400 flex-shrink-0 ml-2 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {fontControls}
+              <ChevronDown size={18} className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            </div>
           </div>
         </CardHeader>
-        {expanded && <CardContent className="p-4 pt-0">{children}</CardContent>}
+        {expanded && (
+          <CardContent className="p-4 pt-0" style={fontSize ? { fontSize } : undefined}>
+            {children}
+          </CardContent>
+        )}
       </Card>
     </div>
   );
@@ -666,6 +695,19 @@ export default function StaffDashboard() {
     forceChange: true
   });
   
+  // Per-section font size (persisted in localStorage)
+  const [sectionFontSize, setSectionFontSize] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem('sectionFontSize') || '{}'); } catch { return {}; }
+  });
+  const getSectionFontSize = (id: string) => sectionFontSize[id] ?? SECTION_FONT_DEFAULT;
+  const setSectionFont = (id: string, size: number) => {
+    setSectionFontSize(prev => {
+      const next = { ...prev, [id]: size };
+      localStorage.setItem('sectionFontSize', JSON.stringify(next));
+      return next;
+    });
+  };
+
   // Auto Close dialog state
   const [autoCloseTicket, setAutoCloseTicket] = useState<ValetTicket | null>(null);
   const [inHouseCollapsed, setInHouseCollapsed] = useState(false);
@@ -1903,6 +1945,7 @@ export default function StaffDashboard() {
                             title={`Retrieving Car (${activeTickets?.filter(t => ['retrieving', 'transit'].includes(t.status)).length || 0})`}
                             icon={<Car size={14} />}
                             expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('retrievals')} onFontSizeChange={s => setSectionFont('retrievals', s)}
                           >
                             <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
                               {activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).map((ticket) => (
@@ -1941,6 +1984,7 @@ export default function StaffDashboard() {
                             title={`Car Will Return (${activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})`}
                             icon={<Car size={14} />} borderClass="border-blue-200" headerClass="text-blue-700"
                             expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('guest-out')} onFontSizeChange={s => setSectionFont('guest-out', s)}
                           >
                             <div className="space-y-2 max-h-40 overflow-y-auto mt-2">
                               {activeTickets?.filter(t => t.status === 'out_with_guest').map((ticket) => (
@@ -1984,6 +2028,7 @@ export default function StaffDashboard() {
                               title={`In House (${allActive.length})`}
                               icon={<Clock size={14} />}
                               expanded={isExpanded} onToggle={toggle}
+                              fontSize={getSectionFontSize('in-house')} onFontSizeChange={s => setSectionFont('in-house', s)}
                             >
                               {/* Sort control */}
                               <div className="flex items-center justify-end gap-2 mt-2 mb-1">
@@ -2040,6 +2085,7 @@ export default function StaffDashboard() {
                               title={`Departed Today (${departedToday.length})`}
                               icon={<LogOut size={14} />} headerClass="text-gray-600"
                               expanded={isExpanded} onToggle={toggle}
+                              fontSize={getSectionFontSize('departed-today')} onFontSizeChange={s => setSectionFont('departed-today', s)}
                             >
                               <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
                                 {departedToday.map((ticket) => {
@@ -2087,6 +2133,7 @@ export default function StaffDashboard() {
                               title={`Departed History (${departedHistory.length})`}
                               icon={<LogOut size={14} />} headerClass="text-gray-500"
                               expanded={isExpanded} onToggle={toggle}
+                              fontSize={getSectionFontSize('departed-history')} onFontSizeChange={s => setSectionFont('departed-history', s)}
                             >
                               <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
                                 {departedHistory.map((ticket) => {
@@ -2341,6 +2388,7 @@ export default function StaffDashboard() {
                               badge={<Badge className="bg-regis-navy text-white text-sm px-3 py-1 ml-2">{allActiveD.length}</Badge>}
                               icon={<Clock className="text-regis-navy" size={18} />}
                               expanded={isExpanded} onToggle={toggle}
+                              fontSize={getSectionFontSize('in-house')} onFontSizeChange={s => setSectionFont('in-house', s)}
                             >
                               {ticketsLoading ? <div className="text-center py-6">Loading tickets...</div> : (
                                 <div>
@@ -2408,6 +2456,7 @@ export default function StaffDashboard() {
                             badge={<Badge className="bg-orange-500 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => ['retrieving', 'transit', 'preparing', 'ready'].includes(t.status)).length || 0}</Badge>}
                             icon={<Car className="text-orange-500" size={18} />}
                             expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('retrievals')} onFontSizeChange={s => setSectionFont('retrievals', s)}
                           >
                             <UnifiedRetrievalBox
                               tickets={activeTickets || []}
@@ -2429,6 +2478,7 @@ export default function StaffDashboard() {
                             icon={<Car className="text-blue-700" size={18} />}
                             borderClass="border-blue-200" headerClass="text-blue-700"
                             expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('guest-out')} onFontSizeChange={s => setSectionFont('guest-out', s)}
                           >
                             {activeTickets?.filter(t => t.status === 'out_with_guest').length === 0 ? (
                               <div className="text-center py-6 text-gray-400">
@@ -2453,6 +2503,7 @@ export default function StaffDashboard() {
                             badge={<span className="ml-2 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{departedToday.length}</span>}
                             icon={<LogOut className="text-gray-600" size={18} />} headerClass="text-gray-600"
                             expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('departed-today')} onFontSizeChange={s => setSectionFont('departed-today', s)}
                           >
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                               {departedToday.length === 0 ? (
@@ -2471,6 +2522,7 @@ export default function StaffDashboard() {
                             badge={<span className="ml-2 bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{departedHistory.length}</span>}
                             icon={<LogOut className="text-gray-500" size={18} />} headerClass="text-gray-500"
                             expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('departed-history')} onFontSizeChange={s => setSectionFont('departed-history', s)}
                           >
                             {(() => {
                               const availableYears = Array.from(new Set(departedHistory.map(t => t.updatedAt ? new Date(t.updatedAt).getFullYear().toString() : null).filter(Boolean))).sort((a,b) => Number(b)-Number(a)) as string[];
