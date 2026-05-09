@@ -424,7 +424,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           {(Object.entries(VISITOR_TYPES) as [VisitorType, string][]).map(([key, label]) => (
             <button
               key={key}
-              onClick={() => setFormData({ ...formData, visitorType: key, visitorSubType: "" })}
+              onClick={() => {
+                const autoRoom = key === 'hotel_guest' ? '' : key === 'event' ? 'Event' : key === 'others' ? 'Others' : '';
+                setFormData({ ...formData, visitorType: key, visitorSubType: "", roomNumber: autoRoom });
+              }}
               className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
                 formData.visitorType === key 
                   ? "border-regis-gold bg-regis-gold/10" 
@@ -447,7 +450,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             {(Object.entries(RESTAURANT_SUB_TYPES) as [RestaurantSubType, string][]).map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setFormData({ ...formData, visitorSubType: key })}
+                onClick={() => setFormData({ ...formData, visitorSubType: key, roomNumber: label })}
                 className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
                   formData.visitorSubType === key 
                     ? "border-regis-gold bg-regis-gold/10" 
@@ -860,14 +863,28 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700">Room Number</label>
-            <Input
-              value={formData.roomNumber}
-              onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
-              placeholder="Enter room number (optional)"
-              className="mt-1"
-              data-testid="input-room-number"
-            />
+            {formData.visitorType === 'hotel_guest' ? (
+              <>
+                <label className="text-sm font-medium text-gray-700">Room Number</label>
+                <Input
+                  value={formData.roomNumber}
+                  onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+                  placeholder="Enter room number (optional)"
+                  className="mt-1"
+                  data-testid="input-room-number"
+                />
+              </>
+            ) : (
+              <>
+                <label className="text-sm font-medium text-gray-700">
+                  {formData.visitorType === 'restaurant' ? 'Restaurant' : formData.visitorType === 'event' ? 'Event' : 'Category'}
+                </label>
+                <div className="mt-1 flex items-center gap-2 px-3 py-2.5 rounded-md border border-gray-200 bg-gray-50">
+                  <span className="font-semibold text-regis-navy">{formData.roomNumber || '—'}</span>
+                  <span className="ml-auto text-xs text-gray-400 italic">auto-filled</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
