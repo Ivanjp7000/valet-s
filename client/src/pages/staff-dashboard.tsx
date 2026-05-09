@@ -380,7 +380,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               {countdownDisplay}
             </span>
           </div>
-          <p className="text-xs text-gray-700 truncate font-medium">Mx. {ticket.guestName}</p>
+          <p className="text-sm font-bold text-regis-navy truncate">Mx. {ticket.guestName}</p>
           {!collapsed && (
             <>
               <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
@@ -2180,7 +2180,7 @@ export default function StaffDashboard() {
                                             PL: {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
-                                        <p className="mt-0.5 font-medium text-sm text-gray-800">Mx. {ticket.guestName}</p>
+                                        <p className="mt-0.5 font-bold text-base sm:text-lg text-regis-navy">Mx. {ticket.guestName}</p>
                                       </div>
                                       <div className="flex items-start gap-2">
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
