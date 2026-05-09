@@ -366,7 +366,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
           {ticket.roomNumber && (
             <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
           )}
-          <p className="text-xs text-gray-500 truncate">{ticket.carMake} {ticket.carModel}</p>
+          <p className="text-xs font-semibold text-gray-700 tracking-wide truncate">{ticket.carMake} {ticket.carModel}</p>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
             ticket.parkingLocation
               ? 'bg-green-100 text-green-700 border border-green-300'
@@ -2117,7 +2117,7 @@ export default function StaffDashboard() {
                                             PL: {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
-                                        <p className="text-xs text-gray-500">{ticket.carMake} {ticket.carModel}</p>
+                                        <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.carMake} {ticket.carModel}</p>
                                         {ticket.licensePlate && <p className="text-xs font-semibold text-gray-700 tracking-wide">{ticket.licensePlate}</p>}
                                       </div>
                                       <div className="flex items-start gap-2">
