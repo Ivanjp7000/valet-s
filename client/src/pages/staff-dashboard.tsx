@@ -1550,12 +1550,12 @@ export default function StaffDashboard() {
               const RosterTable = ({ tickets, pageNum = 1, totalPages = 1 }: { tickets: ValetTicket[]; pageNum?: number; totalPages?: number }) => (
                 <div>
                   {/* Title bar */}
-                  <div className="border border-black relative flex items-center justify-between px-4 py-2 bg-white">
-                    <div className="flex items-center gap-4 z-10">
+                  <div className="border border-black flex items-center justify-between px-4 py-2 bg-white">
+                    <div className="flex items-center gap-4">
                       <span className="text-sm font-semibold text-gray-500 border-r border-black pr-4">Page {pageNum}{totalPages > 1 ? ` / ${totalPages}` : ''}</span>
+                      <h2 className="text-lg font-bold tracking-[0.2em]">VALET PARKING LIST</h2>
                     </div>
-                    <h2 className="absolute inset-x-0 text-center text-lg font-bold tracking-[0.2em] pointer-events-none">VALET PARKING LIST</h2>
-                    <div className="flex items-center gap-6 text-sm font-semibold z-10">
+                    <div className="flex items-center gap-6 text-sm font-semibold">
                       <span className="border-l border-black pl-4">{tabDefs.find(t => t.key === rosterTab)?.sublabel}</span>
                       <span>DATE: {todayStr}</span>
                     </div>
