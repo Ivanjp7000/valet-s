@@ -26,7 +26,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, SafeUser as UserType } from "@shared/schema";
-import { RESTAURANT_SUB_TYPES } from "@shared/schema";
+import { RESTAURANT_SUB_TYPES, VISITOR_TYPES } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
 // Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
@@ -344,6 +344,17 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 align-middle">Room Pending</span>
             )}
           </p>
+          {ticket.visitorType && (
+            <span className="inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded bg-regis-navy/10 text-regis-navy border border-regis-navy/20 leading-tight mt-0.5">
+              {ticket.visitorType === 'hotel_guest'
+                ? 'Hotel Guest'
+                : ticket.visitorType === 'restaurant'
+                  ? `Restaurant${ticket.visitorSubType ? ` - ${RESTAURANT_SUB_TYPES[ticket.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]}` : ''}`
+                  : ticket.visitorType === 'event'
+                    ? 'Event'
+                    : 'Others'}
+            </span>
+          )}
           {ticket.roomNumber && (
             <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
           )}
@@ -2117,6 +2128,19 @@ export default function StaffDashboard() {
                                       <p><strong>Guest:</strong> {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
                                         <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
                                       )}</p>
+                                      {ticket.visitorType && (
+                                        <p>
+                                          <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-regis-navy/10 text-regis-navy border border-regis-navy/20">
+                                            {ticket.visitorType === 'hotel_guest'
+                                              ? 'Hotel Guest'
+                                              : ticket.visitorType === 'restaurant'
+                                                ? `Restaurant${ticket.visitorSubType ? ` - ${RESTAURANT_SUB_TYPES[ticket.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]}` : ''}`
+                                                : ticket.visitorType === 'event'
+                                                  ? 'Event'
+                                                  : 'Others'}
+                                          </span>
+                                        </p>
+                                      )}
                                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
                                       <p><strong>Color:</strong> {ticket.carColor}</p>
                                     </div>
