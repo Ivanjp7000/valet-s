@@ -1616,7 +1616,7 @@ export default function StaffDashboard() {
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">C/IN</th>
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">C/OUT</th>
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">駐車場所</th>
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-24">備考</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-24" style={{ position: 'sticky', right: 0, zIndex: 20, background: '#f3f4f6' }}>備考</th>
                       </tr>
                       <tr className="bg-gray-100">
                         <th className="border border-black px-1 py-0.5 text-center text-[11px]">部屋番号</th>
@@ -1682,7 +1682,7 @@ export default function StaffDashboard() {
                                 </>) : ''}
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-bold align-middle">{ticket.parkingLocation || ''}</td>
-                              <td className="border border-black p-0 align-middle overflow-hidden"><BikouCell ticket={ticket} /></td>
+                              <td className="border border-black p-0 align-middle overflow-hidden" style={{ position: 'sticky', right: 0, zIndex: 10, background: ticket.status === 'cancelled' ? '#fef2f2' : ticket.status === 'completed' ? '#f9fafb' : '#ffffff' }}><BikouCell ticket={ticket} /></td>
                             </tr>
                           );
                         }
@@ -1704,7 +1704,7 @@ export default function StaffDashboard() {
                             <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 font-mono">：</span></td>
                             <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 font-mono">：</span></td>
                             <td className="border border-black"></td>
-                            <td className="border border-black p-0 align-middle overflow-hidden">
+                            <td className="border border-black p-0 align-middle overflow-hidden" style={{ position: 'sticky', right: 0, zIndex: 10, background: '#ffffff' }}>
                               <div className="flex flex-col" style={{ minHeight: 54 }}>
                                 <div className="flex-1 flex items-center justify-center border-b border-gray-200 text-[10px] text-gray-200 font-bold">NOTES</div>
                                 <div className="flex-1 flex items-center justify-center text-[10px] text-gray-200 font-bold">NC Done</div>
