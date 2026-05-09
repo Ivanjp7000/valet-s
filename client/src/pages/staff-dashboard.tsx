@@ -1846,6 +1846,34 @@ export default function StaffDashboard() {
                           </span>
                         </div>
                         {ticket.licensePlate && <p className="text-[10px] font-mono text-gray-400 mt-0.5">{ticket.licensePlate}</p>}
+                        {/* NOTES + NC Done buttons */}
+                        <div className="flex mt-1.5 rounded overflow-hidden border border-gray-300" style={{ height: 36 }}>
+                          {(() => {
+                            const hasNotes = !!(ticket.staffNotes && ticket.staffNotes.trim());
+                            const ncDone = !!(ticket as any).nightCheckDone;
+                            return (<>
+                              <button
+                                onClick={() => setRosterNotesPopup({ ticketNumber: ticket.ticketNumber, notes: ticket.staffNotes || '' })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold border-r border-gray-300 transition-colors ${
+                                  hasNotes ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-white text-gray-400 hover:bg-gray-50'
+                                }`}
+                                title={hasNotes ? ticket.staffNotes! : 'Add notes'}
+                              >
+                                <FileText size={12} />
+                                NOTES{hasNotes ? ' ✓' : ''}
+                              </button>
+                              <button
+                                onClick={() => rosterNotesMutation.mutate({ ticketNumber: ticket.ticketNumber, nightCheckDone: !ncDone })}
+                                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold transition-colors ${
+                                  ncDone ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-red-500 text-white hover:bg-red-600'
+                                }`}
+                              >
+                                <CheckSquare size={12} />
+                                NC Done{ncDone ? ' ✓' : ''}
+                              </button>
+                            </>);
+                          })()}
+                        </div>
                       </div>
                     ))}
                     {rosterTickets.length === 0 && (
