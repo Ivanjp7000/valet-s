@@ -1564,7 +1564,7 @@ export default function StaffDashboard() {
                           : 'bg-red-500 text-white hover:bg-red-600'
                       }`}
                     >
-                      NC Done
+                      {ncDone ? 'NC Done' : 'NC Pending'}
                     </button>
                   </div>
                 );
@@ -1708,7 +1708,7 @@ export default function StaffDashboard() {
                             <td className="border border-black p-0 align-middle overflow-hidden" style={{ position: 'sticky', right: 0, zIndex: 10, background: '#ffffff' }}>
                               <div className="flex flex-col" style={{ minHeight: 54 }}>
                                 <div className="flex-1 flex items-center justify-center border-b border-gray-200 text-[10px] text-gray-200 font-bold">NOTES</div>
-                                <div className="flex-1 flex items-center justify-center text-[10px] text-gray-200 font-bold">NC Done</div>
+                                <div className="flex-1 flex items-center justify-center text-[10px] text-gray-200 font-bold">NC Pending</div>
                               </div>
                             </td>
                           </tr>
@@ -1870,7 +1870,7 @@ export default function StaffDashboard() {
                                 }`}
                               >
                                 <CheckSquare size={12} />
-                                NC Done{ncDone ? ' ✓' : ''}
+                                {ncDone ? 'NC Done ✓' : 'NC Pending'}
                               </button>
                             </>);
                           })()}
