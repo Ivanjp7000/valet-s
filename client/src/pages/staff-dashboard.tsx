@@ -380,11 +380,11 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
           </div>
           <p className="text-xs text-gray-700 truncate font-medium">Mx. {ticket.guestName}</p>
           <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
-          <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
-            <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest truncate leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
+          <div className="mt-1 w-fit mx-auto rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
+            <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center whitespace-nowrap">{ticket.carMake} {ticket.carModel}</p>
             <div className="flex justify-center">
               {ticket.licensePlate ? (
-                <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+                <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight whitespace-nowrap">{ticket.licensePlate}</span>
               ) : (
                 <span className="text-[10px] text-slate-400 italic">No plate</span>
               )}
@@ -2183,11 +2183,11 @@ export default function StaffDashboard() {
                                       </div>
                                     </div>
                                     <div className="space-y-1.5 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                                      <div className="rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
-                                        <p className="text-sm font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
+                                      <div className="w-fit mx-auto rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
+                                        <p className="text-sm font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center whitespace-nowrap">{ticket.carMake} {ticket.carModel}</p>
                                         <div className="flex justify-center">
                                           {ticket.licensePlate ? (
-                                            <span className="text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+                                            <span className="text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight whitespace-nowrap">{ticket.licensePlate}</span>
                                           ) : (
                                             <span className="text-[10px] text-slate-400 italic">No plate</span>
                                           )}
