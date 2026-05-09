@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useOCR } from "@/hooks/useOCR";
+import { CameraScanner } from "@/components/camera-scanner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -296,6 +297,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const { recognizePlate } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
+  const [showTicketScanner, setShowTicketScanner] = useState(false);
   const [isCarPhotoProcessing, setIsCarPhotoProcessing] = useState(false);
 
   const [formData, setFormData] = useState<TicketFormData>({
@@ -922,47 +924,11 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   type="button"
                   variant="outline"
                   className="shrink-0 border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
-                  disabled={isTicketOcrRunning}
-                  onClick={() => {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*';
-                    input.capture = 'environment';
-                    input.onchange = async (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        const dataUrl = ev.target?.result as string;
-                        setIsTicketOcrRunning(true);
-                        try {
-                          const rawText = await recognizeText(dataUrl);
-                          const match = rawText.match(/\b\d{5}\b/);
-                          if (match) {
-                            setFormData(prev => ({ ...prev, ticketNumber: match[0] }));
-                          } else {
-                            toast({ title: "No ticket number found", description: "Please enter it manually.", variant: "destructive" });
-                          }
-                        } catch {
-                          toast({ title: "Scan failed", description: "Please enter the number manually.", variant: "destructive" });
-                        } finally {
-                          setIsTicketOcrRunning(false);
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    };
-                    input.click();
-                  }}
+                  onClick={() => setShowTicketScanner(true)}
                   data-testid="button-scan-ticket-number"
                 >
-                  {isTicketOcrRunning ? (
-                    <span className="text-xs">Reading...</span>
-                  ) : (
-                    <>
-                      <ScanLine className="w-4 h-4 mr-1" />
-                      Scan
-                    </>
-                  )}
+                  <ScanLine className="w-4 h-4 mr-1" />
+                  Scan
                 </Button>
               </div>
               <Button
@@ -1176,6 +1142,19 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </>
         )}
       </DialogContent>
+
+      {/* Full-screen CameraScanner overlay */}
+      {showTicketScanner && (
+        <div className="fixed inset-0 z-[200]">
+          <CameraScanner
+            onScanComplete={(number) => {
+              setFormData(prev => ({ ...prev, ticketNumber: number }));
+              setShowTicketScanner(false);
+            }}
+            onClose={() => setShowTicketScanner(false)}
+          />
+        </div>
+      )}
     </Dialog>
   );
 }
