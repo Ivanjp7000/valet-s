@@ -518,13 +518,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const currentUser = req.currentUser;
       const { 
-        ticketNumber, visitorType, visitorSubType, guestName,
+        visitorType, visitorSubType, guestName,
         carMake, carModel, carColor, licensePlate, platePhotoUrl, carPhoto,
         locationId, parkingSector, parkingLocation, 
         createdByUserId, createdByName
       } = req.body;
 
       const PSEUDO_TICKET = 'X7777';
+      let ticketNumber: string = req.body.ticketNumber;
 
       // Validate required fields
       if (!ticketNumber || (ticketNumber !== PSEUDO_TICKET && !/^\d{5}$/.test(ticketNumber))) {
@@ -534,11 +535,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Check if ticket already exists — pseudo ticket X7777 is exempt from uniqueness
-      if (ticketNumber !== PSEUDO_TICKET) {
+      // For pseudo tickets generate a unique placeholder number (P + 4 digits)
+      if (ticketNumber === PSEUDO_TICKET) {
+        let unique = false;
+        let attempts = 0;
+        while (!unique && attempts < 20) {
+          const candidate = 'P' + String(Math.floor(1000 + Math.random() * 9000));
+          const existing = await storage.getValetTicket(candidate);
+          if (!existing) {
+            ticketNumber = candidate;
+            unique = true;
+          }
+          attempts++;
+        }
+        if (!unique) {
+          return res.status(500).json({ message: "Could not generate a unique ticket number. Please try again." });
+        }
+      } else {
         const existingTicket = await storage.getValetTicket(ticketNumber);
         if (existingTicket) {
-          return res.status(400).json({ message: "Ticket number already exists" });
+          return res.status(400).json({ message: "Ticket number " + ticketNumber + " is already in use. Please check the ticket and try again." });
         }
       }
 
