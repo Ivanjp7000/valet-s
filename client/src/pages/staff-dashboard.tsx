@@ -379,12 +379,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             </span>
           </div>
           <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
-          <p className="text-xs text-gray-700 truncate font-medium">
-            Mx. {ticket.guestName}
-            {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
-              <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 align-middle">Room Pending</span>
-            )}
-          </p>
+          <p className="text-xs text-gray-700 truncate font-medium">Mx. {ticket.guestName}</p>
           {ticket.visitorType && (
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight border ${
@@ -404,6 +399,9 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                       ? 'Event'
                       : 'Others'}
               </span>
+              {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 leading-tight">Room Pending</span>
+              )}
               {ticket.roomNumber && (
                 <span className="text-[9px] font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
               )}
@@ -2194,9 +2192,7 @@ export default function StaffDashboard() {
                                       </div>
                                     </div>
                                     <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                                      <p className="font-medium text-gray-800">Mx. {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
-                                        <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
-                                      )}</p>
+                                      <p className="font-medium text-gray-800">Mx. {ticket.guestName}</p>
                                       {ticket.visitorType && (
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border ${
@@ -2216,6 +2212,9 @@ export default function StaffDashboard() {
                                                   ? 'Event'
                                                   : 'Others'}
                                           </span>
+                                          {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                                            <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 leading-tight">Room Pending</span>
+                                          )}
                                           {ticket.roomNumber && (
                                             <span className="text-xs font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
                                           )}
