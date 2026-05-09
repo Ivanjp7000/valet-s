@@ -1630,12 +1630,12 @@ export default function StaffDashboard() {
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-mono align-middle">{ticket.licensePlate || ''}</td>
                               <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle leading-tight">
-                                <div className="text-[9px]">{fmtRosterDate(ticket.createdAt)}</div>
+                                <div>{fmtRosterDate(ticket.createdAt)}</div>
                                 <div>{fmtTime(ticket.createdAt)}</div>
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-mono tabular-nums align-middle leading-tight">
                                 {ticket.status === 'completed' && ticket.departedAt ? (<>
-                                  <div className="text-[9px]">{fmtRosterDate(ticket.departedAt)}</div>
+                                  <div>{fmtRosterDate(ticket.departedAt)}</div>
                                   <div>{fmtTime(ticket.departedAt)}</div>
                                 </>) : ''}
                               </td>
