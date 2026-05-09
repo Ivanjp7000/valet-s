@@ -368,11 +368,13 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
           )}
           <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
             <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest truncate leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
-            {ticket.licensePlate ? (
-              <span className="inline-block text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
-            ) : (
-              <span className="inline-block text-[10px] text-slate-400 italic">No plate</span>
-            )}
+            <div className="flex justify-center">
+              {ticket.licensePlate ? (
+                <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+              ) : (
+                <span className="text-[10px] text-slate-400 italic">No plate</span>
+              )}
+            </div>
           </div>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
             ticket.parkingLocation
@@ -2126,11 +2128,13 @@ export default function StaffDashboard() {
                                         </div>
                                         <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
                                           <p className="text-sm font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
-                                          {ticket.licensePlate ? (
-                                            <span className="inline-block text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
-                                          ) : (
-                                            <span className="inline-block text-[10px] text-slate-400 italic">No plate</span>
-                                          )}
+                                          <div className="flex justify-center">
+                                            {ticket.licensePlate ? (
+                                              <span className="text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+                                            ) : (
+                                              <span className="text-[10px] text-slate-400 italic">No plate</span>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                       <div className="flex items-start gap-2">
