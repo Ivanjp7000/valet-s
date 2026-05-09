@@ -384,6 +384,14 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</span>
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-bold ${
+              ticket.parkingLocation
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : 'bg-red-100 text-red-700 border border-red-300'
+            }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
+              <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+              {ticket.parkingLocation || 'Unassigned'}
+            </span>
             {isOvernight && (
               <span className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1 leading-tight">
                 Day {dayNumber}
@@ -435,14 +443,6 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                   )}
                 </div>
               )}
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-bold mt-0.5 ${
-                ticket.parkingLocation
-                  ? 'bg-green-100 text-green-700 border border-green-300'
-                  : 'bg-red-100 text-red-700 border border-red-300'
-              }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-                <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
-                {ticket.parkingLocation || 'Unassigned'}
-              </span>
               {scheduled && (
                 <div className="flex items-center gap-1 mt-0.5">
                   <p className="text-[10px] text-purple-600 font-semibold">
