@@ -386,26 +386,28 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             )}
           </p>
           {ticket.visitorType && (
-            <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight mt-0.5 border ${
-              ticket.visitorType === 'hotel_guest'
-                ? 'bg-blue-100 text-blue-700 border-blue-300'
-                : ticket.visitorType === 'restaurant'
-                  ? 'bg-orange-100 text-orange-700 border-orange-300'
-                  : ticket.visitorType === 'event'
-                    ? 'bg-purple-100 text-purple-700 border-purple-300'
-                    : 'bg-teal-100 text-teal-700 border-teal-300'
-            }`}>
-              {ticket.visitorType === 'hotel_guest'
-                ? 'Hotel Guest'
-                : ticket.visitorType === 'restaurant'
-                  ? `Restaurant${ticket.visitorSubType ? ` - ${RESTAURANT_SUB_TYPES[ticket.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]}` : ''}`
-                  : ticket.visitorType === 'event'
-                    ? 'Event'
-                    : 'Others'}
-            </span>
-          )}
-          {ticket.roomNumber && (
-            <p className="text-xs text-gray-500">Room: {ticket.roomNumber}</p>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight border ${
+                ticket.visitorType === 'hotel_guest'
+                  ? 'bg-blue-100 text-blue-700 border-blue-300'
+                  : ticket.visitorType === 'restaurant'
+                    ? 'bg-orange-100 text-orange-700 border-orange-300'
+                    : ticket.visitorType === 'event'
+                      ? 'bg-purple-100 text-purple-700 border-purple-300'
+                      : 'bg-teal-100 text-teal-700 border-teal-300'
+              }`}>
+                {ticket.visitorType === 'hotel_guest'
+                  ? 'Hotel Guest'
+                  : ticket.visitorType === 'restaurant'
+                    ? `Restaurant${ticket.visitorSubType ? ` - ${RESTAURANT_SUB_TYPES[ticket.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]}` : ''}`
+                    : ticket.visitorType === 'event'
+                      ? 'Event'
+                      : 'Others'}
+              </span>
+              {ticket.roomNumber && (
+                <span className="text-[9px] font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
+              )}
+            </div>
           )}
           <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
             <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest truncate leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
@@ -2196,7 +2198,7 @@ export default function StaffDashboard() {
                                         <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
                                       )}</p>
                                       {ticket.visitorType && (
-                                        <p>
+                                        <div className="flex items-center gap-2 flex-wrap">
                                           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border ${
                                             ticket.visitorType === 'hotel_guest'
                                               ? 'bg-blue-100 text-blue-700 border-blue-300'
@@ -2214,9 +2216,11 @@ export default function StaffDashboard() {
                                                   ? 'Event'
                                                   : 'Others'}
                                           </span>
-                                        </p>
+                                          {ticket.roomNumber && (
+                                            <span className="text-xs font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
+                                          )}
+                                        </div>
                                       )}
-                                      {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
                                       <CarColorBadge color={ticket.carColor || ''} />
                                     </div>
                                     {(ticket as any).scheduledDepartureAt && (
