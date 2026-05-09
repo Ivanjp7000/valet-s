@@ -1652,11 +1652,11 @@ export default function StaffDashboard() {
                               {/* Row number + status */}
                               <td className="border border-black text-center px-1 py-1 align-middle">
                                 <div className="font-bold text-xs">{index + 1}</div>
-                                <div className={`text-base font-bold leading-none ${
-                                  ticket.status === 'completed' ? 'text-green-600' :
-                                  (Date.now() - new Date(ticket.createdAt!).getTime()) >= 24 * 60 * 60 * 1000
-                                    ? 'text-orange-600' : 'text-green-600'
-                                }`}>{ticket.status === 'completed' ? '✓' : '●'}</div>
+                                {(() => {
+                                  const isOver24h = (Date.now() - new Date(ticket.createdAt!).getTime()) >= 24 * 60 * 60 * 1000;
+                                  const dotColor = ticket.status === 'completed' ? '#16a34a' : isOver24h ? '#ea580c' : '#16a34a';
+                                  return <div className="text-base font-bold leading-none" style={{ color: dotColor }}>{ticket.status === 'completed' ? '✓' : '●'}</div>;
+                                })()}
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle text-sm">#{ticket.ticketNumber}</td>
                               <td className="border border-black px-2 py-1 align-middle">
@@ -1818,11 +1818,7 @@ export default function StaffDashboard() {
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-gray-400 font-bold w-4">{index + 1}</span>
-                            <span className={`font-bold text-xs ${
-                              ticket.status === 'completed' ? 'text-green-600' :
-                              (Date.now() - new Date(ticket.createdAt!).getTime()) >= 24 * 60 * 60 * 1000
-                                ? 'text-orange-600' : 'text-green-600'
-                            }`}>
+                            <span className="font-bold text-xs" style={{ color: ticket.status === 'completed' ? '#16a34a' : (Date.now() - new Date(ticket.createdAt!).getTime()) >= 24 * 60 * 60 * 1000 ? '#ea580c' : '#16a34a' }}>
                               {ticket.status === 'completed' ? '✓' : '●'}
                             </span>
                             <span className="font-bold text-regis-navy text-sm">#{ticket.ticketNumber}</span>
