@@ -331,6 +331,19 @@ function carColorStyle(name: string): { bg: string; text: string } {
   return map[n] ?? { bg: '#e2e8f0', text: '#1a1a1a' };
 }
 
+function sortInHouseTickets(tickets: any[], sortBy: string) {
+  const s = [...tickets];
+  switch (sortBy) {
+    case 'newest':    return s.sort((a,b) => new Date(b.createdAt||0).getTime() - new Date(a.createdAt||0).getTime());
+    case 'oldest':    return s.sort((a,b) => new Date(a.createdAt||0).getTime() - new Date(b.createdAt||0).getTime());
+    case 'name_az':   return s.sort((a,b) => (a.guestName||'').localeCompare(b.guestName||''));
+    case 'name_za':   return s.sort((a,b) => (b.guestName||'').localeCompare(a.guestName||''));
+    case 'ticket_asc':  return s.sort((a,b) => (a.ticketNumber||'').localeCompare(b.ticketNumber||''));
+    case 'ticket_desc': return s.sort((a,b) => (b.ticketNumber||'').localeCompare(a.ticketNumber||''));
+    default: return s;
+  }
+}
+
 function CarColorBadge({ color }: { color: string }) {
   if (!color) return null;
   const { bg, text } = carColorStyle(color);
@@ -656,6 +669,7 @@ export default function StaffDashboard() {
   // Auto Close dialog state
   const [autoCloseTicket, setAutoCloseTicket] = useState<ValetTicket | null>(null);
   const [inHouseCollapsed, setInHouseCollapsed] = useState(false);
+  const [inHouseSortBy, setInHouseSortBy] = useState<'newest'|'oldest'|'name_az'|'name_za'|'ticket_asc'|'ticket_desc'>('newest');
   const [autoCloseDate, setAutoCloseDate] = useState('');
   const [autoCloseTime, setAutoCloseTime] = useState('12:00');
 
@@ -1941,38 +1955,82 @@ export default function StaffDashboard() {
                           </SortablePanel>
                         );
 
-                        if (panelId === 'in-house') return (
-                          <SortablePanel key="in-house" id="in-house"
-                            title={`In House (${activeTickets?.filter(t => t.status === 'active').length || 0})`}
-                            icon={<Clock size={14} />}
-                            expanded={isExpanded} onToggle={toggle}
-                          >
-                            <div className="space-y-2 max-h-60 overflow-y-auto mt-2">
-                              {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
-                                <CompactInHouseCard key={ticket.id} ticket={ticket}
-                                  onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                                  onEdit={() => setEditTicketData(ticket)}
-                                  onView={() => setViewTicket(ticket)}
-                                  onDepart={() => departMutation.mutate(ticket.ticketNumber)}
-                                  onAutoClose={() => {
-                                    setAutoCloseTicket(ticket);
-                                    const today = new Date();
-                                    const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                                    const localTime = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
-                                    setAutoCloseDate(localDate);
-                                    setAutoCloseTime(localTime);
-                                  }}
-                                  onCancelAutoClose={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
-                                  canEdit={canEdit}
-                                  collapsed={inHouseCollapsed}
-                                  onToggleCollapse={() => setInHouseCollapsed(c => !c)} />
-                              ))}
-                              {activeTickets?.filter(t => t.status === 'active').length === 0 && (
+                        if (panelId === 'in-house') {
+                          const allActive = activeTickets?.filter(t => t.status === 'active') || [];
+                          const now = Date.now();
+                          const freshTickets = sortInHouseTickets(allActive.filter(t => (now - new Date(t.createdAt||0).getTime()) < 24*60*60*1000), inHouseSortBy);
+                          const overnightTickets = sortInHouseTickets(allActive.filter(t => (now - new Date(t.createdAt||0).getTime()) >= 24*60*60*1000), inHouseSortBy);
+                          const renderCompact = (ticket: any) => (
+                            <CompactInHouseCard key={ticket.id} ticket={ticket}
+                              onRetrieve={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                              onEdit={() => setEditTicketData(ticket)}
+                              onView={() => setViewTicket(ticket)}
+                              onDepart={() => departMutation.mutate(ticket.ticketNumber)}
+                              onAutoClose={() => {
+                                setAutoCloseTicket(ticket);
+                                const today = new Date();
+                                const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                                const localTime = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
+                                setAutoCloseDate(localDate);
+                                setAutoCloseTime(localTime);
+                              }}
+                              onCancelAutoClose={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
+                              canEdit={canEdit}
+                              collapsed={inHouseCollapsed}
+                              onToggleCollapse={() => setInHouseCollapsed(c => !c)} />
+                          );
+                          return (
+                            <SortablePanel key="in-house" id="in-house"
+                              title={`In House (${allActive.length})`}
+                              icon={<Clock size={14} />}
+                              expanded={isExpanded} onToggle={toggle}
+                            >
+                              {/* Sort control */}
+                              <div className="flex items-center justify-end gap-2 mt-2 mb-1">
+                                <span className="text-[10px] text-gray-400 font-medium">Sort:</span>
+                                <select
+                                  value={inHouseSortBy}
+                                  onChange={e => setInHouseSortBy(e.target.value as any)}
+                                  className="text-[10px] border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 bg-white focus:outline-none"
+                                >
+                                  <option value="newest">Newest first</option>
+                                  <option value="oldest">Oldest first</option>
+                                  <option value="name_az">Name A→Z</option>
+                                  <option value="name_za">Name Z→A</option>
+                                  <option value="ticket_asc">Ticket ↑</option>
+                                  <option value="ticket_desc">Ticket ↓</option>
+                                </select>
+                              </div>
+                              {/* Fresh section */}
+                              <div className="mb-2">
+                                <div className="flex items-center gap-1.5 px-1 py-0.5 mb-1">
+                                  <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                                  <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">Under 24h ({freshTickets.length})</span>
+                                </div>
+                                <div className="space-y-2 max-h-52 overflow-y-auto">
+                                  {freshTickets.length > 0 ? freshTickets.map(renderCompact) : (
+                                    <p className="text-[10px] text-gray-400 text-center py-1">None</p>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Overnight section */}
+                              <div>
+                                <div className="flex items-center gap-1.5 px-1 py-0.5 mb-1 border-t border-amber-200 pt-2">
+                                  <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Overnight 24h+ ({overnightTickets.length})</span>
+                                </div>
+                                <div className="space-y-2 max-h-52 overflow-y-auto">
+                                  {overnightTickets.length > 0 ? overnightTickets.map(renderCompact) : (
+                                    <p className="text-[10px] text-gray-400 text-center py-1">None</p>
+                                  )}
+                                </div>
+                              </div>
+                              {allActive.length === 0 && (
                                 <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
                               )}
-                            </div>
-                          </SortablePanel>
-                        );
+                            </SortablePanel>
+                          );
+                        }
 
                         if (panelId === 'departed-today') {
                           const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -2160,16 +2218,12 @@ export default function StaffDashboard() {
                         const isExpanded = expandedPanels.has(panelId);
                         const toggle = () => togglePanel(panelId);
 
-                        if (panelId === 'in-house') return (
-                          <SortablePanel key="in-house" id="in-house"
-                            title="In House"
-                            badge={<Badge className="bg-regis-navy text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => t.status === 'active').length || 0}</Badge>}
-                            icon={<Clock className="text-regis-navy" size={18} />}
-                            expanded={isExpanded} onToggle={toggle}
-                          >
-                            {ticketsLoading ? <div className="text-center py-6">Loading tickets...</div> : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                {activeTickets?.filter(t => t.status === 'active').map((ticket) => (
+                        if (panelId === 'in-house') {
+                          const allActiveD = activeTickets?.filter(t => t.status === 'active') || [];
+                          const nowD = Date.now();
+                          const freshD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) < 24*60*60*1000), inHouseSortBy);
+                          const overnightD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) >= 24*60*60*1000), inHouseSortBy);
+                          const renderDesktopCard = (ticket: any) => (
                                   <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3">
                                       <div>
@@ -2280,17 +2334,73 @@ export default function StaffDashboard() {
                                       </div>
                                     )}
                                   </div>
-                                ))}
-                                {activeTickets?.filter(t => t.status === 'active').length === 0 && (
-                                  <div className="col-span-full text-center py-6 sm:py-8 text-gray-400">
-                                    <Clock size={36} className="mx-auto mb-2 opacity-40" />
-                                    <p className="text-sm">No vehicles in house</p>
+                          );
+                          return (
+                            <SortablePanel key="in-house" id="in-house"
+                              title="In House"
+                              badge={<Badge className="bg-regis-navy text-white text-sm px-3 py-1 ml-2">{allActiveD.length}</Badge>}
+                              icon={<Clock className="text-regis-navy" size={18} />}
+                              expanded={isExpanded} onToggle={toggle}
+                            >
+                              {ticketsLoading ? <div className="text-center py-6">Loading tickets...</div> : (
+                                <div>
+                                  {/* Sort control */}
+                                  <div className="flex items-center justify-end gap-2 mb-3">
+                                    <span className="text-xs text-gray-400 font-medium">Sort:</span>
+                                    <select
+                                      value={inHouseSortBy}
+                                      onChange={e => setInHouseSortBy(e.target.value as any)}
+                                      className="text-xs border border-gray-200 rounded px-2 py-1 text-gray-600 bg-white focus:outline-none"
+                                    >
+                                      <option value="newest">Newest first</option>
+                                      <option value="oldest">Oldest first</option>
+                                      <option value="name_az">Name A→Z</option>
+                                      <option value="name_za">Name Z→A</option>
+                                      <option value="ticket_asc">Ticket ↑</option>
+                                      <option value="ticket_desc">Ticket ↓</option>
+                                    </select>
                                   </div>
-                                )}
-                              </div>
-                            )}
-                          </SortablePanel>
-                        );
+                                  {/* Fresh section */}
+                                  <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2 pb-1 border-b border-green-200">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0" />
+                                      <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Under 24h</span>
+                                      <span className="ml-auto text-xs font-semibold text-green-600 bg-green-50 border border-green-200 rounded-full px-2">{freshD.length}</span>
+                                    </div>
+                                    {freshD.length > 0 ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                        {freshD.map(renderDesktopCard)}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-gray-400 text-center py-2">None</p>
+                                    )}
+                                  </div>
+                                  {/* Overnight section */}
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2 pb-1 border-b border-amber-200">
+                                      <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
+                                      <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Overnight 24h+</span>
+                                      <span className="ml-auto text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2">{overnightD.length}</span>
+                                    </div>
+                                    {overnightD.length > 0 ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                        {overnightD.map(renderDesktopCard)}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-gray-400 text-center py-2">None</p>
+                                    )}
+                                  </div>
+                                  {allActiveD.length === 0 && (
+                                    <div className="text-center py-6 sm:py-8 text-gray-400">
+                                      <Clock size={36} className="mx-auto mb-2 opacity-40" />
+                                      <p className="text-sm">No vehicles in house</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </SortablePanel>
+                          );
+                        }
 
                         if (panelId === 'retrievals') return (
                           <SortablePanel key="retrievals" id="retrievals"
