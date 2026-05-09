@@ -248,10 +248,10 @@ function GuestOutCard({ ticket, onBack, onView, canEdit = true }: { ticket: Vale
           </Button>
         </div>
       </div>
-      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-bold ${
+      <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${
         ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
       }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-        <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+
         {ticket.parkingLocation || 'Unassigned'}
       </span>
       {canEdit && (
@@ -384,12 +384,12 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</span>
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-bold ${
+            <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${
               ticket.parkingLocation
                 ? 'bg-green-100 text-green-700 border border-green-300'
                 : 'bg-red-100 text-red-700 border border-red-300'
             }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-              <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+      
               {ticket.parkingLocation || 'Unassigned'}
             </span>
             {isOvernight && (
@@ -543,10 +543,10 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
       </div>
       <div className="text-sm text-gray-600 mb-3 space-y-1">
         <p style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}><strong>Guest:</strong> {ticket.guestName}</p>
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold ${
+        <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${
           ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
         }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-          <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+  
           {ticket.parkingLocation || 'Unassigned'}
         </span>
       </div>
@@ -2276,8 +2276,8 @@ export default function StaffDashboard() {
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <p className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</p>
-                                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                                          <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
+                                    
                                             {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
@@ -2707,8 +2707,8 @@ export default function StaffDashboard() {
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="font-medium text-sm sm:text-base">Ticket #{ticket.ticketNumber}</p>
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                                  <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
+                            
                                     {ticket.parkingLocation || 'Unassigned'}
                                   </span>
                                 </div>
