@@ -335,11 +335,12 @@ function CarColorBadge({ color }: { color: string }) {
   if (!color) return null;
   const { bg, text } = carColorStyle(color);
   return (
-    <div
-      className="mt-1 rounded-md border px-2 py-1.5 flex items-center justify-center gap-2"
-      style={{ backgroundColor: bg, borderColor: bg === '#f5f5f5' ? '#d1d5db' : bg }}
-    >
-      <span className="text-xs font-bold tracking-wide" style={{ color: text }}>{color}</span>
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs text-gray-500 font-medium">Color:</span>
+      <span
+        className="text-xs font-bold tracking-wide rounded px-2 py-0.5 border"
+        style={{ backgroundColor: bg, color: text, borderColor: bg === '#f5f5f5' ? '#d1d5db' : bg }}
+      >{color}</span>
     </div>
   );
 }
