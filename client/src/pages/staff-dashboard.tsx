@@ -1537,9 +1537,10 @@ export default function StaffDashboard() {
                 );
               };
               // 備考 split cell — top: NOTES popup, bottom: NC Done toggle
+              const todayDateStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
               const BikouCell = ({ ticket }: { ticket: ValetTicket }) => {
                 const hasNotes = !!(ticket.staffNotes && ticket.staffNotes.trim());
-                const ncDone = !!(ticket as any).nightCheckDone;
+                const ncDone = (ticket as any).nightCheckDone === todayDateStr;
                 return (
                   <div className="flex flex-col h-full" style={{ minHeight: 54 }}>
                     {/* Top half — NOTES */}
@@ -1850,7 +1851,7 @@ export default function StaffDashboard() {
                         <div className="flex mt-1.5 rounded overflow-hidden border border-gray-300" style={{ height: 36 }}>
                           {(() => {
                             const hasNotes = !!(ticket.staffNotes && ticket.staffNotes.trim());
-                            const ncDone = !!(ticket as any).nightCheckDone;
+                            const ncDone = (ticket as any).nightCheckDone === todayDateStr;
                             return (<>
                               <button
                                 onClick={() => setRosterNotesPopup({ ticketNumber: ticket.ticketNumber, notes: ticket.staffNotes || '' })}

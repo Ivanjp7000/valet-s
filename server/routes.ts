@@ -1679,7 +1679,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const updateData: any = {};
       if (staffNotes !== undefined) updateData.staffNotes = staffNotes;
-      if (nightCheckDone !== undefined) updateData.nightCheckDone = nightCheckDone;
+      if (nightCheckDone !== undefined) {
+        // Store today's date string when marking done, null when unmarking
+        const todayStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        updateData.nightCheckDone = nightCheckDone ? todayStr : null;
+      }
       const updated = await storage.updateValetTicket(ticketNumber, updateData);
       broadcastToOU(updated?.ouId, { type: 'ticket_updated', data: updated });
       res.json(updated);
