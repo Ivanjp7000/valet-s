@@ -345,7 +345,7 @@ function CarColorBadge({ color }: { color: string }) {
   );
 }
 
-function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAutoClose, onCancelAutoClose, canEdit = true }: {
+function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAutoClose, onCancelAutoClose, canEdit = true, collapsed = false, onToggleCollapse }: {
   ticket: ValetTicket;
   onRetrieve: () => void;
   onEdit: () => void;
@@ -354,6 +354,8 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
   onAutoClose: () => void;
   onCancelAutoClose: () => void;
   canEdit?: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
   const scheduled = (ticket as any).scheduledDepartureAt;
@@ -379,63 +381,67 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             </span>
           </div>
           <p className="text-xs text-gray-700 truncate font-medium">Mx. {ticket.guestName}</p>
-          <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
-          <div className="mt-1 w-fit rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
-            <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center whitespace-nowrap">{ticket.carMake} {ticket.carModel}</p>
-            <div className="flex justify-center">
-              {ticket.licensePlate ? (
-                <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight whitespace-nowrap">{ticket.licensePlate}</span>
-              ) : (
-                <span className="text-[10px] text-slate-400 italic">No plate</span>
+          {!collapsed && (
+            <>
+              <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
+              <div className="mt-1 w-fit rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
+                <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center whitespace-nowrap">{ticket.carMake} {ticket.carModel}</p>
+                <div className="flex justify-center">
+                  {ticket.licensePlate ? (
+                    <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight whitespace-nowrap">{ticket.licensePlate}</span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 italic">No plate</span>
+                  )}
+                </div>
+              </div>
+              <CarColorBadge color={ticket.carColor || ''} />
+              {ticket.visitorType && (
+                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                  <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight border ${
+                    ticket.visitorType === 'hotel_guest'
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : ticket.visitorType === 'restaurant'
+                        ? 'bg-orange-100 text-orange-700 border-orange-300'
+                        : ticket.visitorType === 'event'
+                          ? 'bg-purple-100 text-purple-700 border-purple-300'
+                          : 'bg-teal-100 text-teal-700 border-teal-300'
+                  }`}>
+                    {ticket.visitorType === 'hotel_guest'
+                      ? 'Hotel Guest'
+                      : ticket.visitorType === 'restaurant'
+                        ? `Restaurant${ticket.visitorSubType ? ` - ${RESTAURANT_SUB_TYPES[ticket.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]}` : ''}`
+                        : ticket.visitorType === 'event'
+                          ? 'Event'
+                          : 'Others'}
+                  </span>
+                  {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                    <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 leading-tight">Room Pending</span>
+                  )}
+                  {ticket.roomNumber && (
+                    <span className="text-[9px] font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
+                  )}
+                </div>
               )}
-            </div>
-          </div>
-          <CarColorBadge color={ticket.carColor || ''} />
-          {ticket.visitorType && (
-            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-              <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight border ${
-                ticket.visitorType === 'hotel_guest'
-                  ? 'bg-blue-100 text-blue-700 border-blue-300'
-                  : ticket.visitorType === 'restaurant'
-                    ? 'bg-orange-100 text-orange-700 border-orange-300'
-                    : ticket.visitorType === 'event'
-                      ? 'bg-purple-100 text-purple-700 border-purple-300'
-                      : 'bg-teal-100 text-teal-700 border-teal-300'
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
+                ticket.parkingLocation
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-red-100 text-red-700 border border-red-300'
               }`}>
-                {ticket.visitorType === 'hotel_guest'
-                  ? 'Hotel Guest'
-                  : ticket.visitorType === 'restaurant'
-                    ? `Restaurant${ticket.visitorSubType ? ` - ${RESTAURANT_SUB_TYPES[ticket.visitorSubType as keyof typeof RESTAURANT_SUB_TYPES]}` : ''}`
-                    : ticket.visitorType === 'event'
-                      ? 'Event'
-                      : 'Others'}
+                <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
+                PL: {ticket.parkingLocation || 'Unassigned'}
               </span>
-              {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
-                <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 leading-tight">Room Pending</span>
+              {scheduled && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <p className="text-[10px] text-purple-600 font-semibold">
+                    ⏰ Auto-close: {fmtScheduled(scheduled)}
+                  </p>
+                  <button
+                    className="text-[9px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1 leading-tight"
+                    onClick={onCancelAutoClose}
+                  >✕ Cancel</button>
+                </div>
               )}
-              {ticket.roomNumber && (
-                <span className="text-[9px] font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
-              )}
-            </div>
-          )}
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
-            ticket.parkingLocation
-              ? 'bg-green-100 text-green-700 border border-green-300'
-              : 'bg-red-100 text-red-700 border border-red-300'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${ticket.parkingLocation ? 'bg-green-500' : 'bg-red-500'}`} />
-            PL: {ticket.parkingLocation || 'Unassigned'}
-          </span>
-          {scheduled && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <p className="text-[10px] text-purple-600 font-semibold">
-                ⏰ Auto-close: {fmtScheduled(scheduled)}
-              </p>
-              <button
-                className="text-[9px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1 leading-tight"
-                onClick={onCancelAutoClose}
-              >✕ Cancel</button>
-            </div>
+            </>
           )}
         </div>
         <div className="flex flex-col gap-1">
@@ -447,9 +453,12 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               <Edit size={14} className="text-gray-500" />
             </Button>
           )}
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={onToggleCollapse} title={collapsed ? "Expand" : "Collapse"}>
+            <ChevronDown size={13} className={`text-gray-400 transition-transform duration-200 ${collapsed ? '' : 'rotate-180'}`} />
+          </Button>
         </div>
       </div>
-      {canEdit && (
+      {!collapsed && canEdit && (
         <div className="space-y-1">
           <Button
             size="sm"
@@ -646,6 +655,7 @@ export default function StaffDashboard() {
   
   // Auto Close dialog state
   const [autoCloseTicket, setAutoCloseTicket] = useState<ValetTicket | null>(null);
+  const [inHouseCollapsed, setInHouseCollapsed] = useState(false);
   const [autoCloseDate, setAutoCloseDate] = useState('');
   const [autoCloseTime, setAutoCloseTime] = useState('12:00');
 
@@ -1953,7 +1963,9 @@ export default function StaffDashboard() {
                                     setAutoCloseTime(localTime);
                                   }}
                                   onCancelAutoClose={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
-                                  canEdit={canEdit} />
+                                  canEdit={canEdit}
+                                  collapsed={inHouseCollapsed}
+                                  onToggleCollapse={() => setInHouseCollapsed(c => !c)} />
                               ))}
                               {activeTickets?.filter(t => t.status === 'active').length === 0 && (
                                 <p className="text-xs text-gray-400 text-center py-2">No vehicles in house</p>
@@ -2179,10 +2191,13 @@ export default function StaffDashboard() {
                                             <Edit size={16} className="text-gray-500" />
                                           </Button>
                                         )}
+                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setInHouseCollapsed(c => !c)} title={inHouseCollapsed ? "Expand all" : "Collapse all"}>
+                                          <ChevronDown size={15} className={`text-gray-400 transition-transform duration-200 ${inHouseCollapsed ? '' : 'rotate-180'}`} />
+                                        </Button>
                                         <CircularTimer createdAt={ticket.createdAt || new Date()} maxHours={24} size={40} strokeWidth={3} />
                                       </div>
                                     </div>
-                                    <div className="space-y-1.5 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                                    {!inHouseCollapsed && <div className="space-y-1.5 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                                       <div className="w-fit rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
                                         <p className="text-sm font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center whitespace-nowrap">{ticket.carMake} {ticket.carModel}</p>
                                         <div className="flex justify-center">
@@ -2221,8 +2236,8 @@ export default function StaffDashboard() {
                                           )}
                                         </div>
                                       )}
-                                    </div>
-                                    {(ticket as any).scheduledDepartureAt && (
+                                    </div>}
+                                    {!inHouseCollapsed && (ticket as any).scheduledDepartureAt && (
                                       <div className="flex items-center gap-2 mb-1.5">
                                         <p className="text-xs text-purple-600 font-semibold">
                                           ⏰ Auto-close: {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
@@ -2233,7 +2248,7 @@ export default function StaffDashboard() {
                                         >✕ Cancel</button>
                                       </div>
                                     )}
-                                    {canEdit && (
+                                    {!inHouseCollapsed && canEdit && (
                                       <div className="space-y-1.5">
                                         <Button size="sm" className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
                                           onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
