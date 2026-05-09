@@ -547,6 +547,7 @@ export default function StaffDashboard() {
   const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
   const [rosterDate, setRosterDate] = useState<Date>(new Date());
   const [copiedRowId, setCopiedRowId] = useState<string | null>(null);
+  const [rosterNotesPopup, setRosterNotesPopup] = useState<{ ticketNumber: string; notes: string } | null>(null);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -699,6 +700,14 @@ export default function StaffDashboard() {
   const { data: allTickets, isLoading: allTicketsLoading } = useQuery<ValetTicket[]>({
     queryKey: ["/api/admin/tickets"],
     enabled: user?.role === 'superadmin',
+  });
+
+  const rosterNotesMutation = useMutation({
+    mutationFn: async ({ ticketNumber, staffNotes, nightCheckDone }: { ticketNumber: string; staffNotes?: string; nightCheckDone?: boolean }) =>
+      apiRequest("PATCH", `/api/staff/tickets/${ticketNumber}/roster-notes`, { staffNotes, nightCheckDone }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+    },
   });
 
   const updateStatusMutation = useMutation({
@@ -1391,13 +1400,38 @@ export default function StaffDashboard() {
                   </span>
                 );
               };
-              const RosterNotes = ({ ticket }: { ticket: ValetTicket }) => (
-                <div className="flex flex-col items-center gap-0.5 text-[10px] leading-tight">
-                  {ticket.status === 'completed'  && <span className="font-semibold">転記</span>}
-                  {ticket.status === 'cancelled'  && <span className="text-red-600 font-bold">VOID</span>}
-                  {ticket.staffNotes              && <span className="text-gray-400 truncate max-w-[64px]" title={ticket.staffNotes}>{ticket.staffNotes}</span>}
-                </div>
-              );
+              // 備考 split cell — top: NOTES popup, bottom: NC Done toggle
+              const BikouCell = ({ ticket }: { ticket: ValetTicket }) => {
+                const hasNotes = !!(ticket.staffNotes && ticket.staffNotes.trim());
+                const ncDone = !!(ticket as any).nightCheckDone;
+                return (
+                  <div className="flex flex-col h-full" style={{ minHeight: 54 }}>
+                    {/* Top half — NOTES */}
+                    <button
+                      onClick={() => setRosterNotesPopup({ ticketNumber: ticket.ticketNumber, notes: ticket.staffNotes || '' })}
+                      className={`flex-1 w-full flex items-center justify-center border-b border-black text-[10px] font-bold transition-colors ${
+                        hasNotes
+                          ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                          : 'bg-white text-gray-400 hover:bg-gray-50'
+                      }`}
+                      title={hasNotes ? ticket.staffNotes! : 'Add notes'}
+                    >
+                      NOTES
+                    </button>
+                    {/* Bottom half — NC Done */}
+                    <button
+                      onClick={() => rosterNotesMutation.mutate({ ticketNumber: ticket.ticketNumber, nightCheckDone: !ncDone })}
+                      className={`flex-1 w-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                        ncDone
+                          ? 'bg-green-500 text-white hover:bg-green-600'
+                          : 'bg-red-500 text-white hover:bg-red-600'
+                      }`}
+                    >
+                      NC Done
+                    </button>
+                  </div>
+                );
+              };
 
               const buildRowText = (ticket: ValetTicket, index: number) => [
                 `${index + 1}.`,
@@ -1446,7 +1480,7 @@ export default function StaffDashboard() {
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">C/IN</th>
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-16">C/OUT</th>
                         <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">駐車場所</th>
-                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-20">備考</th>
+                        <th rowSpan={2} className="border border-black px-1 py-1 text-center align-middle w-24">備考</th>
                       </tr>
                       <tr className="bg-gray-100">
                         <th className="border border-black px-1 py-0.5 text-center text-[11px]">部屋番号</th>
@@ -1512,7 +1546,7 @@ export default function StaffDashboard() {
                                 </>) : ''}
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-bold align-middle">{ticket.parkingLocation || ''}</td>
-                              <td className="border border-black text-center px-1 py-1 align-middle"><RosterNotes ticket={ticket} /></td>
+                              <td className="border border-black p-0 align-middle overflow-hidden"><BikouCell ticket={ticket} /></td>
                             </tr>
                           );
                         }
@@ -1534,9 +1568,11 @@ export default function StaffDashboard() {
                             <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 font-mono">：</span></td>
                             <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 font-mono">：</span></td>
                             <td className="border border-black"></td>
-                            <td className="border border-black px-1 align-top pt-1">
-                              <div className="text-[10px] text-gray-200 leading-tight">転記</div>
-                              <div className="text-[10px] text-gray-200 leading-tight">VOID</div>
+                            <td className="border border-black p-0 align-middle overflow-hidden">
+                              <div className="flex flex-col" style={{ minHeight: 54 }}>
+                                <div className="flex-1 flex items-center justify-center border-b border-gray-200 text-[10px] text-gray-200 font-bold">NOTES</div>
+                                <div className="flex-1 flex items-center justify-center text-[10px] text-gray-200 font-bold">NC Done</div>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2977,6 +3013,45 @@ export default function StaffDashboard() {
             </TabsContent>
           )}
         </Tabs>
+
+        {/* Roster NOTES popup */}
+        <Dialog open={!!rosterNotesPopup} onOpenChange={(open) => { if (!open) setRosterNotesPopup(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText size={16} className="text-amber-600" />
+                Roster Notes
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 pt-1">
+              <p className="text-xs text-gray-500">Ticket <span className="font-mono font-bold">#{rosterNotesPopup?.ticketNumber}</span></p>
+              <textarea
+                className="w-full border border-gray-300 rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+                rows={5}
+                placeholder="Enter notes…"
+                value={rosterNotesPopup?.notes ?? ''}
+                onChange={e => setRosterNotesPopup(prev => prev ? { ...prev, notes: e.target.value } : prev)}
+              />
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setRosterNotesPopup(null)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                  disabled={rosterNotesMutation.isPending}
+                  onClick={() => {
+                    if (!rosterNotesPopup) return;
+                    rosterNotesMutation.mutate(
+                      { ticketNumber: rosterNotesPopup.ticketNumber, staffNotes: rosterNotesPopup.notes },
+                      { onSuccess: () => setRosterNotesPopup(null) }
+                    );
+                  }}
+                >
+                  {rosterNotesMutation.isPending ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Add User Modal */}
         <Dialog open={showAddUser} onOpenChange={setShowAddUser}>

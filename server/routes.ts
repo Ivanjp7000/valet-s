@@ -1651,6 +1651,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Roster 備考 cell: update staffNotes and/or nightCheckDone
+  app.patch('/api/staff/tickets/:ticketNumber/roster-notes', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { staffNotes, nightCheckDone } = req.body;
+      const existing = await storage.getValetTicket(ticketNumber);
+      if (!existing) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(existing, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const updateData: any = {};
+      if (staffNotes !== undefined) updateData.staffNotes = staffNotes;
+      if (nightCheckDone !== undefined) updateData.nightCheckDone = nightCheckDone;
+      const updated = await storage.updateValetTicket(ticketNumber, updateData);
+      broadcastToOU(updated?.ouId, { type: 'ticket_updated', data: updated });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating roster notes:", error);
+      res.status(500).json({ message: "Failed to update roster notes" });
+    }
+  });
+
   // Enhanced Staff Routes for Car Management
   app.patch('/api/staff/tickets/:ticketNumber/car-details', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
