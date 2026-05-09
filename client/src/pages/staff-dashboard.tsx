@@ -378,8 +378,19 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               {countdownDisplay}
             </span>
           </div>
-          <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
           <p className="text-xs text-gray-700 truncate font-medium">Mx. {ticket.guestName}</p>
+          <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
+          <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
+            <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest truncate leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
+            <div className="flex justify-center">
+              {ticket.licensePlate ? (
+                <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+              ) : (
+                <span className="text-[10px] text-slate-400 italic">No plate</span>
+              )}
+            </div>
+            <CarColorBadge color={ticket.carColor || ''} />
+          </div>
           {ticket.visitorType && (
             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
               <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight border ${
@@ -407,17 +418,6 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               )}
             </div>
           )}
-          <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2 py-1.5 space-y-1">
-            <p className="text-xs font-extrabold text-slate-800 uppercase tracking-widest truncate leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
-            <div className="flex justify-center">
-              {ticket.licensePlate ? (
-                <span className="text-[11px] font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-1.5 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
-              ) : (
-                <span className="text-[10px] text-slate-400 italic">No plate</span>
-              )}
-            </div>
-            <CarColorBadge color={ticket.carColor || ''} />
-          </div>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
             ticket.parkingLocation
               ? 'bg-green-100 text-green-700 border border-green-300'
@@ -2168,16 +2168,7 @@ export default function StaffDashboard() {
                                             PL: {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
-                                        <div className="mt-1 rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
-                                          <p className="text-sm font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
-                                          <div className="flex justify-center">
-                                            {ticket.licensePlate ? (
-                                              <span className="text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
-                                            ) : (
-                                              <span className="text-[10px] text-slate-400 italic">No plate</span>
-                                            )}
-                                          </div>
-                                        </div>
+                                        <p className="mt-0.5 font-medium text-sm text-gray-800">Mx. {ticket.guestName}</p>
                                       </div>
                                       <div className="flex items-start gap-2">
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
@@ -2191,8 +2182,18 @@ export default function StaffDashboard() {
                                         <CircularTimer createdAt={ticket.createdAt || new Date()} maxHours={24} size={40} strokeWidth={3} />
                                       </div>
                                     </div>
-                                    <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                                      <p className="font-medium text-gray-800">Mx. {ticket.guestName}</p>
+                                    <div className="space-y-1.5 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                                      <div className="rounded-md bg-slate-100 border border-slate-300 px-2.5 py-1.5 space-y-1">
+                                        <p className="text-sm font-extrabold text-slate-800 uppercase tracking-widest leading-none text-center">{ticket.carMake} {ticket.carModel}</p>
+                                        <div className="flex justify-center">
+                                          {ticket.licensePlate ? (
+                                            <span className="text-xs font-bold tracking-widest text-slate-900 bg-yellow-50 border border-yellow-400 rounded px-2 py-0.5 font-mono leading-tight">{ticket.licensePlate}</span>
+                                          ) : (
+                                            <span className="text-[10px] text-slate-400 italic">No plate</span>
+                                          )}
+                                        </div>
+                                        <CarColorBadge color={ticket.carColor || ''} />
+                                      </div>
                                       {ticket.visitorType && (
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border ${
@@ -2220,7 +2221,6 @@ export default function StaffDashboard() {
                                           )}
                                         </div>
                                       )}
-                                      <CarColorBadge color={ticket.carColor || ''} />
                                     </div>
                                     {(ticket as any).scheduledDepartureAt && (
                                       <div className="flex items-center gap-2 mb-1.5">
