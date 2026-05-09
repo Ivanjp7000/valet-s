@@ -304,6 +304,46 @@ function useParkedTimers(createdAt: Date | string | undefined | null) {
   return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
 }
 
+function carColorStyle(name: string): { bg: string; text: string } {
+  const n = name.toLowerCase().trim();
+  const map: Record<string, { bg: string; text: string }> = {
+    black:   { bg: '#1a1a1a', text: '#ffffff' },
+    white:   { bg: '#f5f5f5', text: '#1a1a1a' },
+    silver:  { bg: '#c0c0c0', text: '#1a1a1a' },
+    gray:    { bg: '#6b7280', text: '#ffffff' },
+    grey:    { bg: '#6b7280', text: '#ffffff' },
+    red:     { bg: '#dc2626', text: '#ffffff' },
+    blue:    { bg: '#2563eb', text: '#ffffff' },
+    navy:    { bg: '#1e3a5f', text: '#ffffff' },
+    green:   { bg: '#16a34a', text: '#ffffff' },
+    yellow:  { bg: '#eab308', text: '#1a1a1a' },
+    gold:    { bg: '#d97706', text: '#ffffff' },
+    orange:  { bg: '#ea580c', text: '#ffffff' },
+    brown:   { bg: '#92400e', text: '#ffffff' },
+    beige:   { bg: '#e8dcc8', text: '#1a1a1a' },
+    cream:   { bg: '#fffdd0', text: '#1a1a1a' },
+    pink:    { bg: '#ec4899', text: '#ffffff' },
+    purple:  { bg: '#7c3aed', text: '#ffffff' },
+    maroon:  { bg: '#7f1d1d', text: '#ffffff' },
+    champagne: { bg: '#f7e7ce', text: '#1a1a1a' },
+    bronze:  { bg: '#cd7f32', text: '#ffffff' },
+  };
+  return map[n] ?? { bg: '#e2e8f0', text: '#1a1a1a' };
+}
+
+function CarColorBadge({ color }: { color: string }) {
+  if (!color) return null;
+  const { bg, text } = carColorStyle(color);
+  return (
+    <div
+      className="mt-1 rounded-md border px-2 py-1.5 flex items-center justify-center gap-2"
+      style={{ backgroundColor: bg, borderColor: bg === '#f5f5f5' ? '#d1d5db' : bg }}
+    >
+      <span className="text-xs font-bold tracking-wide" style={{ color: text }}>{color}</span>
+    </div>
+  );
+}
+
 function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAutoClose, onCancelAutoClose, canEdit = true }: {
   ticket: ValetTicket;
   onRetrieve: () => void;
@@ -375,6 +415,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                 <span className="text-[10px] text-slate-400 italic">No plate</span>
               )}
             </div>
+            <CarColorBadge color={ticket.carColor || ''} />
           </div>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold mt-0.5 ${
             ticket.parkingLocation
@@ -2175,7 +2216,7 @@ export default function StaffDashboard() {
                                         </p>
                                       )}
                                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
-                                      <p><strong>Color:</strong> {ticket.carColor}</p>
+                                      <CarColorBadge color={ticket.carColor || ''} />
                                     </div>
                                     {(ticket as any).scheduledDepartureAt && (
                                       <div className="flex items-center gap-2 mb-1.5">
