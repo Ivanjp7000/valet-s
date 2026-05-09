@@ -338,14 +338,22 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             </span>
           </div>
           <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
-          <p className="text-xs text-gray-700 truncate">
-            {ticket.guestName}
+          <p className="text-xs text-gray-700 truncate font-medium">
+            Mx. {ticket.guestName}
             {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
               <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 align-middle">Room Pending</span>
             )}
           </p>
           {ticket.visitorType && (
-            <span className="inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded bg-regis-navy/10 text-regis-navy border border-regis-navy/20 leading-tight mt-0.5">
+            <span className={`inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded leading-tight mt-0.5 border ${
+              ticket.visitorType === 'hotel_guest'
+                ? 'bg-blue-100 text-blue-700 border-blue-300'
+                : ticket.visitorType === 'restaurant'
+                  ? 'bg-orange-100 text-orange-700 border-orange-300'
+                  : ticket.visitorType === 'event'
+                    ? 'bg-purple-100 text-purple-700 border-purple-300'
+                    : 'bg-teal-100 text-teal-700 border-teal-300'
+            }`}>
               {ticket.visitorType === 'hotel_guest'
                 ? 'Hotel Guest'
                 : ticket.visitorType === 'restaurant'
@@ -2125,12 +2133,20 @@ export default function StaffDashboard() {
                                       </div>
                                     </div>
                                     <div className="space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
-                                      <p><strong>Guest:</strong> {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                                      <p className="font-medium text-gray-800">Mx. {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
                                         <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
                                       )}</p>
                                       {ticket.visitorType && (
                                         <p>
-                                          <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-regis-navy/10 text-regis-navy border border-regis-navy/20">
+                                          <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                                            ticket.visitorType === 'hotel_guest'
+                                              ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                              : ticket.visitorType === 'restaurant'
+                                                ? 'bg-orange-100 text-orange-700 border-orange-300'
+                                                : ticket.visitorType === 'event'
+                                                  ? 'bg-purple-100 text-purple-700 border-purple-300'
+                                                  : 'bg-teal-100 text-teal-700 border-teal-300'
+                                          }`}>
                                             {ticket.visitorType === 'hotel_guest'
                                               ? 'Hotel Guest'
                                               : ticket.visitorType === 'restaurant'
