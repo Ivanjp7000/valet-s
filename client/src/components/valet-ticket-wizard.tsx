@@ -18,6 +18,11 @@ import {
 } from "@shared/schema";
 import type { User as UserType } from "@shared/schema";
 
+const stripHonorifics = (name: string) =>
+  name.replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
+const fmtGuest = (name: string | null | undefined) =>
+  name ? stripHonorifics(name) + '様' : '';
+
 /**
  * Prepares a plate image for Google Cloud Vision API:
  *  1. Crops to the centre band on portrait shots so Vision sees only the plate area.
@@ -998,7 +1003,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
           <div className="bg-gray-50 p-3 rounded-lg">
             <span className="text-gray-500">Guest Name</span>
-            <p className="font-medium">{formData.guestName}</p>
+            <p className="font-medium">{fmtGuest(formData.guestName)}</p>
             {formData.roomNumber && (
               <p className="text-xs text-gray-500 mt-1">Room: {formData.roomNumber}</p>
             )}

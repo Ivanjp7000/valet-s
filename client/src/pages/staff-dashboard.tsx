@@ -30,6 +30,13 @@ import { RESTAURANT_SUB_TYPES, VISITOR_TYPES } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 import licenseCertImg from "@assets/Valet-S_Software_License1_1778373848645.png";
 
+// Strip leading honorifics (Mr., Mrs., Ms., Mx., Dr., etc.) from a guest name
+const stripHonorifics = (name: string) =>
+  name.replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
+// Display-ready guest name: stripped prefix + 様
+const fmtGuest = (name: string | null | undefined) =>
+  name ? stripHonorifics(name) + '\u69D8' : '';
+
 // Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
 function toDatetimeLocal(d: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -402,7 +409,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               {countdownDisplay}
             </span>
           </div>
-          <p className="font-bold text-regis-navy truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>Mx. {ticket.guestName}</p>
+          <p className="font-bold text-regis-navy truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
           {!collapsed && (
             <>
               <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
@@ -543,7 +550,7 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
         </div>
       </div>
       <div className="text-sm text-gray-600 mb-3 space-y-1">
-        <p style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}><strong>Guest:</strong> {ticket.guestName}</p>
+        <p style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}><strong>Guest:</strong> {fmtGuest(ticket.guestName)}</p>
         <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${
           ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
         }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
@@ -1497,7 +1504,7 @@ export default function StaffDashboard() {
                           Car Retrieval Requested — #{ticket.ticketNumber}
                         </p>
                         <p className="text-xs text-gray-600 truncate">
-                          {ticket.guestName} · {ticket.carColor} {ticket.carMake} {ticket.carModel}
+                          {fmtGuest(ticket.guestName)} · {ticket.carColor} {ticket.carMake} {ticket.carModel}
                           {ticket.licensePlate ? ` · ${ticket.licensePlate}` : ''}
                           {ticket.parkingSector || ticket.parkingLocation ? ` · Parking: ${[ticket.parkingSector, ticket.parkingLocation].filter(Boolean).join('-')}` : ''}
                         </p>
@@ -1652,7 +1659,7 @@ export default function StaffDashboard() {
               const buildRowText = (ticket: ValetTicket, index: number) => [
                 `${index + 1}.`,
                 `#${ticket.ticketNumber}`,
-                `${ticket.guestName}様`,
+                `${fmtGuest(ticket.guestName)}`,
                 ticket.roomNumber ? `Rm${ticket.roomNumber}` : '',
                 `${ticket.carMake} ${ticket.carModel}`,
                 ticket.carColor ? `(${ticket.carColor})` : '',
@@ -1739,7 +1746,7 @@ export default function StaffDashboard() {
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle text-sm">#{ticket.ticketNumber}</td>
                               <td className="border border-black px-2 py-1 align-middle">
-                                <span className="font-semibold">{ticket.guestName}</span><span className="text-xs ml-0.5">様</span>
+                                <span className="font-semibold">{stripHonorifics(ticket.guestName || '')}</span><span className="text-xs ml-0.5">様</span>
                                 {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
                                   <span className="ml-1 text-[8px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
                                 )}
@@ -1910,7 +1917,7 @@ export default function StaffDashboard() {
                           </div>
                         </div>
                         <div className="flex items-baseline gap-1 mb-0.5 flex-wrap">
-                          <span className="text-sm font-medium text-gray-800">{ticket.guestName}</span>
+                          <span className="text-sm font-medium text-gray-800">{stripHonorifics(ticket.guestName || '')}</span>
                           <span className="text-[10px] text-gray-500">様</span>
                           {ticket.roomNumber && <span className="text-[10px] text-gray-400 ml-1">Rm {ticket.roomNumber}</span>}
                           {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
@@ -2206,7 +2213,7 @@ export default function StaffDashboard() {
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2">
                                             <span className="font-medium text-gray-600" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</span>
-                                            <span className="text-gray-500 truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{ticket.guestName}</span>
+                                            <span className="text-gray-500 truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</span>
                                           </div>
                                           <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
                                           {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
@@ -2253,7 +2260,7 @@ export default function StaffDashboard() {
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                           <span className="font-medium text-gray-600" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</span>
-                                          <span className="text-gray-500 truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{ticket.guestName}</span>
+                                          <span className="text-gray-500 truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</span>
                                         </div>
                                         <p className="text-xs text-gray-400">{ticket.carMake} {ticket.carModel}</p>
                                         {stayHours !== null && <p className="text-xs text-blue-600 font-medium">⏱️ Stayed: {stayHours}h {stayMins}m</p>}
@@ -2355,7 +2362,7 @@ export default function StaffDashboard() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                      <p style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}><strong>Guest:</strong> {ticket.guestName}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
+                      <p style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}><strong>Guest:</strong> {fmtGuest(ticket.guestName)}{ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
                         <span className="ml-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
                       )}</p>
                       {ticket.roomNumber && <p><strong>Room:</strong> {ticket.roomNumber}</p>}
@@ -2390,7 +2397,7 @@ export default function StaffDashboard() {
                                             {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
-                                        <p className="mt-0.5 font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>Mx. {ticket.guestName}</p>
+                                        <p className="mt-0.5 font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
                                       </div>
                                       <div className="flex items-start gap-2">
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
@@ -2888,7 +2895,7 @@ export default function StaffDashboard() {
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
                             {ticket.guestName && (
-                              <p className="truncate"><strong>Guest:</strong> {ticket.guestName}</p>
+                              <p className="truncate"><strong>Guest:</strong> {fmtGuest(ticket.guestName)}</p>
                             )}
                             {ticket.carMake && ticket.carModel && (
                               <p className="truncate"><strong>Vehicle:</strong> {ticket.carMake} {ticket.carModel}</p>
@@ -4231,7 +4238,7 @@ export default function StaffDashboard() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-500">Guest Name</p>
-                      <p className="font-medium">{viewTicket.guestName || 'N/A'}</p>
+                      <p className="font-medium">{viewTicket.guestName ? fmtGuest(viewTicket.guestName) : 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500">Visitor Type</p>
@@ -4521,7 +4528,7 @@ export default function StaffDashboard() {
                         drawText({ text: `#${ticket.ticketNumber}`, size: 32, face: bold, align: "center", gapMm: 4 });
                         
                         // Guest info
-                        drawText({ text: ticket.guestName || "Guest", size: 14, face: bold });
+                        drawText({ text: fmtGuest(ticket.guestName) || "Guest", size: 14, face: bold });
                         if (ticket.roomNumber) {
                           drawText({ text: `Room: ${ticket.roomNumber}`, size: 11 });
                         }
@@ -4765,7 +4772,7 @@ export default function StaffDashboard() {
                 </div>
                 
                 <div className="text-sm text-gray-600">
-                  <p><strong>Guest:</strong> {deleteTicket.guestName || 'N/A'}</p>
+                  <p><strong>Guest:</strong> {deleteTicket.guestName ? fmtGuest(deleteTicket.guestName) : 'N/A'}</p>
                   <p><strong>Vehicle:</strong> {deleteTicket.carMake} {deleteTicket.carModel}</p>
                 </div>
 
@@ -4814,7 +4821,7 @@ export default function StaffDashboard() {
                 </div>
                 
                 <div className="text-sm text-gray-600">
-                  <p><strong>Guest:</strong> {archiveTicket.guestName || 'N/A'}</p>
+                  <p><strong>Guest:</strong> {archiveTicket.guestName ? fmtGuest(archiveTicket.guestName) : 'N/A'}</p>
                   <p><strong>Vehicle:</strong> {archiveTicket.carMake} {archiveTicket.carModel}</p>
                   <p><strong>Current Status:</strong> {archiveTicket.status}</p>
                 </div>

@@ -204,7 +204,8 @@ export default function AdminPanel() {
         const departed2 = t.departedAt ? new Date(t.departedAt).toLocaleString('en-GB', { hour12: false }) : '-';
         const stay = t.totalStaySeconds ? `${Math.floor(t.totalStaySeconds/3600)}h ${Math.floor((t.totalStaySeconds%3600)/60)}m` : '-';
         const visitor = t.visitorType === 'hotel_guest' ? 'Hotel' : t.visitorType === 'restaurant' ? 'Restaurant' : 'Other';
-        const guestName = sanitize(t.guestName || '-');
+        const rawGuest = (t.guestName || '').replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
+        const guestName = sanitize(rawGuest ? rawGuest + '様' : '-');
 
         page.drawText(`#${t.ticketNumber}`, { x: M, y, font: fontBold, size: 11, color: rgb(0.15,0.15,0.15) });
         page.drawText(guestName, { x: M + 54, y, font, size: 11, color: rgb(0.15,0.15,0.15) });
