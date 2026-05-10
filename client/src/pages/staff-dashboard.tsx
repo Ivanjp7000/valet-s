@@ -572,7 +572,7 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
 }
 
 // ── Draggable, collapsible dashboard panel ──────────────────────────────────
-const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'guest-out', 'departed-today', 'departed-history'];
+const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'ready', 'guest-out', 'departed-today', 'departed-history'];
 const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed-today', 'departed-history'];
 
 const SECTION_FONT_MIN = 10;
@@ -767,7 +767,14 @@ export default function StaffDashboard() {
   
   // ── Panel order & collapse state (persisted to localStorage) ──────────────
   const [desktopPanelOrder, setDesktopPanelOrder] = useState<string[]>(() => {
-    try { const s = localStorage.getItem('valet-desktop-panel-order'); return s ? JSON.parse(s) : DESKTOP_PANELS_DEFAULT; } catch { return DESKTOP_PANELS_DEFAULT; }
+    try {
+      const s = localStorage.getItem('valet-desktop-panel-order');
+      if (!s) return DESKTOP_PANELS_DEFAULT;
+      const stored: string[] = JSON.parse(s);
+      // Merge any new panels from default that aren't in the stored order yet
+      const missing = DESKTOP_PANELS_DEFAULT.filter(p => !stored.includes(p));
+      return missing.length ? [...stored, ...missing] : stored;
+    } catch { return DESKTOP_PANELS_DEFAULT; }
   });
   const [mobilePanelOrder, setMobilePanelOrder] = useState<string[]>(() => {
     try {
@@ -2665,13 +2672,13 @@ export default function StaffDashboard() {
                         if (panelId === 'retrievals') return (
                           <SortablePanel key="retrievals" id="retrievals"
                             title="Active Retrievals"
-                            badge={<Badge className="bg-orange-500 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => ['retrieving', 'transit', 'preparing', 'ready'].includes(t.status)).length || 0}</Badge>}
+                            badge={<Badge className="bg-orange-500 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).length || 0}</Badge>}
                             icon={<Car className="text-orange-500" size={18} />}
                             expanded={isExpanded} onToggle={toggle}
                             fontSize={getSectionFontSize('retrievals')} onFontSizeChange={s => setSectionFont('retrievals', s)}
                           >
                             <UnifiedRetrievalBox
-                              tickets={activeTickets || []}
+                              tickets={(activeTickets || []).filter(t => t.status !== 'ready')}
                               canEdit={canEdit}
                               onStatusChange={(ticketNumber, status) => { updateStatusMutation.mutate({ ticketNumber, status }); }}
                               onStageComplete={(ticketNumber, nextStage) => {
@@ -2682,6 +2689,71 @@ export default function StaffDashboard() {
                             />
                           </SortablePanel>
                         );
+
+                        if (panelId === 'ready') {
+                          const readyTickets = activeTickets?.filter(t => t.status === 'ready') || [];
+                          return (
+                            <SortablePanel key="ready" id="ready"
+                              title="Ready for Collection"
+                              badge={<Badge className="bg-green-600 text-white text-sm px-3 py-1 ml-2">{readyTickets.length}</Badge>}
+                              icon={<Check className="text-green-600" size={18} />}
+                              borderClass="border-green-200" headerClass="text-green-700"
+                              expanded={isExpanded} onToggle={toggle}
+                              fontSize={getSectionFontSize('ready')} onFontSizeChange={s => setSectionFont('ready', s)}
+                            >
+                              {readyTickets.length === 0 ? (
+                                <div className="text-center py-8 text-gray-400">
+                                  <Check size={36} className="mx-auto mb-2 opacity-40" />
+                                  <p className="text-sm">No cars ready for collection</p>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {readyTickets.map((ticket) => (
+                                    <div key={ticket.id} className="rounded-lg p-4 bg-green-50 border-2 border-green-300 shadow-sm flex flex-col gap-3">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-bold text-green-800" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</p>
+                                            {ticket.parkingLocation && (
+                                              <span className="inline-flex items-center px-1.5 py-0 rounded-full font-bold bg-green-100 text-green-700 border border-green-300" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
+                                                {ticket.parkingLocation}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="font-semibold text-green-900 mt-0.5" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
+                                          <p className="text-xs text-gray-500 mt-0.5">{ticket.carMake} {ticket.carModel} · {ticket.carColor}</p>
+                                          <p className="text-xs text-gray-400 font-mono mt-0.5">{ticket.licensePlate}</p>
+                                        </div>
+                                        <div className="flex gap-1">
+                                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>
+                                            <Eye size={15} className="text-gray-500" />
+                                          </Button>
+                                          {canEdit && (
+                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditTicketData(ticket)}>
+                                              <Edit size={15} className="text-gray-500" />
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {canEdit && (
+                                        <div className="flex gap-2 pt-2 border-t border-green-200">
+                                          <Button size="sm" className="flex-1 h-8 text-xs bg-gray-700 hover:bg-gray-800 text-white"
+                                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'completed' })}>
+                                            Departed
+                                          </Button>
+                                          <Button size="sm" className="flex-1 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'out_with_guest' })}>
+                                            Coming Back
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </SortablePanel>
+                          );
+                        }
 
                         if (panelId === 'guest-out') return (
                           <SortablePanel key="guest-out" id="guest-out"
