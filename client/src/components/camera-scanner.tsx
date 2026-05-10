@@ -18,9 +18,7 @@ function getDigitWorker(): Promise<Tesseract.Worker> {
   if (_workerPromise) return _workerPromise;
 
   _workerPromise = (async () => {
-    const w = await Tesseract.createWorker("eng", 1, {
-      logger: () => {},
-    });
+    const w = await Tesseract.createWorker("eng", 1, { logger: () => {} });
     await w.setParameters({
       tessedit_char_whitelist: "0123456789",
       tessedit_pageseg_mode: "7" as any,
@@ -38,11 +36,7 @@ function getDigitWorker(): Promise<Tesseract.Worker> {
   return _workerPromise;
 }
 
-// Preprocess the canvas: crop guide box region, upscale, grayscale, contrast-stretch, sharpen
-function preprocessFrame(
-  video: HTMLVideoElement,
-  outputCanvas: HTMLCanvasElement
-): boolean {
+function preprocessFrame(video: HTMLVideoElement, outputCanvas: HTMLCanvasElement): boolean {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return false;
@@ -73,7 +67,6 @@ function preprocessFrame(
     if (gray[i] > hi) hi = gray[i];
   }
   const range = hi - lo || 1;
-
   for (let i = 0; i < gray.length; i++) {
     const v = Math.round(((gray[i] - lo) / range) * 255);
     const sharpened = Math.max(0, Math.min(255, 128 + (v - 128) * 1.8));
@@ -84,9 +77,13 @@ function preprocessFrame(
   return true;
 }
 
-// Extract exactly 5 consecutive digits from raw OCR text
 function extract5Digits(raw: string): string | null {
-  const cleaned = raw.replace(/\s+/g, "").replace(/[oO]/g, "0").replace(/[lI|]/g, "1").replace(/[sS]/g, "5").replace(/[gq]/g, "9");
+  const cleaned = raw
+    .replace(/\s+/g, "")
+    .replace(/[oO]/g, "0")
+    .replace(/[lI|]/g, "1")
+    .replace(/[sS]/g, "5")
+    .replace(/[gq]/g, "9");
   const m = cleaned.match(/\d{5}/);
   return m ? m[0] : null;
 }
@@ -94,11 +91,13 @@ function extract5Digits(raw: string): string | null {
 export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const processCanvas = useRef<HTMLCanvasElement>(document.createElement("canvas"));
-  const previewCanvas = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isScanningRef = useRef(false);
   const mountedRef = useRef(true);
+  // Used inside the loop callback to stop without re-creating the loop effect
+  const foundRef = useRef(false);
+  const votesRef = useRef<Record<string, number>>({});
 
   const [workerReady, setWorkerReady] = useState(false);
   const [status, setStatus] = useState<"loading" | "scanning" | "found" | "error">("loading");
@@ -110,28 +109,22 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
-  // Warm up the Tesseract worker immediately
+  // Warm up the Tesseract worker
   useEffect(() => {
     getDigitWorker()
       .then(() => { if (mountedRef.current) setWorkerReady(true); })
-      .catch(() => { if (mountedRef.current) setCameraError("OCR engine failed to load"); });
+      .catch(() => { if (mountedRef.current) setCameraError("OCR engine failed to load. Please close and try again."); });
   }, []);
 
-  // Start camera
+  // Camera stream
   useEffect(() => {
     const startCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         });
         streamRef.current = stream;
         if (videoRef.current && mountedRef.current) {
@@ -142,130 +135,153 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
       }
     };
     startCamera();
-    return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
+    return () => { streamRef.current?.getTracks().forEach((t) => t.stop()); };
   }, []);
 
-  const stopScanLoop = useCallback(() => {
-    if (scanLoopRef.current) {
-      clearTimeout(scanLoopRef.current);
-      scanLoopRef.current = null;
-    }
-  }, []);
-
-  const runOCR = useCallback(async () => {
-    if (isScanningRef.current || !videoRef.current || !workerReady || !mountedRef.current) return;
+  // Single OCR pass — returns the detected number or null
+  const runOCR = useCallback(async (): Promise<string | null> => {
+    if (isScanningRef.current || !videoRef.current || !mountedRef.current) return null;
     const video = videoRef.current;
-    if (video.readyState < 2) return;
+    if (video.readyState < 2) return null;
 
     isScanningRef.current = true;
     try {
-      const ok = preprocessFrame(video, processCanvas.current);
-      if (!ok) return;
-
-      if (previewCanvas.current && mountedRef.current) {
-        const pCtx = previewCanvas.current.getContext("2d")!;
-        previewCanvas.current.width = processCanvas.current.width;
-        previewCanvas.current.height = processCanvas.current.height;
-        pCtx.drawImage(processCanvas.current, 0, 0);
-      }
+      if (!preprocessFrame(video, processCanvas.current)) return null;
 
       const worker = await getDigitWorker();
       const { data } = await worker.recognize(processCanvas.current);
+      if (!mountedRef.current) return null;
+
       const result = extract5Digits(data.text);
-
-      if (!mountedRef.current) return;
-
       if (result && data.confidence > 55) {
-        setLiveResult(result);
-        setConfidence(Math.round(data.confidence));
-
-        setVotes((prev) => {
-          const next = { ...prev, [result]: (prev[result] ?? 0) + 1 };
-
-          // When same number seen 2+ times, show confirmation button — do NOT auto-submit
-          const winner = Object.entries(next).find(([, c]) => c >= 2);
-          if (winner && mountedRef.current) {
-            stopScanLoop();
-            setStatus("found");
-            setConfirmedNumber(winner[0]);
-            setLiveResult(winner[0]);
-          } else if (mountedRef.current) {
-            setStatus("scanning");
-          }
-          return next;
-        });
-      } else if (mountedRef.current) {
-        setStatus("scanning");
+        if (mountedRef.current) {
+          setLiveResult(result);
+          setConfidence(Math.round(data.confidence));
+        }
+        return result;
       }
     } catch (err) {
       console.warn("[OCR]", err);
     } finally {
       isScanningRef.current = false;
     }
-  }, [workerReady, stopScanLoop]);
+    return null;
+  }, []);
 
-  // Auto-scan loop — stops automatically once a number is confirmed
+  // Scan loop — starts once when worker is ready, runs until found or unmounted
   useEffect(() => {
     if (!workerReady) return;
+
+    foundRef.current = false;
+    votesRef.current = {};
     setStatus("scanning");
 
-    const loop = () => {
-      if (!mountedRef.current) return;
-      runOCR().finally(() => {
-        if (mountedRef.current && status !== "found") {
-          scanLoopRef.current = setTimeout(loop, 1200);
+    const loop = async () => {
+      if (!mountedRef.current || foundRef.current) return;
+
+      const result = await runOCR();
+
+      if (!mountedRef.current || foundRef.current) return;
+
+      if (result) {
+        votesRef.current[result] = (votesRef.current[result] ?? 0) + 1;
+        setVotes({ ...votesRef.current });
+
+        if (votesRef.current[result] >= 2) {
+          // Confirmed — stop loop and show confirmation button
+          foundRef.current = true;
+          setConfirmedNumber(result);
+          setStatus("found");
+          return;
         }
-      });
+      }
+
+      // Schedule next scan
+      scanLoopRef.current = setTimeout(loop, 1200);
     };
+
     scanLoopRef.current = setTimeout(loop, 600);
 
-    return () => stopScanLoop();
-  }, [workerReady, runOCR, stopScanLoop, status]);
+    return () => {
+      if (scanLoopRef.current) clearTimeout(scanLoopRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workerReady]); // intentionally only [workerReady] — loop manages itself via refs
 
-  // Manual capture (reset votes + scan immediately)
   const handleManualCapture = () => {
+    votesRef.current = {};
     setVotes({});
     setLiveResult(null);
-    setConfirmedNumber(null);
-    setStatus("scanning");
     runOCR();
   };
 
   const handleUseNumber = () => {
     if (confirmedNumber) {
-      stopScanLoop();
+      foundRef.current = true;
+      if (scanLoopRef.current) clearTimeout(scanLoopRef.current);
       onScanComplete(confirmedNumber);
     }
   };
 
   const handleScanAgain = () => {
+    foundRef.current = false;
+    votesRef.current = {};
     setVotes({});
     setLiveResult(null);
     setConfirmedNumber(null);
     setStatus("scanning");
+    // Restart loop
+    const loop = async () => {
+      if (!mountedRef.current || foundRef.current) return;
+      const result = await runOCR();
+      if (!mountedRef.current || foundRef.current) return;
+      if (result) {
+        votesRef.current[result] = (votesRef.current[result] ?? 0) + 1;
+        setVotes({ ...votesRef.current });
+        if (votesRef.current[result] >= 2) {
+          foundRef.current = true;
+          setConfirmedNumber(result);
+          setStatus("found");
+          return;
+        }
+      }
+      scanLoopRef.current = setTimeout(loop, 1200);
+    };
+    scanLoopRef.current = setTimeout(loop, 600);
   };
 
   const isFound = status === "found";
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
+    <div className="fixed inset-0 z-[300] bg-black flex flex-col" style={{ touchAction: "none" }}>
       {/* Header */}
-      <div className="bg-regis-navy text-white px-6 py-4 flex items-center justify-between shrink-0">
+      <div className="bg-regis-navy text-white px-4 py-3 flex items-center justify-between shrink-0 safe-top">
         <div>
           <h2 className="font-semibold text-lg">Scan Ticket Number</h2>
           <p className="text-xs text-blue-200">Point camera at the 5-digit ticket number</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:text-gray-300">
-          <X size={20} />
-        </Button>
+        {/* Large tappable close button */}
+        <button
+          onClick={onClose}
+          className="w-12 h-12 flex items-center justify-center rounded-full bg-white/10 active:bg-white/25 text-white"
+          style={{ WebkitTapHighlightColor: "transparent" }}
+        >
+          <X size={22} />
+        </button>
       </div>
 
       {/* Camera view */}
-      <div className="relative flex-1 bg-black flex items-center justify-center overflow-hidden" style={{ minHeight: 320 }}>
+      <div className="relative flex-1 bg-black overflow-hidden" style={{ minHeight: 280 }}>
         {cameraError ? (
-          <p className="text-white text-center px-8 text-sm">{cameraError}</p>
+          <div className="flex flex-col items-center justify-center h-full gap-4 px-8">
+            <p className="text-white text-center text-sm">{cameraError}</p>
+            <button
+              onClick={onClose}
+              className="px-6 py-3 rounded-xl bg-white/20 text-white font-semibold"
+            >
+              Close
+            </button>
+          </div>
         ) : (
           <>
             <video
@@ -276,39 +292,26 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
               className="absolute inset-0 w-full h-full object-cover"
             />
 
-            {/* Darkened overlay with clear guide window */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {/* Overlay */}
+            <div className="absolute inset-0 pointer-events-none">
               <div className="absolute top-0 left-0 right-0 bg-black/55" style={{ bottom: "calc(50% + 52px)" }} />
               <div className="absolute bottom-0 left-0 right-0 bg-black/55" style={{ top: "calc(50% + 52px)" }} />
               <div className="absolute left-0 bg-black/55" style={{ top: "calc(50% - 52px)", bottom: "calc(50% - 52px)", right: "calc(50% + 120px)" }} />
               <div className="absolute right-0 bg-black/55" style={{ top: "calc(50% - 52px)", bottom: "calc(50% - 52px)", left: "calc(50% + 120px)" }} />
 
-              {/* Guide box */}
-              <div
-                className={`w-60 h-26 relative transition-all duration-300 ${isFound ? "scale-105" : ""}`}
-                style={{ width: 240, height: 104 }}
-              >
+              {/* Guide box corners */}
+              <div className="absolute" style={{ left: "calc(50% - 120px)", top: "calc(50% - 52px)", width: 240, height: 104 }}>
                 {[
                   "top-0 left-0 border-t-4 border-l-4 rounded-tl-md",
                   "top-0 right-0 border-t-4 border-r-4 rounded-tr-md",
                   "bottom-0 left-0 border-b-4 border-l-4 rounded-bl-md",
                   "bottom-0 right-0 border-b-4 border-r-4 rounded-br-md",
                 ].map((cls, i) => (
-                  <div
-                    key={i}
-                    className={`absolute w-8 h-8 transition-colors duration-300 ${cls} ${
-                      isFound ? "border-green-400" : "border-regis-gold"
-                    }`}
-                  />
+                  <div key={i} className={`absolute w-8 h-8 transition-colors duration-300 ${cls} ${isFound ? "border-green-400" : "border-regis-gold"}`} />
                 ))}
-
                 {!isFound && (
-                  <div
-                    className="absolute left-2 right-2 h-0.5 bg-regis-gold/70 animate-bounce"
-                    style={{ animationDuration: "1.6s", top: "50%" }}
-                  />
+                  <div className="absolute left-2 right-2 h-0.5 bg-regis-gold/70 animate-bounce" style={{ animationDuration: "1.6s", top: "50%" }} />
                 )}
-
                 {isFound && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="bg-green-500/90 rounded-full p-3">
@@ -319,13 +322,12 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
               </div>
             </div>
 
-            {/* Capture button (bottom centre) — only shown while scanning */}
+            {/* Manual capture button */}
             {!isFound && (
               <button
                 onClick={handleManualCapture}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95"
-                style={{ background: "#c9a84c", boxShadow: "0 0 0 4px rgba(201,168,76,0.35)" }}
-                title="Capture now"
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center active:scale-95 transition-all"
+                style={{ background: "#c9a84c", boxShadow: "0 0 0 4px rgba(201,168,76,0.35)", WebkitTapHighlightColor: "transparent" }}
               >
                 <Camera size={26} className="text-white" />
               </button>
@@ -335,18 +337,12 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
       </div>
 
       {/* Status bar */}
-      <div className={`shrink-0 px-6 py-4 transition-colors duration-300 ${
-        isFound ? "bg-green-700" : status === "loading" ? "bg-gray-800" : "bg-regis-navy"
-      }`}>
+      <div className={`shrink-0 px-5 py-4 transition-colors duration-300 ${isFound ? "bg-green-700" : status === "loading" ? "bg-gray-800" : "bg-regis-navy"}`}>
         {!isFound && (
           <div className="flex items-center justify-between">
             <div>
-              {status === "loading" && (
-                <p className="text-white/70 text-sm">Initialising scanner…</p>
-              )}
-              {status === "scanning" && !liveResult && (
-                <p className="text-white/70 text-sm animate-pulse">Scanning for digits…</p>
-              )}
+              {status === "loading" && <p className="text-white/70 text-sm">Initialising scanner…</p>}
+              {status === "scanning" && !liveResult && <p className="text-white/70 text-sm animate-pulse">Scanning for digits…</p>}
               {status === "scanning" && liveResult && (
                 <>
                   <p className="text-white/60 text-xs uppercase tracking-wider mb-0.5">Reading</p>
@@ -358,19 +354,13 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
             {status === "scanning" && liveResult && (
               <div className="flex gap-1.5">
                 {[0, 1].map((i) => (
-                  <div
-                    key={i}
-                    className={`w-3 h-3 rounded-full transition-colors ${
-                      (votes[liveResult] ?? 0) > i ? "bg-regis-gold" : "bg-white/20"
-                    }`}
-                  />
+                  <div key={i} className={`w-3 h-3 rounded-full transition-colors ${(votes[liveResult] ?? 0) > i ? "bg-regis-gold" : "bg-white/20"}`} />
                 ))}
               </div>
             )}
           </div>
         )}
 
-        {/* Confirmed — show two clear action buttons */}
         {isFound && confirmedNumber && (
           <div className="space-y-3">
             <div className="text-center">
@@ -381,6 +371,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
               <button
                 onClick={handleScanAgain}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/15 text-white text-sm font-medium active:scale-95 transition-all"
+                style={{ WebkitTapHighlightColor: "transparent" }}
               >
                 <RefreshCw size={16} />
                 Scan again
@@ -388,6 +379,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
               <button
                 onClick={handleUseNumber}
                 className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl bg-green-400 text-green-900 text-base font-bold active:scale-95 transition-all"
+                style={{ WebkitTapHighlightColor: "transparent" }}
               >
                 <Check size={18} />
                 Use {confirmedNumber}
@@ -398,25 +390,20 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
       </div>
 
       {/* Manual entry fallback */}
-      <div className="shrink-0 bg-white px-6 py-4 border-t border-gray-100">
+      <div className="shrink-0 bg-white px-5 py-4 border-t border-gray-100">
         <p className="text-center text-xs text-gray-500 mb-3">Or enter your 5-digit ticket number below</p>
         <ManualEntry onSubmit={onScanComplete} />
       </div>
-
-      {/* Hidden processing canvas */}
-      <canvas ref={previewCanvas} className="hidden" />
     </div>
   );
 }
 
 function ManualEntry({ onSubmit }: { onSubmit: (n: string) => void }) {
   const [val, setVal] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="flex gap-2">
       <input
-        ref={inputRef}
         type="tel"
         inputMode="numeric"
         pattern="[0-9]*"
@@ -425,12 +412,12 @@ function ManualEntry({ onSubmit }: { onSubmit: (n: string) => void }) {
         value={val}
         onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 5))}
         onKeyDown={(e) => { if (e.key === "Enter" && val.length === 5) onSubmit(val); }}
-        className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-center font-mono text-lg tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-regis-navy/40"
+        className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-center font-mono text-lg tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-regis-navy/40"
       />
       <button
         onClick={() => { if (val.length === 5) onSubmit(val); }}
         disabled={val.length < 5}
-        className="px-5 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        className="px-5 py-3 rounded-lg font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         style={{ background: "#1a2340", color: "white" }}
       >
         Go

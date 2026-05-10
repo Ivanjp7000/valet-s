@@ -1128,6 +1128,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -1188,19 +1189,18 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </>
         )}
       </DialogContent>
-
-      {/* Full-screen CameraScanner overlay */}
-      {showTicketScanner && (
-        <div className="fixed inset-0 z-[200]">
-          <CameraScanner
-            onScanComplete={(number) => {
-              setFormData(prev => ({ ...prev, ticketNumber: number }));
-              setShowTicketScanner(false);
-            }}
-            onClose={() => setShowTicketScanner(false)}
-          />
-        </div>
-      )}
     </Dialog>
+
+    {/* Full-screen CameraScanner — rendered OUTSIDE Dialog to avoid focus trap */}
+    {showTicketScanner && (
+      <CameraScanner
+        onScanComplete={(number) => {
+          setFormData(prev => ({ ...prev, ticketNumber: number }));
+          setShowTicketScanner(false);
+        }}
+        onClose={() => setShowTicketScanner(false)}
+      />
+    )}
+    </>
   );
 }
