@@ -1417,8 +1417,8 @@ export default function StaffDashboard() {
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
             <Crown className="text-regis-navy flex-shrink-0" size={20} />
             <div className="min-w-0">
-              <h1 className="text-base sm:text-xl font-bold text-regis-navy truncate">Staff Dashboard</h1>
-              <p className="text-xs sm:text-sm text-gray-600 truncate">Hotel St. Regis Osaka</p>
+              <h1 className="text-base sm:text-xl font-bold text-regis-navy truncate">Dashboard</h1>
+              <p className="text-xs sm:text-sm text-gray-600 truncate">The St. Regis Osaka</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
