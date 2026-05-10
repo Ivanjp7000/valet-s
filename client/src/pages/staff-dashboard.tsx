@@ -1450,7 +1450,7 @@ export default function StaffDashboard() {
       <div className="p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${user?.role === 'superadmin' ? 'sm:grid-cols-6' : user?.role === 'privilege_admin' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${user?.role === 'superadmin' ? 'sm:grid-cols-7' : user?.role === 'privilege_admin' ? 'sm:grid-cols-5' : 'sm:grid-cols-3'}`}>
               <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                 <Car size={14} className="sm:w-4 sm:h-4" />
                 <span>Dashboard</span>
@@ -1482,6 +1482,10 @@ export default function StaffDashboard() {
               <TabsTrigger value="license" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                 <ShieldCheck size={14} className="sm:w-4 sm:h-4" />
                 <span>License</span>
+              </TabsTrigger>
+              <TabsTrigger value="docs" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                <FileText size={14} className="sm:w-4 sm:h-4" />
+                <span>Documentation</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -3833,6 +3837,15 @@ export default function StaffDashboard() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Documentation Tab — placeholder */}
+          <TabsContent value="docs" className="space-y-6">
+            <div className="flex flex-col items-center justify-center py-24 text-center text-gray-400">
+              <FileText size={48} className="mb-4 text-gray-300" />
+              <h2 className="text-xl font-semibold text-gray-500 mb-2">Documentation</h2>
+              <p className="text-sm text-gray-400">Content coming soon.</p>
+            </div>
           </TabsContent>
 
         </Tabs>
