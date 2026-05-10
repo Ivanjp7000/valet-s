@@ -786,6 +786,18 @@ export default function StaffDashboard() {
   });
   const [expandedPanels, setExpandedPanels] = useState<Set<string>>(new Set()); // all start collapsed
 
+  // Font size for the 5 mobile status buttons (number + label), persisted
+  const [statBtnFontSize, setStatBtnFontSize] = useState<number>(() => {
+    try { return Number(localStorage.getItem('valet-stat-btn-font')) || 0; } catch { return 0; }
+  });
+  const changeStatBtnFont = (delta: number) => {
+    setStatBtnFontSize(prev => {
+      const next = Math.max(-3, Math.min(5, prev + delta));
+      try { localStorage.setItem('valet-stat-btn-font', String(next)); } catch {}
+      return next;
+    });
+  };
+
   const scrollToPanel = (panelId: string) => {
     setExpandedPanels(prev => { const next = new Set(prev); next.add(panelId); return next; });
     setTimeout(() => {
@@ -2037,30 +2049,46 @@ export default function StaffDashboard() {
                   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
                   const departedTodayCount = activeTickets?.filter(t => t.status === 'completed' && t.updatedAt && new Date(t.updatedAt) >= todayStart).length || 0;
                   const retrievingCount = activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).length || 0;
+                  const numSz = 24 + statBtnFontSize * 2;
+                  const lblSz = 10 + statBtnFontSize;
                   return (
                     <div className="space-y-2">
+                      {/* Font size controls */}
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="text-[10px] text-gray-400 font-medium mr-0.5">Text size</span>
+                        <button
+                          onClick={() => changeStatBtnFont(-1)}
+                          disabled={statBtnFontSize <= -3}
+                          className="w-6 h-6 rounded-md border border-gray-300 bg-white text-gray-600 text-sm font-bold flex items-center justify-center disabled:opacity-30 active:bg-gray-100"
+                        >−</button>
+                        <button
+                          onClick={() => changeStatBtnFont(1)}
+                          disabled={statBtnFontSize >= 5}
+                          className="w-6 h-6 rounded-md border border-gray-300 bg-white text-gray-600 text-sm font-bold flex items-center justify-center disabled:opacity-30 active:bg-gray-100"
+                        >+</button>
+                      </div>
                       {/* Row 1: 3 statuses */}
                       <div className="grid grid-cols-3 gap-2">
                         <button
                           className="rounded-xl border-2 border-blue-400 bg-blue-50 active:bg-blue-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
                           onClick={() => scrollToPanel('in-house')}
                         >
-                          <p className="text-2xl font-extrabold text-blue-700 leading-none">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
-                          <p className="text-[10px] text-blue-600 font-semibold leading-tight mt-1">Cars In House</p>
+                          <p style={{ fontSize: numSz }} className="font-extrabold text-blue-700 leading-none">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
+                          <p style={{ fontSize: lblSz }} className="text-blue-600 font-semibold leading-tight mt-1">Cars In House</p>
                         </button>
                         <button
                           className="rounded-xl border-2 border-indigo-400 bg-indigo-50 active:bg-indigo-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
                           onClick={() => scrollToPanel('guest-out')}
                         >
-                          <p className="text-2xl font-extrabold text-indigo-700 leading-none">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</p>
-                          <p className="text-[10px] text-indigo-600 font-semibold leading-tight mt-1">Car Will Return</p>
+                          <p style={{ fontSize: numSz }} className="font-extrabold text-indigo-700 leading-none">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</p>
+                          <p style={{ fontSize: lblSz }} className="text-indigo-600 font-semibold leading-tight mt-1">Car Will Return</p>
                         </button>
                         <button
                           className="rounded-xl border-2 border-amber-400 bg-amber-50 active:bg-amber-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
                           onClick={() => scrollToPanel('retrievals')}
                         >
-                          <p className="text-2xl font-extrabold text-amber-700 leading-none">{retrievingCount}</p>
-                          <p className="text-[10px] text-amber-600 font-semibold leading-tight mt-1">Retrieving Car</p>
+                          <p style={{ fontSize: numSz }} className="font-extrabold text-amber-700 leading-none">{retrievingCount}</p>
+                          <p style={{ fontSize: lblSz }} className="text-amber-600 font-semibold leading-tight mt-1">Retrieving Car</p>
                         </button>
                       </div>
                       {/* Row 2: 2 statuses */}
@@ -2069,15 +2097,15 @@ export default function StaffDashboard() {
                           className="rounded-xl border-2 border-green-400 bg-green-50 active:bg-green-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
                           onClick={() => scrollToPanel('ready')}
                         >
-                          <p className="text-2xl font-extrabold text-green-700 leading-none">{activeTickets?.filter(t => t.status === 'ready').length || 0}</p>
-                          <p className="text-[10px] text-green-600 font-semibold leading-tight mt-1">Ready for Collection</p>
+                          <p style={{ fontSize: numSz }} className="font-extrabold text-green-700 leading-none">{activeTickets?.filter(t => t.status === 'ready').length || 0}</p>
+                          <p style={{ fontSize: lblSz }} className="text-green-600 font-semibold leading-tight mt-1">Ready for Collection</p>
                         </button>
                         <button
                           className="rounded-xl border-2 border-gray-400 bg-gray-50 active:bg-gray-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
                           onClick={() => scrollToPanel('departed-today')}
                         >
-                          <p className="text-2xl font-extrabold text-gray-700 leading-none">{departedTodayCount}</p>
-                          <p className="text-[10px] text-gray-600 font-semibold leading-tight mt-1">Departed Today</p>
+                          <p style={{ fontSize: numSz }} className="font-extrabold text-gray-700 leading-none">{departedTodayCount}</p>
+                          <p style={{ fontSize: lblSz }} className="text-gray-600 font-semibold leading-tight mt-1">Departed Today</p>
                         </button>
                       </div>
                     </div>
