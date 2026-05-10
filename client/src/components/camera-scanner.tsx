@@ -23,7 +23,7 @@ function getDigitWorker(): Promise<Tesseract.Worker> {
     });
     await w.setParameters({
       tessedit_char_whitelist: "0123456789",
-      tessedit_pageseg_mode: "7" as any, // single text line
+      tessedit_pageseg_mode: "7" as any,
       preserve_interword_spaces: "0",
     });
     _worker = w;
@@ -47,29 +47,22 @@ function preprocessFrame(
   const vh = video.videoHeight;
   if (!vw || !vh) return false;
 
-  // Guide box is centred at 50% × 50% of the viewport, ~70% wide, ~20% tall
-  // We crop a generous band: centre 80% wide × 30% tall of the video frame
   const cropW = Math.round(vw * 0.8);
   const cropH = Math.round(vh * 0.28);
   const cropX = Math.round((vw - cropW) / 2);
   const cropY = Math.round((vh - cropH) / 2);
 
-  // Upscale to a fixed 900px wide output for Tesseract
   const outW = 900;
   const outH = Math.round((outW / cropW) * cropH);
   outputCanvas.width = outW;
   outputCanvas.height = outH;
 
   const ctx = outputCanvas.getContext("2d")!;
-
-  // Draw scaled crop
   ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
 
-  // Grayscale + contrast stretch + threshold
   const imgData = ctx.getImageData(0, 0, outW, outH);
   const d = imgData.data;
 
-  // Convert to grayscale and find range for contrast stretch
   const gray = new Uint8ClampedArray(outW * outH);
   for (let i = 0; i < gray.length; i++) {
     gray[i] = Math.round(0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]);
@@ -81,10 +74,8 @@ function preprocessFrame(
   }
   const range = hi - lo || 1;
 
-  // Apply contrast stretch and adaptive threshold for white text on dark or dark on white
   for (let i = 0; i < gray.length; i++) {
     const v = Math.round(((gray[i] - lo) / range) * 255);
-    // Sharpen: simple unsharp mask (amplify deviation from 128)
     const sharpened = Math.max(0, Math.min(255, 128 + (v - 128) * 1.8));
     d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = sharpened;
     d[i * 4 + 3] = 255;
@@ -107,6 +98,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isScanningRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const [workerReady, setWorkerReady] = useState(false);
   const [status, setStatus] = useState<"loading" | "scanning" | "found" | "error">("loading");
@@ -116,11 +108,18 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
   const [confirmedNumber, setConfirmedNumber] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // Warm up the Tesseract worker immediately
   useEffect(() => {
     getDigitWorker()
-      .then(() => setWorkerReady(true))
-      .catch(() => setCameraError("OCR engine failed to load"));
+      .then(() => { if (mountedRef.current) setWorkerReady(true); })
+      .catch(() => { if (mountedRef.current) setCameraError("OCR engine failed to load"); });
   }, []);
 
   // Start camera
@@ -135,11 +134,11 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
           },
         });
         streamRef.current = stream;
-        if (videoRef.current) {
+        if (videoRef.current && mountedRef.current) {
           videoRef.current.srcObject = stream;
         }
       } catch {
-        setCameraError("Camera access denied. Please allow camera access and try again.");
+        if (mountedRef.current) setCameraError("Camera access denied. Please allow camera access and try again.");
       }
     };
     startCamera();
@@ -148,8 +147,15 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
     };
   }, []);
 
+  const stopScanLoop = useCallback(() => {
+    if (scanLoopRef.current) {
+      clearTimeout(scanLoopRef.current);
+      scanLoopRef.current = null;
+    }
+  }, []);
+
   const runOCR = useCallback(async () => {
-    if (isScanningRef.current || !videoRef.current || !workerReady) return;
+    if (isScanningRef.current || !videoRef.current || !workerReady || !mountedRef.current) return;
     const video = videoRef.current;
     if (video.readyState < 2) return;
 
@@ -158,8 +164,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
       const ok = preprocessFrame(video, processCanvas.current);
       if (!ok) return;
 
-      // Show preprocessed preview
-      if (previewCanvas.current) {
+      if (previewCanvas.current && mountedRef.current) {
         const pCtx = previewCanvas.current.getContext("2d")!;
         previewCanvas.current.width = processCanvas.current.width;
         previewCanvas.current.height = processCanvas.current.height;
@@ -170,6 +175,8 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
       const { data } = await worker.recognize(processCanvas.current);
       const result = extract5Digits(data.text);
 
+      if (!mountedRef.current) return;
+
       if (result && data.confidence > 55) {
         setLiveResult(result);
         setConfidence(Math.round(data.confidence));
@@ -177,20 +184,19 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
         setVotes((prev) => {
           const next = { ...prev, [result]: (prev[result] ?? 0) + 1 };
 
-          // Auto-confirm when same number seen 2+ times
+          // When same number seen 2+ times, show confirmation button — do NOT auto-submit
           const winner = Object.entries(next).find(([, c]) => c >= 2);
-          if (winner) {
+          if (winner && mountedRef.current) {
+            stopScanLoop();
             setStatus("found");
             setConfirmedNumber(winner[0]);
             setLiveResult(winner[0]);
-            // Auto-submit after short delay for visual feedback
-            setTimeout(() => onScanComplete(winner[0]), 900);
-          } else {
+          } else if (mountedRef.current) {
             setStatus("scanning");
           }
           return next;
         });
-      } else {
+      } else if (mountedRef.current) {
         setStatus("scanning");
       }
     } catch (err) {
@@ -198,24 +204,25 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
     } finally {
       isScanningRef.current = false;
     }
-  }, [workerReady, onScanComplete]);
+  }, [workerReady, stopScanLoop]);
 
-  // Auto-scan loop
+  // Auto-scan loop — stops automatically once a number is confirmed
   useEffect(() => {
     if (!workerReady) return;
     setStatus("scanning");
 
     const loop = () => {
+      if (!mountedRef.current) return;
       runOCR().finally(() => {
-        scanLoopRef.current = setTimeout(loop, 1200);
+        if (mountedRef.current && status !== "found") {
+          scanLoopRef.current = setTimeout(loop, 1200);
+        }
       });
     };
     scanLoopRef.current = setTimeout(loop, 600);
 
-    return () => {
-      if (scanLoopRef.current) clearTimeout(scanLoopRef.current);
-    };
-  }, [workerReady, runOCR]);
+    return () => stopScanLoop();
+  }, [workerReady, runOCR, stopScanLoop, status]);
 
   // Manual capture (reset votes + scan immediately)
   const handleManualCapture = () => {
@@ -224,6 +231,20 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
     setConfirmedNumber(null);
     setStatus("scanning");
     runOCR();
+  };
+
+  const handleUseNumber = () => {
+    if (confirmedNumber) {
+      stopScanLoop();
+      onScanComplete(confirmedNumber);
+    }
+  };
+
+  const handleScanAgain = () => {
+    setVotes({});
+    setLiveResult(null);
+    setConfirmedNumber(null);
+    setStatus("scanning");
   };
 
   const isFound = status === "found";
@@ -257,13 +278,9 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
 
             {/* Darkened overlay with clear guide window */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              {/* Top dark band */}
               <div className="absolute top-0 left-0 right-0 bg-black/55" style={{ bottom: "calc(50% + 52px)" }} />
-              {/* Bottom dark band */}
               <div className="absolute bottom-0 left-0 right-0 bg-black/55" style={{ top: "calc(50% + 52px)" }} />
-              {/* Left dark band */}
               <div className="absolute left-0 bg-black/55" style={{ top: "calc(50% - 52px)", bottom: "calc(50% - 52px)", right: "calc(50% + 120px)" }} />
-              {/* Right dark band */}
               <div className="absolute right-0 bg-black/55" style={{ top: "calc(50% - 52px)", bottom: "calc(50% - 52px)", left: "calc(50% + 120px)" }} />
 
               {/* Guide box */}
@@ -271,7 +288,6 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
                 className={`w-60 h-26 relative transition-all duration-300 ${isFound ? "scale-105" : ""}`}
                 style={{ width: 240, height: 104 }}
               >
-                {/* Animated border corners */}
                 {[
                   "top-0 left-0 border-t-4 border-l-4 rounded-tl-md",
                   "top-0 right-0 border-t-4 border-r-4 rounded-tr-md",
@@ -286,7 +302,6 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
                   />
                 ))}
 
-                {/* Scan line animation */}
                 {!isFound && (
                   <div
                     className="absolute left-2 right-2 h-0.5 bg-regis-gold/70 animate-bounce"
@@ -294,7 +309,6 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
                   />
                 )}
 
-                {/* Confirmed tick overlay */}
                 {isFound && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="bg-green-500/90 rounded-full p-3">
@@ -305,7 +319,7 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
               </div>
             </div>
 
-            {/* Capture button (bottom centre) */}
+            {/* Capture button (bottom centre) — only shown while scanning */}
             {!isFound && (
               <button
                 onClick={handleManualCapture}
@@ -316,65 +330,69 @@ export function CameraScanner({ onScanComplete, onClose }: CameraScannerProps) {
                 <Camera size={26} className="text-white" />
               </button>
             )}
-
-            {/* Reset button when found */}
-            {isFound && (
-              <button
-                onClick={() => { setVotes({}); setLiveResult(null); setConfirmedNumber(null); setStatus("scanning"); }}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full bg-white/20 flex items-center justify-center"
-                title="Scan again"
-              >
-                <RefreshCw size={22} className="text-white" />
-              </button>
-            )}
           </>
         )}
       </div>
 
       {/* Status bar */}
-      <div className={`shrink-0 px-6 py-4 flex items-center justify-between transition-colors duration-300 ${
+      <div className={`shrink-0 px-6 py-4 transition-colors duration-300 ${
         isFound ? "bg-green-700" : status === "loading" ? "bg-gray-800" : "bg-regis-navy"
       }`}>
-        <div>
-          {status === "loading" && (
-            <p className="text-white/70 text-sm">Initialising scanner…</p>
-          )}
-          {status === "scanning" && !liveResult && (
-            <p className="text-white/70 text-sm animate-pulse">Scanning for digits…</p>
-          )}
-          {status === "scanning" && liveResult && (
-            <>
-              <p className="text-white/60 text-xs uppercase tracking-wider mb-0.5">Reading</p>
-              <p className="text-white font-mono text-2xl font-bold tracking-[0.3em]">{liveResult}</p>
-              <p className="text-white/50 text-xs">Confidence {confidence}%</p>
-            </>
-          )}
-          {isFound && confirmedNumber && (
-            <>
-              <p className="text-green-200 text-xs uppercase tracking-wider mb-0.5">Confirmed</p>
-              <p className="text-white font-mono text-2xl font-bold tracking-[0.3em]">{confirmedNumber}</p>
-            </>
-          )}
-        </div>
-
-        {/* Dots showing vote progress */}
-        {status === "scanning" && liveResult && (
-          <div className="flex gap-1.5">
-            {[0, 1].map((i) => (
-              <div
-                key={i}
-                className={`w-3 h-3 rounded-full transition-colors ${
-                  (votes[liveResult] ?? 0) > i ? "bg-regis-gold" : "bg-white/20"
-                }`}
-              />
-            ))}
+        {!isFound && (
+          <div className="flex items-center justify-between">
+            <div>
+              {status === "loading" && (
+                <p className="text-white/70 text-sm">Initialising scanner…</p>
+              )}
+              {status === "scanning" && !liveResult && (
+                <p className="text-white/70 text-sm animate-pulse">Scanning for digits…</p>
+              )}
+              {status === "scanning" && liveResult && (
+                <>
+                  <p className="text-white/60 text-xs uppercase tracking-wider mb-0.5">Reading</p>
+                  <p className="text-white font-mono text-2xl font-bold tracking-[0.3em]">{liveResult}</p>
+                  <p className="text-white/50 text-xs">Confidence {confidence}%</p>
+                </>
+              )}
+            </div>
+            {status === "scanning" && liveResult && (
+              <div className="flex gap-1.5">
+                {[0, 1].map((i) => (
+                  <div
+                    key={i}
+                    className={`w-3 h-3 rounded-full transition-colors ${
+                      (votes[liveResult] ?? 0) > i ? "bg-regis-gold" : "bg-white/20"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
-        {isFound && (
-          <div className="flex gap-1.5">
-            {[0, 1].map((i) => (
-              <div key={i} className="w-3 h-3 rounded-full bg-green-300" />
-            ))}
+
+        {/* Confirmed — show two clear action buttons */}
+        {isFound && confirmedNumber && (
+          <div className="space-y-3">
+            <div className="text-center">
+              <p className="text-green-200 text-xs uppercase tracking-wider mb-1">Number detected</p>
+              <p className="text-white font-mono text-3xl font-bold tracking-[0.35em]">{confirmedNumber}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleScanAgain}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/15 text-white text-sm font-medium active:scale-95 transition-all"
+              >
+                <RefreshCw size={16} />
+                Scan again
+              </button>
+              <button
+                onClick={handleUseNumber}
+                className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl bg-green-400 text-green-900 text-base font-bold active:scale-95 transition-all"
+              >
+                <Check size={18} />
+                Use {confirmedNumber}
+              </button>
+            </div>
           </div>
         )}
       </div>

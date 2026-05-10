@@ -774,7 +774,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                     input.type = 'file';
                     input.accept = 'image/*';
                     input.capture = 'environment';
+                    input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+                    document.body.appendChild(input);
                     input.onchange = async (e) => {
+                      document.body.removeChild(input);
                       const file = (e.target as HTMLInputElement).files?.[0];
                       if (file) {
                         const reader = new FileReader();
@@ -883,7 +886,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                       input.type = 'file';
                       input.accept = 'image/*';
                       input.capture = 'environment';
+                      input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+                      document.body.appendChild(input);
                       input.onchange = async (e) => {
+                        document.body.removeChild(input);
                         const file = (e.target as HTMLInputElement).files?.[0];
                         if (!file) return;
                         const reader = new FileReader();
