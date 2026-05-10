@@ -3468,7 +3468,6 @@ export default function StaffDashboard() {
                                 <div className="flex items-start justify-between gap-2">
                                   <div>
                                     <p className="font-semibold text-sm text-regis-navy">{lic.orgName}</p>
-                                    <p className="text-xs text-gray-500">{ou?.name ?? lic.ouId}</p>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${lic.version === 'enterprise' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -3615,7 +3614,6 @@ export default function StaffDashboard() {
                           </div>
                           <div className="bg-gray-50 border rounded-lg p-4 space-y-2 text-sm">
                             <div className="flex justify-between"><span className="text-gray-500">Organization</span><span className="font-medium">{licenseForm.orgName}</span></div>
-                            <div className="flex justify-between"><span className="text-gray-500">OU</span><span className="font-medium">{allOUs?.find(o => o.id === licenseForm.ouId)?.name}</span></div>
                             <div className="flex justify-between"><span className="text-gray-500">Address</span><span className="font-medium text-right max-w-[55%]">{licenseForm.address}</span></div>
                             <div className="flex justify-between"><span className="text-gray-500">Contact</span><span className="font-medium">{licenseForm.contactNumber}</span></div>
                             <div className="flex justify-between"><span className="text-gray-500">Version</span><span className={`font-medium px-2 py-0.5 rounded text-xs ${licenseForm.version === 'enterprise' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{licenseForm.version === 'enterprise' ? 'Enterprise' : 'Professional'}</span></div>
