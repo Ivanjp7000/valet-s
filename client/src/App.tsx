@@ -24,7 +24,7 @@ function VersionBadge() {
   if (isLoading || !isAuthenticated) return null;
   return (
     <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none select-none">
-      <span className="text-xs font-mono text-gray-800 tracking-wide font-semibold">
+      <span className="text-[11px] font-mono tracking-widest opacity-20 text-gray-500">
         {APP_VERSION}
       </span>
     </div>
