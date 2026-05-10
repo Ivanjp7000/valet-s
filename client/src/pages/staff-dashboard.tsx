@@ -846,7 +846,7 @@ export default function StaffDashboard() {
   });
 
   const { data: allOUs } = useQuery<OrganizationalUnit[]>({
-    queryKey: ["/api/admin/ous"],
+    queryKey: ["/api/ous"],
     enabled: user?.role === 'superadmin',
   });
 
@@ -891,7 +891,7 @@ export default function StaffDashboard() {
   const updateBrandingMutation = useMutation({
     mutationFn: async (data: typeof brandingForm) => apiRequest("PATCH", "/api/licenses/branding", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/ous"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ous"] });
       toast({ title: "Branding saved", description: "Your organization's branding has been updated." });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message ?? "Failed to save branding", variant: "destructive" }),
@@ -3654,10 +3654,10 @@ export default function StaffDashboard() {
                       {myLicenseLoading ? (
                         <div className="flex items-center gap-2 text-sm text-gray-500 py-4 justify-center"><Loader2 size={16} className="animate-spin" /> Loading…</div>
                       ) : !lic ? (
-                        <div className="text-center py-8 text-gray-400 text-sm">
-                          <ShieldCheck size={32} className="mx-auto mb-2 opacity-30" />
-                          No license has been issued for your organization yet.
-                          <br />Contact your Super Admin to request one.
+                        <div className="rounded-lg border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-center space-y-2">
+                          <ShieldCheck size={36} className="mx-auto text-amber-400" />
+                          <p className="font-semibold text-amber-800 text-sm">No license issued yet</p>
+                          <p className="text-xs text-amber-700">Your organization does not have a software license assigned. Please ask your Super Admin to issue one for your organization from their License tab.</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
