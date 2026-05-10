@@ -5138,6 +5138,28 @@ export default function StaffDashboard() {
                   />
                 </div>
 
+                <div className="border border-amber-200 bg-amber-50 rounded-lg p-3">
+                  <label className="text-sm font-medium text-amber-800 flex items-center gap-1.5">
+                    <CalendarDays size={14} />
+                    Created Time
+                    <span className="text-xs font-normal text-amber-600 ml-1">(override check-in timestamp)</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="mt-1 w-full border border-amber-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={(() => {
+                      const d = editTicketData.createdAt ? new Date(editTicketData.createdAt) : null;
+                      if (!d || isNaN(d.getTime())) return '';
+                      const pad = (n: number) => String(n).padStart(2, '0');
+                      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    })()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditTicketData({ ...editTicketData, createdAt: val ? new Date(val).toISOString() : editTicketData.createdAt });
+                    }}
+                  />
+                </div>
+
                 <div className="flex space-x-2 pt-4">
                   <Button
                     onClick={() => updateTicketMutation.mutate({
@@ -5151,6 +5173,7 @@ export default function StaffDashboard() {
                       carColor: editTicketData.carColor,
                       parkingLocation: editTicketData.parkingLocation,
                       staffNotes: editTicketData.staffNotes,
+                      createdAt: editTicketData.createdAt,
                     })}
                     disabled={updateTicketMutation.isPending}
                     className="flex-1 bg-regis-navy hover:bg-blue-900"

@@ -1694,14 +1694,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/staff/tickets/:ticketNumber/edit', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
-      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes } = req.body;
+      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes, createdAt } = req.body;
 
       const existing = await storage.getValetTicket(ticketNumber);
       if (!existing) return res.status(404).json({ message: "Ticket not found" });
       if (!await isTicketInScope(existing, req.currentUser)) {
         return res.status(403).json({ message: "Access denied" });
       }
-      
+
+      // Validate and parse optional createdAt override
+      let parsedCreatedAt: Date | undefined;
+      if (createdAt) {
+        const d = new Date(createdAt);
+        if (isNaN(d.getTime())) return res.status(400).json({ message: "Invalid createdAt date" });
+        parsedCreatedAt = d;
+      }
+
       const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
         status,
         guestName,
@@ -1713,7 +1721,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parkingLocation,
         parkingSector,
         staffNotes,
-      });
+        ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
+      } as any);
 
       // Broadcast update to WebSocket clients in the same OU
       broadcastToOU(updatedTicket?.ouId, {
