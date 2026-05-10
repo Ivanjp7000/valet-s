@@ -775,7 +775,7 @@ export class DatabaseStorage implements IStorage {
       target: sessionAuditLog.sessionId,
       set: {
         lastSeenAt: now,
-        snapshotDate: today,
+        // snapshotDate intentionally NOT updated — it stays as the day the session first started
         country: data.country,
         city: data.city,
         ipAddress: data.ipAddress,

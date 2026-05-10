@@ -923,7 +923,13 @@ export default function StaffDashboard() {
   });
   const { data: auditArchiveResults, isLoading: auditArchiveLoading } = useQuery<any[]>({
     queryKey: ["/api/audit/sessions/archive", auditArchiveDate],
-    enabled: !!user && user.role === 'privilege_admin' && auditViewMode === 'archive' && !!auditArchiveDate,
+    queryFn: async () => {
+      if (!auditArchiveDate) return [];
+      const res = await fetch(`/api/audit/sessions/archive?date=${encodeURIComponent(auditArchiveDate)}`, { credentials: 'include' });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!user && (user.role === 'privilege_admin' || user.role === 'superadmin') && auditViewMode === 'archive' && !!auditArchiveDate,
   });
   const { data: auditDates } = useQuery<string[]>({
     queryKey: ["/api/audit/dates"],
