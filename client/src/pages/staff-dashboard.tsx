@@ -3462,8 +3462,8 @@ export default function StaffDashboard() {
                             return (
                               <div key={lic.id} className={`border rounded-lg overflow-hidden ${lic.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
                                 {/* Certificate image thumbnail */}
-                                <div className="w-full overflow-hidden border-b border-amber-100">
-                                  <img src={licenseCertImg} alt="Valet-S Software License" className="w-full object-cover max-h-20" />
+                                <div className="flex justify-center border-b border-amber-100 bg-amber-50 py-2">
+                                  <img src={licenseCertImg} alt="Valet-S Software License" className="w-3/4 h-auto rounded" />
                                 </div>
                                 <div className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-2">
@@ -3610,8 +3610,8 @@ export default function StaffDashboard() {
                       {/* Step 3: Review & Issue */}
                       {licenseWizardStep === 3 && (
                         <div className="space-y-4">
-                          <div className="rounded-lg overflow-hidden border border-amber-200 shadow-sm">
-                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover max-h-40" />
+                          <div className="flex justify-center rounded-lg border border-amber-200 shadow-sm bg-amber-50 py-3">
+                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-3/4 h-auto rounded" />
                           </div>
                           <div className="bg-gray-50 border rounded-lg p-4 space-y-2 text-sm">
                             <div className="flex justify-between"><span className="text-gray-500">Organization</span><span className="font-medium">{licenseForm.orgName}</span></div>
@@ -3671,8 +3671,8 @@ export default function StaffDashboard() {
                       ) : (
                         <div className="space-y-4">
                           {/* Certificate image */}
-                          <div className="rounded-xl overflow-hidden border border-amber-200 shadow-md">
-                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover max-h-40" />
+                          <div className="flex justify-center rounded-xl border border-amber-200 shadow-md bg-amber-50 py-3">
+                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-3/4 h-auto rounded-lg" />
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{lic.orgName}</p></div>
@@ -3779,8 +3779,8 @@ export default function StaffDashboard() {
                   ) : (
                     <div className="space-y-4">
                       {/* Certificate image */}
-                      <div className="rounded-xl overflow-hidden border border-amber-200 shadow-md">
-                        <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover max-h-40" />
+                      <div className="flex justify-center rounded-xl border border-amber-200 shadow-md bg-amber-50 py-3">
+                        <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-3/4 h-auto rounded-lg" />
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{myLicense.orgName}</p></div>
