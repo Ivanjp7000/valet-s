@@ -205,6 +205,17 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Guest Name Imports — pre-imported lists for autocomplete, auto-expire after 24h
+export const guestNameImports = pgTable("guest_name_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  visitorType: varchar("visitor_type").notNull(), // 'hotel_guest' | 'restaurant' | 'event' | 'others'
+  ouId: varchar("ou_id").references(() => organizationalUnits.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type GuestNameImport = typeof guestNameImports.$inferSelect;
+
 // Schema exports
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

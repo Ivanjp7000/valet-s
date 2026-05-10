@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useOCR } from "@/hooks/useOCR";
 import { CameraScanner } from "@/components/camera-scanner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -320,6 +320,24 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     ticketNumber: "",
   });
 
+  // Guest name autocomplete
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameDebounceRef = React.useRef<ReturnType<typeof setTimeout>|null>(null);
+
+  const fetchNameSuggestions = (prefix: string, visitorType: string) => {
+    if (nameDebounceRef.current) clearTimeout(nameDebounceRef.current);
+    if (!prefix.trim() || prefix.length < 1 || !visitorType) { setNameSuggestions([]); return; }
+    nameDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/name-imports?prefix=${encodeURIComponent(prefix)}&visitorType=${encodeURIComponent(visitorType)}`);
+        const data = await res.json();
+        setNameSuggestions(Array.isArray(data) ? data : []);
+        setShowSuggestions(Array.isArray(data) && data.length > 0);
+      } catch { setNameSuggestions([]); }
+    }, 200);
+  };
+
   const filteredCarMakes = useMemo(() => {
     if (carMakeSearch.length < 2) return [];
     const search = carMakeSearch.toLowerCase();
@@ -429,15 +447,40 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       {/* Guest Information — top of step 1 */}
       <div>
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Guest Information</h3>
-        <div>
+        <div className="relative">
           <label className="text-sm font-medium text-gray-700">Full Name *</label>
           <Input
             value={formData.guestName}
-            onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+            onChange={(e) => {
+              const val = e.target.value;
+              setFormData({ ...formData, guestName: val });
+              fetchNameSuggestions(val, formData.visitorType);
+            }}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onFocus={() => { if (nameSuggestions.length > 0) setShowSuggestions(true); }}
             placeholder="Enter guest's full name"
             className="mt-1"
             data-testid="input-guest-name"
+            autoComplete="off"
           />
+          {showSuggestions && nameSuggestions.length > 0 && (
+            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+              {nameSuggestions.map((name, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-regis-gold/10 hover:text-regis-navy border-b border-gray-100 last:border-0"
+                  onMouseDown={() => {
+                    setFormData({ ...formData, guestName: name });
+                    setShowSuggestions(false);
+                    setNameSuggestions([]);
+                  }}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

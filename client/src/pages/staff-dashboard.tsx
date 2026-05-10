@@ -738,6 +738,15 @@ export default function StaffDashboard() {
   const [brandingForm, setBrandingForm] = useState({ logoUrl: '', primaryColor: '#1a2744', accentColor: '#c9a84c' });
   const [showBranding, setShowBranding] = useState(false);
 
+  // V-info Import dialog state (privilege_admin only)
+  const [showVInfoImport, setShowVInfoImport] = useState(false);
+  const [vInfoStep, setVInfoStep] = useState<1|2>(1);
+  const [vInfoVisitorType, setVInfoVisitorType] = useState('');
+  const [vInfoMethod, setVInfoMethod] = useState<'csv'|'paste'|null>(null);
+  const [vInfoPasteText, setVInfoPasteText] = useState('');
+  const [vInfoCsvFile, setVInfoCsvFile] = useState<File|null>(null);
+  const [vInfoImportedCount, setVInfoImportedCount] = useState<number|null>(null);
+
   // Backup state
   const [backupRange, setBackupRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('30d');
   const [backupFormat, setBackupFormat] = useState<'csv'|'json'>('csv');
@@ -881,6 +890,15 @@ export default function StaffDashboard() {
   const { data: myLicense, isLoading: myLicenseLoading } = useQuery<OULicense | null>({
     queryKey: ["/api/licenses/my"],
     enabled: !!user && user.role !== 'superadmin',
+  });
+
+  const vInfoImportMutation = useMutation({
+    mutationFn: async ({ names, visitorType }: { names: string[]; visitorType: string }) =>
+      apiRequest("POST", "/api/name-imports", { names, visitorType }),
+    onSuccess: (data: any) => {
+      setVInfoImportedCount(data.imported ?? 0);
+    },
+    onError: (e: any) => toast({ title: "Import failed", description: e.message ?? "Could not import names", variant: "destructive" }),
   });
 
   const issueLicenseMutation = useMutation({
@@ -1549,6 +1567,17 @@ export default function StaffDashboard() {
                 >
                   <Plus size={16} className="mr-1 sm:mr-2" />
                   New Valet Ticket
+                </Button>
+              )}
+              {user?.role === 'privilege_admin' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-blue-600 text-blue-700 hover:bg-blue-50"
+                  onClick={() => { setShowVInfoImport(true); setVInfoStep(1); setVInfoVisitorType(''); setVInfoMethod(null); setVInfoPasteText(''); setVInfoCsvFile(null); setVInfoImportedCount(null); }}
+                >
+                  <FileText size={16} className="mr-1 sm:mr-2" />
+                  V-info Import
                 </Button>
               )}
               <Button
@@ -4195,6 +4224,126 @@ export default function StaffDashboard() {
                 )}
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* V-info Import Dialog (privilege_admin only) */}
+        <Dialog open={showVInfoImport} onOpenChange={(o) => { if (!o) setShowVInfoImport(false); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText size={18} className="text-blue-600" />
+                V-info Import
+              </DialogTitle>
+            </DialogHeader>
+
+            {vInfoImportedCount !== null ? (
+              /* Success screen */
+              <div className="flex flex-col items-center py-8 gap-3 text-center">
+                <CheckCircle2 size={48} className="text-green-500" />
+                <p className="text-lg font-semibold text-gray-800">{vInfoImportedCount} name{vInfoImportedCount !== 1 ? 's' : ''} imported</p>
+                <p className="text-sm text-gray-500">Names will be available for autocomplete for 24 hours.</p>
+                <Button className="mt-2 bg-regis-navy text-white" onClick={() => setShowVInfoImport(false)}>Done</Button>
+              </div>
+            ) : vInfoStep === 1 ? (
+              /* Step 1 — pick visitor type */
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">Select the guest category for this name list:</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {([
+                    { key: 'hotel_guest', label: 'Hotel Staying Guest', icon: <Home size={20} /> },
+                    { key: 'restaurant',  label: 'Restaurant Valet',    icon: <FileText size={20} /> },
+                    { key: 'event',       label: 'Event',               icon: <CalendarDays size={20} /> },
+                    { key: 'others',      label: 'Others',              icon: <Users size={20} /> },
+                  ] as { key: string; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+                    <button
+                      key={key}
+                      onClick={() => { setVInfoVisitorType(key); setVInfoStep(2); }}
+                      className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
+                    >
+                      <span className="text-blue-600">{icon}</span>
+                      <span className="font-medium text-gray-800">{label}</span>
+                      <ChevronRight size={16} className="ml-auto text-gray-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Step 2 — pick method + input */
+              <div className="space-y-4">
+                <button onClick={() => setVInfoStep(1)} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                  <ChevronLeft size={14} /> Back
+                </button>
+
+                {!vInfoMethod ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setVInfoMethod('csv')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                    >
+                      <Download size={24} className="text-blue-600" />
+                      <span className="text-sm font-medium">Import from CSV</span>
+                    </button>
+                    <button
+                      onClick={() => setVInfoMethod('paste')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                    >
+                      <FileText size={24} className="text-blue-600" />
+                      <span className="text-sm font-medium">Paste Names</span>
+                    </button>
+                  </div>
+                ) : vInfoMethod === 'paste' ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600">Paste guest names — one name per line:</p>
+                    <textarea
+                      className="w-full h-48 border border-gray-300 rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      placeholder={"Tanaka Hiroshi\nYamamoto Kenji\nSato Yuki"}
+                      value={vInfoPasteText}
+                      onChange={(e) => setVInfoPasteText(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1" onClick={() => setVInfoMethod(null)}>Back</Button>
+                      <Button
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={!vInfoPasteText.trim() || vInfoImportMutation.isPending}
+                        onClick={() => {
+                          const names = vInfoPasteText.split('\n').map(n => n.trim()).filter(Boolean);
+                          vInfoImportMutation.mutate({ names, visitorType: vInfoVisitorType });
+                        }}
+                      >
+                        {vInfoImportMutation.isPending ? 'Importing…' : `Import ${vInfoPasteText.split('\n').filter(l => l.trim()).length} Names`}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600">Select a CSV file (one name per row in the first column):</p>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      onChange={(e) => setVInfoCsvFile(e.target.files?.[0] ?? null)}
+                    />
+                    {vInfoCsvFile && <p className="text-xs text-gray-500">{vInfoCsvFile.name} selected</p>}
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1" onClick={() => setVInfoMethod(null)}>Back</Button>
+                      <Button
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={!vInfoCsvFile || vInfoImportMutation.isPending}
+                        onClick={async () => {
+                          if (!vInfoCsvFile) return;
+                          const text = await vInfoCsvFile.text();
+                          const names = text.split('\n').map(row => row.split(',')[0].replace(/^"|"$/g, '').trim()).filter(Boolean);
+                          vInfoImportMutation.mutate({ names, visitorType: vInfoVisitorType });
+                        }}
+                      >
+                        {vInfoImportMutation.isPending ? 'Importing…' : 'Import CSV'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </DialogContent>
         </Dialog>
 

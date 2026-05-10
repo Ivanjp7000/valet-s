@@ -8,6 +8,7 @@ import {
   faqs,
   systemSettings,
   ouLicenses,
+  guestNameImports,
   type User,
   type UpsertUser,
   type OrganizationalUnit,
@@ -27,7 +28,7 @@ import {
   type InsertOULicense,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull } from "drizzle-orm";
+import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull, gt, ilike } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -112,6 +113,11 @@ export interface IStorage {
   getAllLicenses(): Promise<OULicense[]>;
   updateLicense(id: string, data: Partial<OULicense>): Promise<OULicense | undefined>;
   updateOUBranding(ouId: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string }): Promise<OrganizationalUnit | undefined>;
+
+  // Guest Name Import operations
+  bulkImportGuestNames(names: { name: string; visitorType: string }[], ouId: string): Promise<void>;
+  getGuestNameSuggestions(prefix: string, visitorType: string, ouId: string): Promise<string[]>;
+  clearGuestNameImports(visitorType: string, ouId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -708,6 +714,33 @@ export class DatabaseStorage implements IStorage {
   async updateOUBranding(ouId: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string }): Promise<OrganizationalUnit | undefined> {
     const [ou] = await db.update(organizationalUnits).set({ ...data, updatedAt: new Date() }).where(eq(organizationalUnits.id, ouId)).returning();
     return ou;
+  }
+
+  async bulkImportGuestNames(names: { name: string; visitorType: string }[], ouId: string): Promise<void> {
+    if (names.length === 0) return;
+    // Clear old entries for this ouId + visitorType before inserting fresh batch
+    const visitorType = names[0].visitorType;
+    await db.delete(guestNameImports).where(and(eq(guestNameImports.ouId, ouId), eq(guestNameImports.visitorType, visitorType)));
+    await db.insert(guestNameImports).values(names.map(n => ({ name: n.name, visitorType: n.visitorType, ouId })));
+  }
+
+  async getGuestNameSuggestions(prefix: string, visitorType: string, ouId: string): Promise<string[]> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const results = await db.select({ name: guestNameImports.name })
+      .from(guestNameImports)
+      .where(and(
+        eq(guestNameImports.ouId, ouId),
+        eq(guestNameImports.visitorType, visitorType),
+        gt(guestNameImports.createdAt, cutoff),
+        ilike(guestNameImports.name, `${prefix}%`)
+      ))
+      .orderBy(asc(guestNameImports.name))
+      .limit(8);
+    return results.map(r => r.name);
+  }
+
+  async clearGuestNameImports(visitorType: string, ouId: string): Promise<void> {
+    await db.delete(guestNameImports).where(and(eq(guestNameImports.ouId, ouId), eq(guestNameImports.visitorType, visitorType)));
   }
 }
 

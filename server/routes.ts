@@ -2128,5 +2128,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // ── Guest Name Import endpoints ──────────────────────────────────────────
+  // POST /api/name-imports  (privilege_admin only — bulk insert names)
+  app.post('/api/name-imports', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned to your account' });
+      const { names, visitorType } = req.body;
+      if (!visitorType || typeof visitorType !== 'string') return res.status(400).json({ message: 'visitorType is required' });
+      if (!Array.isArray(names) || names.length === 0) return res.status(400).json({ message: 'names array is required' });
+      const valid = (names as string[]).filter(n => typeof n === 'string' && n.trim().length > 0).map(n => n.trim());
+      if (valid.length === 0) return res.status(400).json({ message: 'No valid names provided' });
+      await storage.bulkImportGuestNames(valid.map(name => ({ name, visitorType })), user.ouId);
+      res.json({ imported: valid.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET /api/name-imports  (any authenticated staff — for autocomplete suggestions)
+  app.get('/api/name-imports', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !user.ouId) return res.json([]);
+      const prefix = (req.query.prefix as string) || '';
+      const visitorType = (req.query.visitorType as string) || '';
+      if (prefix.length < 1 || !visitorType) return res.json([]);
+      const suggestions = await storage.getGuestNameSuggestions(prefix, visitorType, user.ouId);
+      res.json(suggestions);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   return httpServer;
 }
