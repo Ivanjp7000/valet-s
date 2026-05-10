@@ -384,9 +384,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const canProceedStep1 = formData.visitorType && 
     (formData.visitorType !== "restaurant" || formData.visitorSubType) &&
-    formData.carMake && formData.carModel && formData.carColor;
+    formData.carMake && formData.carModel && formData.carColor &&
+    formData.guestName.trim().length > 0;
 
-  const canProceedStep2 = formData.guestName.trim().length > 0 && formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
+  const canProceedStep2 = formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
 
   const PSEUDO_TICKET = 'X7777';
   const canProceedStep3 = formData.ticketNumber === PSEUDO_TICKET || (formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber));
@@ -420,6 +421,21 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const renderStep1 = () => (
     <div className="space-y-6">
+      {/* Guest Information — top of step 1 */}
+      <div>
+        <h3 className="text-lg font-semibold text-regis-navy mb-3">Guest Information</h3>
+        <div>
+          <label className="text-sm font-medium text-gray-700">Full Name *</label>
+          <Input
+            value={formData.guestName}
+            onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
+            placeholder="Enter guest's full name"
+            className="mt-1"
+            data-testid="input-guest-name"
+          />
+        </div>
+      </div>
+
       <div>
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Visitor Type</h3>
         <div className="grid grid-cols-1 gap-3">
@@ -852,43 +868,20 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-3">Guest Information</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="text-sm font-medium text-gray-700">Full Name *</label>
-            <Input
-              value={formData.guestName}
-              onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
-              placeholder="Enter guest's full name"
-              className="mt-1"
-              data-testid="input-guest-name"
-            />
+        <h3 className="text-lg font-semibold text-regis-navy mb-3">Room Number</h3>
+        {formData.visitorType === 'hotel_guest' ? (
+          <Input
+            value={formData.roomNumber}
+            onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+            placeholder="Enter room number (optional)"
+            data-testid="input-room-number"
+          />
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-gray-200 bg-gray-50">
+            <span className="font-semibold text-regis-navy">{formData.roomNumber || '—'}</span>
+            <span className="ml-auto text-xs text-gray-400 italic">auto-filled</span>
           </div>
-          <div>
-            {formData.visitorType === 'hotel_guest' ? (
-              <>
-                <label className="text-sm font-medium text-gray-700">Room Number</label>
-                <Input
-                  value={formData.roomNumber}
-                  onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
-                  placeholder="Enter room number (optional)"
-                  className="mt-1"
-                  data-testid="input-room-number"
-                />
-              </>
-            ) : (
-              <>
-                <label className="text-sm font-medium text-gray-700">
-                  {formData.visitorType === 'restaurant' ? 'Restaurant' : formData.visitorType === 'event' ? 'Event' : 'Category'}
-                </label>
-                <div className="mt-1 flex items-center gap-2 px-3 py-2.5 rounded-md border border-gray-200 bg-gray-50">
-                  <span className="font-semibold text-regis-navy">{formData.roomNumber || '—'}</span>
-                  <span className="ml-auto text-xs text-gray-400 italic">auto-filled</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
