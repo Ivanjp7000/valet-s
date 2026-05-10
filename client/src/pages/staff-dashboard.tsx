@@ -28,6 +28,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, SafeUser as UserType, OULicense, OrganizationalUnit } from "@shared/schema";
 import { RESTAURANT_SUB_TYPES, VISITOR_TYPES } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
+import licenseCertImg from "@assets/Valet-S_Software_License1_1778373848645.png";
 
 // Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
 function toDatetimeLocal(d: Date): string {
@@ -3458,7 +3459,12 @@ export default function StaffDashboard() {
                           {allLicenses?.map(lic => {
                             const ou = allOUs?.find(o => o.id === lic.ouId);
                             return (
-                              <div key={lic.id} className={`border rounded-lg p-4 space-y-2 ${lic.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
+                              <div key={lic.id} className={`border rounded-lg overflow-hidden ${lic.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
+                                {/* Certificate image thumbnail */}
+                                <div className="w-full overflow-hidden border-b border-amber-100">
+                                  <img src={licenseCertImg} alt="Valet-S Software License" className="w-full object-cover max-h-36" />
+                                </div>
+                                <div className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-2">
                                   <div>
                                     <p className="font-semibold text-sm text-regis-navy">{lic.orgName}</p>
@@ -3496,6 +3502,7 @@ export default function StaffDashboard() {
                                     {lic.isActive ? <><Ban size={11} className="mr-1" />Revoke</> : <><CheckCircle2 size={11} className="mr-1" />Reinstate</>}
                                   </Button>
                                 </div>
+                                </div>{/* end p-4 content */}
                               </div>
                             );
                           })}
@@ -3603,6 +3610,9 @@ export default function StaffDashboard() {
                       {/* Step 3: Review & Issue */}
                       {licenseWizardStep === 3 && (
                         <div className="space-y-4">
+                          <div className="rounded-lg overflow-hidden border border-amber-200 shadow-sm">
+                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover" />
+                          </div>
                           <div className="bg-gray-50 border rounded-lg p-4 space-y-2 text-sm">
                             <div className="flex justify-between"><span className="text-gray-500">Organization</span><span className="font-medium">{licenseForm.orgName}</span></div>
                             <div className="flex justify-between"><span className="text-gray-500">OU</span><span className="font-medium">{allOUs?.find(o => o.id === licenseForm.ouId)?.name}</span></div>
@@ -3661,6 +3671,10 @@ export default function StaffDashboard() {
                         </div>
                       ) : (
                         <div className="space-y-4">
+                          {/* Certificate image */}
+                          <div className="rounded-xl overflow-hidden border border-amber-200 shadow-md">
+                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover" />
+                          </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{lic.orgName}</p></div>
                             <div><p className="text-gray-500 text-xs">Version</p><p className="font-semibold capitalize">{lic.version}</p></div>
@@ -3753,6 +3767,10 @@ export default function StaffDashboard() {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {/* Certificate image */}
+                      <div className="rounded-xl overflow-hidden border border-amber-200 shadow-md">
+                        <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover" />
+                      </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{myLicense.orgName}</p></div>
                         <div><p className="text-gray-500 text-xs">Version</p><p className="font-semibold capitalize">{myLicense.version}</p></div>
