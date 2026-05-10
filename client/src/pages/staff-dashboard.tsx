@@ -849,8 +849,22 @@ export default function StaffDashboard() {
 
   const { data: allOUs } = useQuery<OrganizationalUnit[]>({
     queryKey: ["/api/ous"],
-    enabled: user?.role === 'superadmin',
+    enabled: user?.role === 'superadmin' || user?.role === 'privilege_admin',
   });
+
+  // Pre-populate branding form from saved OU data
+  useEffect(() => {
+    if (user?.role === 'privilege_admin' && allOUs && user?.ouId) {
+      const myOU = allOUs.find(o => o.id === user.ouId);
+      if (myOU) {
+        setBrandingForm({
+          logoUrl: myOU.logoUrl ?? '',
+          primaryColor: myOU.primaryColor ?? '#1a2744',
+          accentColor: myOU.accentColor ?? '#c9a84c',
+        });
+      }
+    }
+  }, [allOUs, user?.ouId, user?.role]);
 
   const { data: allLicenses, isLoading: licensesLoading } = useQuery<OULicense[]>({
     queryKey: ["/api/admin/licenses"],
@@ -3649,13 +3663,18 @@ export default function StaffDashboard() {
             {/* ── Privilege Admin: OU license card + branding editor ────── */}
             {user?.role === 'privilege_admin' && (() => {
               const lic = myLicense;
+              const myOU = allOUs?.find(o => o.id === user?.ouId);
               return (
                 <div className="space-y-6">
                   {/* License card */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <ShieldCheck size={18} className="text-regis-gold" />
+                        {myOU?.logoUrl ? (
+                          <img src={myOU.logoUrl} alt="Logo" className="h-8 w-8 object-contain rounded border" onError={e => (e.currentTarget.style.display = 'none')} />
+                        ) : (
+                          <ShieldCheck size={18} className="text-regis-gold" />
+                        )}
                         Your Software License
                       </CardTitle>
                     </CardHeader>
