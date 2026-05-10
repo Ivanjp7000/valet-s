@@ -1519,7 +1519,7 @@ export default function StaffDashboard() {
               {user?.role === 'privilege_admin' && (
                 <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                   <Activity size={14} className="sm:w-4 sm:h-4" />
-                  <span>Security</span>
+                  <span>Audit</span>
                 </TabsTrigger>
               )}
               <TabsTrigger value="license" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
@@ -3617,9 +3617,24 @@ export default function StaffDashboard() {
                             {/* IP + Geo */}
                             <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2">
                               <Globe size={14} className="text-blue-500 flex-shrink-0" />
-                              <div className="min-w-0">
-                                <div className="text-xs font-medium text-gray-700 truncate">{s.ipAddress || '—'}</div>
-                                <div className="text-xs text-gray-400 truncate">{[s.city, s.country].filter(Boolean).join(', ') || 'Unknown location'}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-medium text-gray-700 truncate">{s.ipAddress || '—'}</span>
+                                  {s.ipAddress && s.ipAddress !== 'Local' && (
+                                    <a
+                                      href={`https://www.iplocation.net/?query=${s.ipAddress}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-500 hover:text-blue-700 flex-shrink-0"
+                                      title="Lookup IP location"
+                                    >
+                                      <Globe size={11} />
+                                    </a>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 font-medium truncate">
+                                  {[s.city, s.country].filter(Boolean).join(', ') || 'Unknown location'}
+                                </div>
                               </div>
                             </div>
 
