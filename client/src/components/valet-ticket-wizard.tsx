@@ -482,6 +482,19 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            const first = ["Aiden","Blake","Cameron","Dakota","Ellis","Finley","Gray","Harper","Indigo","Jordan","Kendall","Logan","Morgan","Noah","Oakley","Parker","Quinn","Reese","Sage","Taylor","River","Avery","Casey","Drew","Emery","Fallon","Haven","Juno","Kai","Lane","Marlowe","Noel","Onyx","Piper","Remy","Scout","Sloane","Spencer","Sterling","Wynne"];
+            const last = ["Ashford","Bennett","Calloway","Davenport","Elsworth","Fairfax","Graham","Harrington","Ingram","Jennings","Kensington","Langley","Merritt","Northcott","Ogilvy","Pemberton","Quinlan","Radcliffe","Stanton","Thornton","Upton","Vane","Whitmore","Xavier","Yardley","Zealand"];
+            const name = `Mx. ${first[Math.floor(Math.random()*first.length)]} ${last[Math.floor(Math.random()*last.length)]}`;
+            setFormData({ ...formData, guestName: name });
+          }}
+          className="mt-2 inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 rounded-md px-2.5 py-1 transition-colors"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 1 0 5 5"/><path d="M12 2v4m0 0a5 5 0 0 1 5 5"/><circle cx="12" cy="17" r="5"/></svg>
+          Generate Name
+        </button>
       </div>
 
       <div>
