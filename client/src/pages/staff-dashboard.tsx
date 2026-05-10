@@ -5034,133 +5034,142 @@ export default function StaffDashboard() {
 
         {/* Edit Ticket Modal */}
         <Dialog open={!!editTicketData} onOpenChange={() => setEditTicketData(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Edit size={20} />
-                Edit Ticket #{editTicketData?.ticketNumber}
-              </DialogTitle>
-            </DialogHeader>
+          <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden">
+            {/* Compact header */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-regis-navy text-white">
+              <div className="flex items-center gap-2">
+                <Edit size={14} />
+                <span className="font-semibold text-sm">Edit Ticket #{editTicketData?.ticketNumber}</span>
+              </div>
+            </div>
             {editTicketData && (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Status</label>
-                  <Select
-                    value={editTicketData.status}
-                    onValueChange={(value) => setEditTicketData({ ...editTicketData, status: value })}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="retrieving">Retrieving</SelectItem>
-                      <SelectItem value="transit">Transit</SelectItem>
-                      <SelectItem value="ready">Ready</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="px-4 py-3 space-y-2.5 max-h-[80vh] overflow-y-auto">
+
+                {/* Row: Status + Parking */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Status</label>
+                    <Select
+                      value={editTicketData.status}
+                      onValueChange={(value) => setEditTicketData({ ...editTicketData, status: value })}
+                    >
+                      <SelectTrigger className="h-8 text-xs mt-0.5">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="retrieving">Retrieving</SelectItem>
+                        <SelectItem value="transit">Transit</SelectItem>
+                        <SelectItem value="ready">Ready</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Parking Spot</label>
+                    <Input
+                      value={editTicketData.parkingLocation || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, parkingLocation: e.target.value })}
+                      placeholder="e.g. A23"
+                      className="h-8 text-xs mt-0.5"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                {/* Row: Guest Name + Room */}
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Guest Name</label>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Guest Name</label>
                     <Input
                       value={editTicketData.guestName || ''}
                       onChange={(e) => setEditTicketData({ ...editTicketData, guestName: e.target.value })}
-                      className="mt-1"
+                      className="h-8 text-xs mt-0.5"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Room Number</label>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Room No.</label>
                     <Input
                       value={editTicketData.roomNumber || ''}
                       onChange={(e) => setEditTicketData({ ...editTicketData, roomNumber: e.target.value })}
                       placeholder="Optional"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">License Plate</label>
-                    <Input
-                      value={editTicketData.licensePlate || ''}
-                      onChange={(e) => setEditTicketData({ ...editTicketData, licensePlate: e.target.value })}
-                      className="mt-1"
+                      className="h-8 text-xs mt-0.5"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                {/* Row: Make + Model + Color */}
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Car Make</label>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Make</label>
                     <Input
                       value={editTicketData.carMake || ''}
                       onChange={(e) => setEditTicketData({ ...editTicketData, carMake: e.target.value })}
-                      className="mt-1"
+                      className="h-8 text-xs mt-0.5"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Car Model</label>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Model</label>
                     <Input
                       value={editTicketData.carModel || ''}
                       onChange={(e) => setEditTicketData({ ...editTicketData, carModel: e.target.value })}
-                      className="mt-1"
+                      className="h-8 text-xs mt-0.5"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Car Color</label>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Color</label>
                     <Input
                       value={editTicketData.carColor || ''}
                       onChange={(e) => setEditTicketData({ ...editTicketData, carColor: e.target.value })}
-                      className="mt-1"
+                      className="h-8 text-xs mt-0.5"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Parking Location</label>
-                  <Input
-                    value={editTicketData.parkingLocation || ''}
-                    onChange={(e) => setEditTicketData({ ...editTicketData, parkingLocation: e.target.value })}
-                    placeholder="e.g., A23"
-                    className="mt-1"
-                  />
+                {/* Row: License Plate + Created Time */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">License Plate</label>
+                    <Input
+                      value={editTicketData.licensePlate || ''}
+                      onChange={(e) => setEditTicketData({ ...editTicketData, licensePlate: e.target.value })}
+                      className="h-8 text-xs font-mono mt-0.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide flex items-center gap-1">
+                      <CalendarDays size={10} /> Check-in Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      className="mt-0.5 w-full h-8 border border-amber-300 rounded-md px-2 text-xs bg-amber-50 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      value={(() => {
+                        const d = editTicketData.createdAt ? new Date(editTicketData.createdAt) : null;
+                        if (!d || isNaN(d.getTime())) return '';
+                        const pad = (n: number) => String(n).padStart(2, '0');
+                        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                      })()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditTicketData({ ...editTicketData, createdAt: val ? new Date(val).toISOString() : editTicketData.createdAt });
+                      }}
+                    />
+                  </div>
                 </div>
 
+                {/* Staff Notes */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Staff Notes</label>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Staff Notes</label>
                   <Textarea
                     value={editTicketData.staffNotes || ''}
                     onChange={(e) => setEditTicketData({ ...editTicketData, staffNotes: e.target.value })}
                     placeholder="Add notes..."
-                    className="mt-1"
-                    rows={3}
+                    className="mt-0.5 text-xs resize-none"
+                    rows={2}
                   />
                 </div>
 
-                <div className="border border-amber-200 bg-amber-50 rounded-lg p-3">
-                  <label className="text-sm font-medium text-amber-800 flex items-center gap-1.5">
-                    <CalendarDays size={14} />
-                    Created Time
-                    <span className="text-xs font-normal text-amber-600 ml-1">(override check-in timestamp)</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="mt-1 w-full border border-amber-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    value={(() => {
-                      const d = editTicketData.createdAt ? new Date(editTicketData.createdAt) : null;
-                      if (!d || isNaN(d.getTime())) return '';
-                      const pad = (n: number) => String(n).padStart(2, '0');
-                      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-                    })()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditTicketData({ ...editTicketData, createdAt: val ? new Date(val).toISOString() : editTicketData.createdAt });
-                    }}
-                  />
-                </div>
-
-                <div className="flex space-x-2 pt-4">
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-1 pb-1">
                   <Button
                     onClick={() => updateTicketMutation.mutate({
                       ticketNumber: editTicketData.ticketNumber,
@@ -5176,16 +5185,16 @@ export default function StaffDashboard() {
                       createdAt: editTicketData.createdAt,
                     })}
                     disabled={updateTicketMutation.isPending}
-                    className="flex-1 bg-regis-navy hover:bg-blue-900"
+                    className="flex-1 h-8 text-xs bg-regis-navy hover:bg-blue-900"
                     data-testid="button-save-ticket"
                   >
-                    <Save size={16} className="mr-2" />
-                    {updateTicketMutation.isPending ? "Saving..." : "Save Changes"}
+                    <Save size={13} className="mr-1.5" />
+                    {updateTicketMutation.isPending ? "Saving…" : "Save Changes"}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setEditTicketData(null)}
-                    className="flex-1"
+                    className="h-8 text-xs px-4"
                   >
                     Cancel
                   </Button>
