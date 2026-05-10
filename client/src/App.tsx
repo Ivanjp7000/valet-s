@@ -8,6 +8,7 @@ import Landing from "@/pages/landing";
 import Home from "@/pages/home";
 import StaffDashboard from "@/pages/staff-dashboard";
 import AdminPanel from "@/pages/admin-panel";
+import Docs from "@/pages/docs";
 import NotFound from "@/pages/not-found";
 
 // Version is derived from the build date — updates automatically on every deploy
@@ -41,6 +42,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/staff" component={StaffDashboard} />
+          <Route path="/docs" component={Docs} />
           {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
             <Route path="/admin" component={AdminPanel} />
           )}

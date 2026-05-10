@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Crown, LogOut, Users, Settings, Car, Building, MapPin, Shield, Minimize2, Maximize2 } from "lucide-react";
+import { Crown, LogOut, Users, Settings, Car, Building, MapPin, Shield, Minimize2, Maximize2, FileText } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
@@ -133,6 +133,22 @@ export default function Home() {
               </Link>
             )}
 
+            {/* Compact Documentation */}
+            <Link href="/docs">
+              <div className="bg-white border rounded-lg p-3 flex items-center gap-3 shadow-sm active:bg-gray-50">
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <FileText className="text-gray-500" size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-regis-navy text-sm">Documentation</h3>
+                  <p className="text-xs text-gray-500 truncate">System guides & references</p>
+                </div>
+                <Button size="sm" variant="outline" className="text-xs px-3">
+                  Open
+                </Button>
+              </div>
+            </Link>
+
             {/* Compact System Overview */}
             {user?.role === 'superadmin' && (
               <div className="bg-white border-2 border-purple-200 rounded-lg p-3 shadow-sm">
@@ -204,6 +220,21 @@ export default function Home() {
                 </CardContent>
               </Card>
             )}
+
+            <Card className="shadow-lg" data-testid="card-documentation">
+              <CardContent className="p-6 sm:p-8 text-center">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                  <FileText className="text-gray-500" size={24} />
+                </div>
+                <h2 className="text-lg sm:text-xl font-semibold text-regis-navy mb-2">Documentation</h2>
+                <p className="text-gray-600 mb-4 sm:mb-6 text-xs sm:text-sm">System guides, feature references, and operational instructions</p>
+                <Link href="/docs">
+                  <Button variant="outline" className="w-full border-regis-navy text-regis-navy hover:bg-regis-navy/5 font-medium">
+                    Open Documentation
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
 
             {user?.role === 'superadmin' && (
               <Card className="shadow-lg border-2 border-purple-200" data-testid="card-super-admin-stats">

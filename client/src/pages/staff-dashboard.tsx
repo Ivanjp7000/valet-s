@@ -1501,10 +1501,6 @@ export default function StaffDashboard() {
                 <ShieldCheck size={14} className="sm:w-4 sm:h-4" />
                 <span>License</span>
               </TabsTrigger>
-              <TabsTrigger value="docs" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
-                <FileText size={14} className="sm:w-4 sm:h-4" />
-                <span>Documentation</span>
-              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -3868,14 +3864,6 @@ export default function StaffDashboard() {
             )}
           </TabsContent>
 
-          {/* Documentation Tab — placeholder */}
-          <TabsContent value="docs" className="space-y-6">
-            <div className="flex flex-col items-center justify-center py-24 text-center text-gray-400">
-              <FileText size={48} className="mb-4 text-gray-300" />
-              <h2 className="text-xl font-semibold text-gray-500 mb-2">Documentation</h2>
-              <p className="text-sm text-gray-400">Content coming soon.</p>
-            </div>
-          </TabsContent>
 
         </Tabs>
 
