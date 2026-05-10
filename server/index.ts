@@ -52,6 +52,27 @@ app.use((req, res, next) => {
     ADD COLUMN IF NOT EXISTS scheduled_departure_at TIMESTAMPTZ;
   `).catch((e: any) => console.error('[Migration] scheduled_departure_at:', e.message));
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS session_audit_log (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      session_id varchar UNIQUE NOT NULL,
+      user_id varchar NOT NULL,
+      username varchar NOT NULL,
+      display_name varchar,
+      role varchar NOT NULL,
+      ou_id varchar,
+      ip_address varchar,
+      country varchar,
+      city varchar,
+      device_type varchar,
+      os varchar,
+      browser varchar,
+      first_seen_at timestamp DEFAULT now(),
+      last_seen_at timestamp DEFAULT now(),
+      snapshot_date varchar
+    );
+  `).catch((e: any) => console.error('[Migration] session_audit_log:', e.message));
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

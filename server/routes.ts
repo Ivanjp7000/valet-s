@@ -12,6 +12,88 @@ import { Resend } from "resend";
 // In-memory OTP store: userId → { code, expiresAt }
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
+// ── Session Audit Helpers ─────────────────────────────────────────────────────
+
+// Simple user-agent parser (no external package needed)
+function parseUserAgent(ua: string): { deviceType: string; os: string; browser: string } {
+  if (!ua) return { deviceType: 'Unknown', os: 'Unknown', browser: 'Unknown' };
+  const isTablet = /iPad|Tablet|tablet/i.test(ua);
+  const isMobile = !isTablet && /Mobile|Android|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const deviceType = isTablet ? 'Tablet' : isMobile ? 'Mobile' : 'Desktop';
+
+  let os = 'Unknown';
+  if (/Windows NT 10/.test(ua)) os = 'Windows 10/11';
+  else if (/Windows NT 6\.3/.test(ua)) os = 'Windows 8.1';
+  else if (/Windows NT 6\.1/.test(ua)) os = 'Windows 7';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Mac OS X ([\d_]+)/.test(ua)) {
+    const m = ua.match(/Mac OS X ([\d_]+)/);
+    os = m ? 'macOS ' + m[1].replace(/_/g, '.') : 'macOS';
+  } else if (/Android ([\d.]+)/.test(ua)) {
+    const m = ua.match(/Android ([\d.]+)/);
+    os = m ? 'Android ' + m[1] : 'Android';
+  } else if (/CPU iPhone OS ([\d_]+)|CPU OS ([\d_]+)/.test(ua)) {
+    const m = ua.match(/CPU (?:iPhone )?OS ([\d_]+)/);
+    os = m ? 'iOS ' + m[1].replace(/_/g, '.') : 'iOS';
+  } else if (/Linux/.test(ua)) os = 'Linux';
+  else if (/CrOS/.test(ua)) os = 'Chrome OS';
+
+  let browser = 'Unknown';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera\//.test(ua)) browser = 'Opera';
+  else if (/Chrome\/([\d]+)/.test(ua)) { const m = ua.match(/Chrome\/([\d]+)/); browser = m ? `Chrome ${m[1]}` : 'Chrome'; }
+  else if (/Firefox\/([\d]+)/.test(ua)) { const m = ua.match(/Firefox\/([\d]+)/); browser = m ? `Firefox ${m[1]}` : 'Firefox'; }
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+
+  return { deviceType, os, browser };
+}
+
+// Geo lookup cache: ip → { country, city }
+const geoCache = new Map<string, { country: string; city: string }>();
+async function lookupGeo(ip: string): Promise<{ country: string; city: string }> {
+  const localPrefixes = ['127.', '::1', '192.168.', '10.', '172.', '::ffff:127.'];
+  if (!ip || localPrefixes.some(p => ip.startsWith(p))) return { country: 'Local', city: 'Dev' };
+  if (geoCache.has(ip)) return geoCache.get(ip)!;
+  try {
+    const resp = await fetch(`http://ip-api.com/json/${ip}?fields=country,city`, { signal: AbortSignal.timeout(3000) });
+    const data: any = await resp.json();
+    const result = { country: data.country || 'Unknown', city: data.city || '' };
+    geoCache.set(ip, result);
+    return result;
+  } catch {
+    return { country: 'Unknown', city: '' };
+  }
+}
+
+// Track session — fire-and-forget, never blocks a request
+async function trackSession(req: any): Promise<void> {
+  try {
+    const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+    if (!userId || !req.sessionID) return;
+    const user = await (await import('./storage')).storage.getUser(userId);
+    if (!user) return;
+    const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const ip = rawIp.replace('::ffff:', '');
+    const ua = req.headers['user-agent'] || '';
+    const { deviceType, os, browser } = parseUserAgent(ua);
+    const geo = await lookupGeo(ip);
+    await (await import('./storage')).storage.upsertSessionAudit({
+      sessionId: req.sessionID,
+      userId: user.id,
+      username: user.username || user.email || user.id,
+      displayName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
+      role: user.role,
+      ouId: user.ouId || undefined,
+      ipAddress: ip || undefined,
+      country: geo.country,
+      city: geo.city,
+      deviceType,
+      os,
+      browser,
+    });
+  } catch { /* silent */ }
+}
+
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -2141,6 +2223,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (valid.length === 0) return res.status(400).json({ message: 'No valid names provided' });
       await storage.bulkImportGuestNames(valid.map(name => ({ name, visitorType })), user.ouId);
       res.json({ imported: valid.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── Session Audit Routes (privilege_admin only) ──────────────────────────────
+
+  // Middleware: track every authenticated request (fire-and-forget)
+  app.use('/api', isAuthenticated, (req: any, _res: any, next: any) => {
+    trackSession(req).catch(() => {});
+    next();
+  });
+
+  // GET /api/audit/sessions — active sessions (last 30 min), scoped to caller's OU
+  app.get('/api/audit/sessions', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user: any = req.currentUser;
+      const ouId = user.role === 'superadmin' ? undefined : user.ouId;
+      const sessions = await storage.getActiveSessionAudits(ouId);
+      res.json(sessions);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET /api/audit/sessions/archive?date=YYYY-MM-DD — historical sessions for a date
+  app.get('/api/audit/sessions/archive', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user: any = req.currentUser;
+      const ouId = user.role === 'superadmin' ? undefined : user.ouId;
+      const date = (req.query.date as string) || '';
+      if (!date) return res.json([]);
+      const sessions = await storage.getArchivedSessionAudits(date, ouId);
+      res.json(sessions);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET /api/audit/dates — distinct snapshot dates (for archive picker)
+  app.get('/api/audit/dates', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user: any = req.currentUser;
+      const ouId = user.role === 'superadmin' ? undefined : user.ouId;
+      const dates = await storage.getAuditArchiveDates(ouId);
+      res.json(dates);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

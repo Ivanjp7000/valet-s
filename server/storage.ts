@@ -9,6 +9,7 @@ import {
   systemSettings,
   ouLicenses,
   guestNameImports,
+  sessionAuditLog,
   type User,
   type UpsertUser,
   type OrganizationalUnit,
@@ -26,9 +27,11 @@ import {
   type InsertSystemSetting,
   type OULicense,
   type InsertOULicense,
+  type SessionAuditLog,
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull, gt, ilike } from "drizzle-orm";
+import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull, gt, ilike, lt } from "drizzle-orm";
+import { sql as drizzleSql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -118,6 +121,12 @@ export interface IStorage {
   bulkImportGuestNames(names: { name: string; visitorType: string }[], ouId: string): Promise<void>;
   getGuestNameSuggestions(prefix: string, visitorType: string, ouId: string): Promise<string[]>;
   clearGuestNameImports(visitorType: string, ouId: string): Promise<void>;
+
+  // Session Audit operations
+  upsertSessionAudit(data: { sessionId: string; userId: string; username: string; displayName?: string; role: string; ouId?: string; ipAddress?: string; country?: string; city?: string; deviceType?: string; os?: string; browser?: string }): Promise<void>;
+  getActiveSessionAudits(ouId?: string): Promise<SessionAuditLog[]>;
+  getArchivedSessionAudits(date: string, ouId?: string): Promise<SessionAuditLog[]>;
+  getAuditArchiveDates(ouId?: string): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -741,6 +750,70 @@ export class DatabaseStorage implements IStorage {
 
   async clearGuestNameImports(visitorType: string, ouId: string): Promise<void> {
     await db.delete(guestNameImports).where(and(eq(guestNameImports.ouId, ouId), eq(guestNameImports.visitorType, visitorType)));
+  }
+
+  async upsertSessionAudit(data: { sessionId: string; userId: string; username: string; displayName?: string; role: string; ouId?: string; ipAddress?: string; country?: string; city?: string; deviceType?: string; os?: string; browser?: string }): Promise<void> {
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    await db.insert(sessionAuditLog).values({
+      sessionId: data.sessionId,
+      userId: data.userId,
+      username: data.username,
+      displayName: data.displayName,
+      role: data.role,
+      ouId: data.ouId,
+      ipAddress: data.ipAddress,
+      country: data.country,
+      city: data.city,
+      deviceType: data.deviceType,
+      os: data.os,
+      browser: data.browser,
+      firstSeenAt: now,
+      lastSeenAt: now,
+      snapshotDate: today,
+    }).onConflictDoUpdate({
+      target: sessionAuditLog.sessionId,
+      set: {
+        lastSeenAt: now,
+        snapshotDate: today,
+        country: data.country,
+        city: data.city,
+        ipAddress: data.ipAddress,
+      },
+    });
+  }
+
+  async getActiveSessionAudits(ouId?: string): Promise<SessionAuditLog[]> {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    if (ouId) {
+      return db.select().from(sessionAuditLog)
+        .where(and(eq(sessionAuditLog.ouId, ouId), gt(sessionAuditLog.lastSeenAt, cutoff)))
+        .orderBy(desc(sessionAuditLog.lastSeenAt));
+    }
+    return db.select().from(sessionAuditLog)
+      .where(gt(sessionAuditLog.lastSeenAt, cutoff))
+      .orderBy(desc(sessionAuditLog.lastSeenAt));
+  }
+
+  async getArchivedSessionAudits(date: string, ouId?: string): Promise<SessionAuditLog[]> {
+    if (ouId) {
+      return db.select().from(sessionAuditLog)
+        .where(and(eq(sessionAuditLog.ouId, ouId), eq(sessionAuditLog.snapshotDate, date)))
+        .orderBy(desc(sessionAuditLog.lastSeenAt));
+    }
+    return db.select().from(sessionAuditLog)
+      .where(eq(sessionAuditLog.snapshotDate, date))
+      .orderBy(desc(sessionAuditLog.lastSeenAt));
+  }
+
+  async getAuditArchiveDates(ouId?: string): Promise<string[]> {
+    const rows = await pool.query<{ snapshot_date: string }>(
+      ouId
+        ? `SELECT DISTINCT snapshot_date FROM session_audit_log WHERE ou_id = $1 AND snapshot_date IS NOT NULL ORDER BY snapshot_date DESC LIMIT 90`
+        : `SELECT DISTINCT snapshot_date FROM session_audit_log WHERE snapshot_date IS NOT NULL ORDER BY snapshot_date DESC LIMIT 90`,
+      ouId ? [ouId] : []
+    );
+    return rows.rows.map(r => r.snapshot_date);
   }
 }
 

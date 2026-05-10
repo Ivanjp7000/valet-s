@@ -16,7 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -747,6 +747,10 @@ export default function StaffDashboard() {
   const [vInfoCsvFile, setVInfoCsvFile] = useState<File|null>(null);
   const [vInfoImportedCount, setVInfoImportedCount] = useState<number|null>(null);
 
+  // Security / Audit state
+  const [auditArchiveDate, setAuditArchiveDate] = useState('');
+  const [auditViewMode, setAuditViewMode] = useState<'live'|'archive'>('live');
+
   // Backup state
   const [backupRange, setBackupRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('30d');
   const [backupFormat, setBackupFormat] = useState<'csv'|'json'>('csv');
@@ -890,6 +894,21 @@ export default function StaffDashboard() {
   const { data: myLicense, isLoading: myLicenseLoading } = useQuery<OULicense | null>({
     queryKey: ["/api/licenses/my"],
     enabled: !!user && user.role !== 'superadmin',
+  });
+
+  // Security / Audit queries (privilege_admin only)
+  const { data: auditSessions, isLoading: auditLoading, refetch: refetchAudit } = useQuery<any[]>({
+    queryKey: ["/api/audit/sessions"],
+    enabled: !!user && user.role === 'privilege_admin',
+    refetchInterval: 30000,
+  });
+  const { data: auditArchiveResults, isLoading: auditArchiveLoading } = useQuery<any[]>({
+    queryKey: ["/api/audit/sessions/archive", auditArchiveDate],
+    enabled: !!user && user.role === 'privilege_admin' && auditViewMode === 'archive' && !!auditArchiveDate,
+  });
+  const { data: auditDates } = useQuery<string[]>({
+    queryKey: ["/api/audit/dates"],
+    enabled: !!user && user.role === 'privilege_admin',
   });
 
   const vInfoImportMutation = useMutation({
@@ -1495,6 +1514,12 @@ export default function StaffDashboard() {
                 <TabsTrigger value="backup" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                   <Database size={14} className="sm:w-4 sm:h-4" />
                   <span>Backup</span>
+                </TabsTrigger>
+              )}
+              {user?.role === 'privilege_admin' && (
+                <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                  <Activity size={14} className="sm:w-4 sm:h-4" />
+                  <span>Security</span>
                 </TabsTrigger>
               )}
               <TabsTrigger value="license" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
@@ -3433,6 +3458,195 @@ export default function StaffDashboard() {
                   </Button>
                 </CardContent>
               </Card>
+
+            </TabsContent>
+          )}
+
+          {/* Security, Audit & Usage Tab — privilege_admin only */}
+          {user?.role === 'privilege_admin' && (
+            <TabsContent value="security" className="space-y-6">
+
+              {/* Header + toggle */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-regis-navy flex items-center gap-2">
+                    <Activity size={18} className="text-blue-600" />
+                    Security, Audit &amp; Usage Data
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Staff sessions scoped to your organisation. Live view refreshes every 30 s.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAuditViewMode('live')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${auditViewMode === 'live' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    Live
+                  </button>
+                  <button
+                    onClick={() => setAuditViewMode('archive')}
+                    className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${auditViewMode === 'archive' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    Archive
+                  </button>
+                  {auditViewMode === 'live' && (
+                    <button
+                      onClick={() => refetchAudit()}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex items-center gap-1"
+                    >
+                      <Activity size={12} /> Refresh
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Archive date picker */}
+              {auditViewMode === 'archive' && (
+                <Card className="border-blue-100">
+                  <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-gray-600 block mb-1">Select Archive Date</label>
+                      <input
+                        type="date"
+                        value={auditArchiveDate}
+                        max={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) => setAuditArchiveDate(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-full sm:w-auto"
+                      />
+                    </div>
+                    {(auditDates?.length ?? 0) > 0 && (
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Recent dates with activity</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {auditDates?.slice(0, 8).map(d => (
+                            <button
+                              key={d}
+                              onClick={() => setAuditArchiveDate(d)}
+                              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${auditArchiveDate === d ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-600 hover:border-blue-400'}`}
+                            >
+                              {d}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Session cards */}
+              {(() => {
+                const isLive = auditViewMode === 'live';
+                const loading = isLive ? auditLoading : auditArchiveLoading;
+                const rows: any[] = isLive ? (auditSessions ?? []) : (auditArchiveResults ?? []);
+
+                if (loading) return (
+                  <div className="flex items-center justify-center py-16 text-gray-400 gap-2">
+                    <Loader2 size={22} className="animate-spin" /> Loading session data…
+                  </div>
+                );
+
+                if (!isLive && !auditArchiveDate) return (
+                  <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
+                    <Archive size={40} className="text-gray-300" />
+                    <p className="text-sm">Pick a date above to browse archived sessions.</p>
+                  </div>
+                );
+
+                if (rows.length === 0) return (
+                  <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-2">
+                    <Monitor size={40} className="text-gray-300" />
+                    <p className="text-sm">{isLive ? 'No active sessions in the last 30 minutes.' : 'No sessions found for this date.'}</p>
+                  </div>
+                );
+
+                const roleBadge = (role: string) => {
+                  const map: Record<string, string> = { superadmin: 'bg-purple-100 text-purple-700', privilege_admin: 'bg-yellow-100 text-yellow-700', standard_admin: 'bg-blue-100 text-blue-700', standard_user: 'bg-gray-100 text-gray-600' };
+                  const label: Record<string, string> = { superadmin: 'Super Admin', privilege_admin: 'Privilege Admin', standard_admin: 'Standard Admin', standard_user: 'Standard User' };
+                  return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${map[role] ?? 'bg-gray-100 text-gray-600'}`}>{label[role] ?? role}</span>;
+                };
+
+                const DeviceIcon = ({ type }: { type: string }) => {
+                  if (type === 'Mobile' || type === 'Tablet') return <Smartphone size={15} className="text-blue-500" />;
+                  return <Monitor size={15} className="text-gray-500" />;
+                };
+
+                const fmtTime = (ts: string) => {
+                  if (!ts) return '—';
+                  const d = new Date(ts);
+                  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                };
+
+                const fmtDateTime = (ts: string) => {
+                  if (!ts) return '—';
+                  const d = new Date(ts);
+                  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                };
+
+                return (
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-500">{rows.length} session{rows.length !== 1 ? 's' : ''} {isLive ? 'active' : `on ${auditArchiveDate}`}</p>
+                    {rows.map((s: any, i: number) => (
+                      <Card key={s.id ?? i} className={`border ${isLive ? 'border-green-100 bg-green-50/30' : 'border-gray-100'}`}>
+                        <CardContent className="p-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+
+                            {/* Avatar + name */}
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-9 h-9 rounded-full bg-regis-navy/10 flex items-center justify-center flex-shrink-0">
+                                <User size={16} className="text-regis-navy" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-regis-navy text-sm truncate">
+                                  {s.displayName || s.username}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate">{s.username}</div>
+                              </div>
+                              <div className="flex-shrink-0">{roleBadge(s.role)}</div>
+                            </div>
+
+                            {/* Time info */}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 sm:text-right">
+                              <span>First seen: <span className="font-medium text-gray-700">{fmtDateTime(s.firstSeenAt)}</span></span>
+                              <span>Last active: <span className="font-medium text-gray-700">{fmtTime(s.lastSeenAt)}</span></span>
+                            </div>
+                          </div>
+
+                          {/* Details row */}
+                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+
+                            {/* IP + Geo */}
+                            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2">
+                              <Globe size={14} className="text-blue-500 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-gray-700 truncate">{s.ipAddress || '—'}</div>
+                                <div className="text-xs text-gray-400 truncate">{[s.city, s.country].filter(Boolean).join(', ') || 'Unknown location'}</div>
+                              </div>
+                            </div>
+
+                            {/* Device */}
+                            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2">
+                              <DeviceIcon type={s.deviceType} />
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-gray-700 truncate">{s.deviceType || '—'}</div>
+                                <div className="text-xs text-gray-400 truncate">{s.os || '—'}</div>
+                              </div>
+                            </div>
+
+                            {/* Browser */}
+                            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2">
+                              <Monitor size={14} className="text-gray-400 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-gray-700 truncate">{s.browser || '—'}</div>
+                                <div className="text-xs text-gray-400">Browser</div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                );
+              })()}
 
             </TabsContent>
           )}

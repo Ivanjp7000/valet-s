@@ -288,6 +288,27 @@ export const insertValetTicketSchema = createInsertSchema(valetTickets).pick({
   createdByName: true,
 });
 
+// Session Audit Log — tracks who is/was logged in, from where, on what device
+export const sessionAuditLog = pgTable("session_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().unique(),
+  userId: varchar("user_id").notNull(),
+  username: varchar("username").notNull(),
+  displayName: varchar("display_name"),
+  role: varchar("role").notNull(),
+  ouId: varchar("ou_id"),
+  ipAddress: varchar("ip_address"),
+  country: varchar("country"),
+  city: varchar("city"),
+  deviceType: varchar("device_type"),
+  os: varchar("os"),
+  browser: varchar("browser"),
+  firstSeenAt: timestamp("first_seen_at").defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow(),
+  snapshotDate: varchar("snapshot_date"),
+});
+export type SessionAuditLog = typeof sessionAuditLog.$inferSelect;
+
 // Visitor types and sub-types
 export const VISITOR_TYPES = {
   hotel_guest: 'Hotel Staying Guest',
