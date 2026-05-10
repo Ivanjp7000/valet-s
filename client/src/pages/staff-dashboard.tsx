@@ -729,6 +729,7 @@ export default function StaffDashboard() {
   const [licenseForm, setLicenseForm] = useState({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '' });
   const [editLicenseId, setEditLicenseId] = useState<string | null>(null);
   const [brandingForm, setBrandingForm] = useState({ logoUrl: '', primaryColor: '#1a2744', accentColor: '#c9a84c' });
+  const [showBranding, setShowBranding] = useState(false);
 
   // Backup state
   const [backupRange, setBackupRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('30d');
@@ -3462,7 +3463,7 @@ export default function StaffDashboard() {
                               <div key={lic.id} className={`border rounded-lg overflow-hidden ${lic.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
                                 {/* Certificate image thumbnail */}
                                 <div className="w-full overflow-hidden border-b border-amber-100">
-                                  <img src={licenseCertImg} alt="Valet-S Software License" className="w-full object-cover max-h-36" />
+                                  <img src={licenseCertImg} alt="Valet-S Software License" className="w-full object-cover max-h-20" />
                                 </div>
                                 <div className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-2">
@@ -3610,7 +3611,7 @@ export default function StaffDashboard() {
                       {licenseWizardStep === 3 && (
                         <div className="space-y-4">
                           <div className="rounded-lg overflow-hidden border border-amber-200 shadow-sm">
-                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover" />
+                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover max-h-40" />
                           </div>
                           <div className="bg-gray-50 border rounded-lg p-4 space-y-2 text-sm">
                             <div className="flex justify-between"><span className="text-gray-500">Organization</span><span className="font-medium">{licenseForm.orgName}</span></div>
@@ -3671,7 +3672,7 @@ export default function StaffDashboard() {
                         <div className="space-y-4">
                           {/* Certificate image */}
                           <div className="rounded-xl overflow-hidden border border-amber-200 shadow-md">
-                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover" />
+                            <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover max-h-40" />
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{lic.orgName}</p></div>
@@ -3703,44 +3704,56 @@ export default function StaffDashboard() {
 
                   {/* Branding editor — only if license active */}
                   {lic?.isActive && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <Building2 size={18} className="text-regis-gold" />
-                          Organization Branding
-                        </CardTitle>
-                        <p className="text-sm text-gray-500 mt-1">Customize your organization's logo and brand colors.</p>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Logo URL</label>
-                          <Input className="mt-1" placeholder="https://cdn.example.com/logo.png" value={brandingForm.logoUrl} onChange={e => setBrandingForm(f => ({ ...f, logoUrl: e.target.value }))} />
-                          {brandingForm.logoUrl && (
-                            <img src={brandingForm.logoUrl} alt="Logo preview" className="mt-2 h-12 rounded border object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Primary Color</label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <input type="color" value={brandingForm.primaryColor} onChange={e => setBrandingForm(f => ({ ...f, primaryColor: e.target.value }))} className="h-9 w-12 rounded border cursor-pointer" />
-                              <Input className="flex-1 font-mono text-sm" value={brandingForm.primaryColor} onChange={e => setBrandingForm(f => ({ ...f, primaryColor: e.target.value }))} />
+                    <div>
+                      <Button
+                        variant="outline"
+                        className="w-full border-dashed border-amber-300 text-amber-700 hover:bg-amber-50"
+                        onClick={() => setShowBranding(v => !v)}
+                      >
+                        <Building2 size={15} className="mr-2" />
+                        {showBranding ? 'Hide Customise' : 'Customise'}
+                      </Button>
+                      {showBranding && (
+                        <Card className="mt-3">
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                              <Building2 size={18} className="text-regis-gold" />
+                              Organization Branding
+                            </CardTitle>
+                            <p className="text-sm text-gray-500 mt-1">Customize your organization's logo and brand colors.</p>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Logo URL</label>
+                              <Input className="mt-1" placeholder="https://cdn.example.com/logo.png" value={brandingForm.logoUrl} onChange={e => setBrandingForm(f => ({ ...f, logoUrl: e.target.value }))} />
+                              {brandingForm.logoUrl && (
+                                <img src={brandingForm.logoUrl} alt="Logo preview" className="mt-2 h-12 rounded border object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
+                              )}
                             </div>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Accent Color</label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <input type="color" value={brandingForm.accentColor} onChange={e => setBrandingForm(f => ({ ...f, accentColor: e.target.value }))} className="h-9 w-12 rounded border cursor-pointer" />
-                              <Input className="flex-1 font-mono text-sm" value={brandingForm.accentColor} onChange={e => setBrandingForm(f => ({ ...f, accentColor: e.target.value }))} />
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-sm font-medium text-gray-700">Primary Color</label>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <input type="color" value={brandingForm.primaryColor} onChange={e => setBrandingForm(f => ({ ...f, primaryColor: e.target.value }))} className="h-9 w-12 rounded border cursor-pointer" />
+                                  <Input className="flex-1 font-mono text-sm" value={brandingForm.primaryColor} onChange={e => setBrandingForm(f => ({ ...f, primaryColor: e.target.value }))} />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium text-gray-700">Accent Color</label>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <input type="color" value={brandingForm.accentColor} onChange={e => setBrandingForm(f => ({ ...f, accentColor: e.target.value }))} className="h-9 w-12 rounded border cursor-pointer" />
+                                  <Input className="flex-1 font-mono text-sm" value={brandingForm.accentColor} onChange={e => setBrandingForm(f => ({ ...f, accentColor: e.target.value }))} />
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <Button className="bg-regis-navy hover:bg-blue-900 text-white" disabled={updateBrandingMutation.isPending} onClick={() => updateBrandingMutation.mutate(brandingForm)}>
-                          {updateBrandingMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
-                          Save Branding
-                        </Button>
-                      </CardContent>
-                    </Card>
+                            <Button className="bg-regis-navy hover:bg-blue-900 text-white" disabled={updateBrandingMutation.isPending} onClick={() => updateBrandingMutation.mutate(brandingForm)}>
+                              {updateBrandingMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
+                              Save Branding
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -3767,7 +3780,7 @@ export default function StaffDashboard() {
                     <div className="space-y-4">
                       {/* Certificate image */}
                       <div className="rounded-xl overflow-hidden border border-amber-200 shadow-md">
-                        <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover" />
+                        <img src={licenseCertImg} alt="Valet-S Software License Certificate" className="w-full object-cover max-h-40" />
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{myLicense.orgName}</p></div>
