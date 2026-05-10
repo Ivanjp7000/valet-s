@@ -16,7 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -25,7 +25,7 @@ import { Link } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import type { ValetTicket, SafeUser as UserType } from "@shared/schema";
+import type { ValetTicket, SafeUser as UserType, OULicense, OrganizationalUnit } from "@shared/schema";
 import { RESTAURANT_SUB_TYPES, VISITOR_TYPES } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 
@@ -722,6 +722,13 @@ export default function StaffDashboard() {
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'storage'>('day');
   const [archiveTicket, setArchiveTicket] = useState<ValetTicket | null>(null);
 
+  // License wizard state
+  const [licenseWizardOpen, setLicenseWizardOpen] = useState(false);
+  const [licenseWizardStep, setLicenseWizardStep] = useState(1);
+  const [licenseForm, setLicenseForm] = useState({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '' });
+  const [editLicenseId, setEditLicenseId] = useState<string | null>(null);
+  const [brandingForm, setBrandingForm] = useState({ logoUrl: '', primaryColor: '#1a2744', accentColor: '#c9a84c' });
+
   // Backup state
   const [backupRange, setBackupRange] = useState<'1d'|'7d'|'30d'|'3m'|'6m'|'1y'|'all'>('30d');
   const [backupFormat, setBackupFormat] = useState<'csv'|'json'>('csv');
@@ -836,6 +843,58 @@ export default function StaffDashboard() {
   const { data: allTickets, isLoading: allTicketsLoading } = useQuery<ValetTicket[]>({
     queryKey: ["/api/admin/tickets"],
     enabled: user?.role === 'superadmin',
+  });
+
+  const { data: allOUs } = useQuery<OrganizationalUnit[]>({
+    queryKey: ["/api/admin/ous"],
+    enabled: user?.role === 'superadmin',
+  });
+
+  const { data: allLicenses, isLoading: licensesLoading } = useQuery<OULicense[]>({
+    queryKey: ["/api/admin/licenses"],
+    enabled: user?.role === 'superadmin',
+  });
+
+  const { data: myLicense, isLoading: myLicenseLoading } = useQuery<OULicense | null>({
+    queryKey: ["/api/licenses/my"],
+    enabled: !!user && user.role !== 'superadmin',
+  });
+
+  const issueLicenseMutation = useMutation({
+    mutationFn: async (data: typeof licenseForm) => apiRequest("POST", "/api/admin/licenses", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/licenses/my"] });
+      setLicenseWizardOpen(false);
+      setLicenseWizardStep(1);
+      setLicenseForm({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '' });
+      setEditLicenseId(null);
+      toast({ title: "License issued", description: "A new software license has been issued successfully." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message ?? "Failed to issue license", variant: "destructive" }),
+  });
+
+  const updateLicenseMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<typeof licenseForm> & { isActive?: boolean } }) =>
+      apiRequest("PATCH", `/api/admin/licenses/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/licenses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/licenses/my"] });
+      setLicenseWizardOpen(false);
+      setLicenseWizardStep(1);
+      setEditLicenseId(null);
+      toast({ title: "License updated", description: "The license has been updated." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message ?? "Failed to update license", variant: "destructive" }),
+  });
+
+  const updateBrandingMutation = useMutation({
+    mutationFn: async (data: typeof brandingForm) => apiRequest("PATCH", "/api/licenses/branding", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ous"] });
+      toast({ title: "Branding saved", description: "Your organization's branding has been updated." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message ?? "Failed to save branding", variant: "destructive" }),
   });
 
   const rosterNotesMutation = useMutation({
@@ -1368,7 +1427,7 @@ export default function StaffDashboard() {
       <div className="p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${user?.role === 'superadmin' ? 'sm:grid-cols-5' : user?.role === 'privilege_admin' ? 'sm:grid-cols-3' : 'sm:grid-cols-1'}`}>
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${user?.role === 'superadmin' ? 'sm:grid-cols-6' : user?.role === 'privilege_admin' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
               <TabsTrigger value="dashboard" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
                 <Car size={14} className="sm:w-4 sm:h-4" />
                 <span>Dashboard</span>
@@ -1397,6 +1456,10 @@ export default function StaffDashboard() {
                   <span>Backup</span>
                 </TabsTrigger>
               )}
+              <TabsTrigger value="license" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">
+                <ShieldCheck size={14} className="sm:w-4 sm:h-4" />
+                <span>License</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -3321,6 +3384,402 @@ export default function StaffDashboard() {
 
             </TabsContent>
           )}
+
+          {/* License Tab — visible to ALL roles */}
+          <TabsContent value="license" className="space-y-6">
+
+            {/* ── Super Admin: full license management ─────────────────── */}
+            {user?.role === 'superadmin' && (() => {
+              const licensed = allLicenses?.filter(l => l.isActive) ?? [];
+              const allOUCount = allOUs?.length ?? 0;
+              const licensedOUIds = new Set(allLicenses?.map(l => l.ouId) ?? []);
+              const unlicensed = allOUs?.filter(ou => !licensedOUIds.has(ou.id)) ?? [];
+
+              function openIssueWizard(ou?: OrganizationalUnit) {
+                setEditLicenseId(null);
+                setLicenseForm({ ouId: ou?.id ?? '', orgName: ou?.name ?? '', address: '', contactNumber: '', version: 'professional', notes: '' });
+                setLicenseWizardStep(1);
+                setLicenseWizardOpen(true);
+              }
+              function openEditWizard(lic: OULicense) {
+                setEditLicenseId(lic.id);
+                setLicenseForm({ ouId: lic.ouId, orgName: lic.orgName, address: lic.address, contactNumber: lic.contactNumber, version: lic.version, notes: lic.notes ?? '' });
+                setLicenseWizardStep(1);
+                setLicenseWizardOpen(true);
+              }
+
+              return (
+                <div className="space-y-6">
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold text-regis-navy">{allOUCount}</p>
+                        <p className="text-xs text-gray-500 mt-1">Total OUs</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold text-green-600">{licensed.length}</p>
+                        <p className="text-xs text-gray-500 mt-1">Licensed</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-600">{unlicensed.length}</p>
+                        <p className="text-xs text-gray-500 mt-1">Unlicensed</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Issue New License */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <ShieldCheck size={18} className="text-regis-gold" />
+                        Software Licenses
+                      </CardTitle>
+                      <Button size="sm" className="bg-regis-navy hover:bg-blue-900 text-white gap-1" onClick={() => openIssueWizard()}>
+                        <Plus size={14} /> Issue License
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {licensesLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-500 py-6 justify-center">
+                          <Loader2 size={16} className="animate-spin" /> Loading…
+                        </div>
+                      ) : (allLicenses?.length ?? 0) === 0 ? (
+                        <div className="text-center py-8 text-gray-400 text-sm">
+                          <ShieldCheck size={32} className="mx-auto mb-2 opacity-30" />
+                          No licenses issued yet. Click "Issue License" to begin.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {allLicenses?.map(lic => {
+                            const ou = allOUs?.find(o => o.id === lic.ouId);
+                            return (
+                              <div key={lic.id} className={`border rounded-lg p-4 space-y-2 ${lic.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="font-semibold text-sm text-regis-navy">{lic.orgName}</p>
+                                    <p className="text-xs text-gray-500">{ou?.name ?? lic.ouId}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${lic.version === 'enterprise' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                      {lic.version === 'enterprise' ? 'Enterprise' : 'Professional'}
+                                    </span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${lic.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      {lic.isActive ? 'Active' : 'Revoked'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 text-xs font-mono text-gray-600 bg-white border rounded px-2 py-1">
+                                  <Key size={11} className="text-gray-400 shrink-0" />
+                                  <span className="flex-1 truncate">{lic.licenseKey}</span>
+                                  <button
+                                    className="text-gray-400 hover:text-regis-navy"
+                                    onClick={() => { navigator.clipboard.writeText(lic.licenseKey); toast({ title: "Copied!", description: "License key copied to clipboard." }); }}
+                                  >
+                                    <Copy size={11} />
+                                  </button>
+                                </div>
+                                <div className="flex gap-1 pt-1">
+                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openEditWizard(lic)}>
+                                    <Edit size={11} className="mr-1" /> Edit
+                                  </Button>
+                                  <Button
+                                    size="sm" variant="outline"
+                                    className={`h-7 text-xs ${lic.isActive ? 'text-red-600 border-red-200 hover:bg-red-50' : 'text-green-600 border-green-200 hover:bg-green-50'}`}
+                                    onClick={() => updateLicenseMutation.mutate({ id: lic.id, data: { isActive: !lic.isActive } })}
+                                    disabled={updateLicenseMutation.isPending}
+                                  >
+                                    {lic.isActive ? <><Ban size={11} className="mr-1" />Revoke</> : <><CheckCircle2 size={11} className="mr-1" />Reinstate</>}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* License Wizard Dialog */}
+                  <Dialog open={licenseWizardOpen} onOpenChange={(open) => { if (!open) { setLicenseWizardOpen(false); setLicenseWizardStep(1); setEditLicenseId(null); } }}>
+                    <DialogContent className="max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <ShieldCheck size={18} className="text-regis-gold" />
+                          {editLicenseId ? 'Edit License' : 'Issue New License'}
+                        </DialogTitle>
+                      </DialogHeader>
+                      {/* Step indicator */}
+                      <div className="flex items-center gap-2 text-xs mb-2">
+                        {[1, 2, 3].map(s => (
+                          <div key={s} className="flex items-center gap-1">
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${licenseWizardStep >= s ? 'bg-regis-navy text-white' : 'bg-gray-200 text-gray-500'}`}>{s}</span>
+                            {s < 3 && <span className="text-gray-300">—</span>}
+                          </div>
+                        ))}
+                        <span className="text-gray-500 ml-1">{licenseWizardStep === 1 ? 'Organization' : licenseWizardStep === 2 ? 'Details' : 'Review'}</span>
+                      </div>
+
+                      {/* Step 1: OU selection */}
+                      {licenseWizardStep === 1 && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Select OU</label>
+                            <Select
+                              value={licenseForm.ouId}
+                              onValueChange={v => {
+                                const ou = allOUs?.find(o => o.id === v);
+                                setLicenseForm(f => ({ ...f, ouId: v, orgName: ou?.name ?? f.orgName }));
+                              }}
+                            >
+                              <SelectTrigger className="mt-1"><SelectValue placeholder="Choose an organization unit…" /></SelectTrigger>
+                              <SelectContent>
+                                {allOUs?.map(ou => (
+                                  <SelectItem key={ou.id} value={ou.id}>
+                                    {ou.name}
+                                    {licensedOUIds.has(ou.id) && !editLicenseId ? ' (has license)' : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Organization Name (for license)</label>
+                            <Input className="mt-1" value={licenseForm.orgName} onChange={e => setLicenseForm(f => ({ ...f, orgName: e.target.value }))} placeholder="e.g. Sony Corporation" />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setLicenseWizardOpen(false)}>Cancel</Button>
+                            <Button className="bg-regis-navy hover:bg-blue-900 text-white" disabled={!licenseForm.ouId || !licenseForm.orgName} onClick={() => setLicenseWizardStep(2)}>
+                              Next →
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step 2: Details */}
+                      {licenseWizardStep === 2 && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Address</label>
+                            <Input className="mt-1" value={licenseForm.address} onChange={e => setLicenseForm(f => ({ ...f, address: e.target.value }))} placeholder="1-1 Namba, Chuo-ku, Osaka" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Contact Number</label>
+                            <Input className="mt-1" value={licenseForm.contactNumber} onChange={e => setLicenseForm(f => ({ ...f, contactNumber: e.target.value }))} placeholder="+81-6-0000-0000" />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">License Version</label>
+                            <Select value={licenseForm.version} onValueChange={v => setLicenseForm(f => ({ ...f, version: v }))}>
+                              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="professional">Professional (APL-PRO-…)</SelectItem>
+                                <SelectItem value="enterprise">Enterprise (APL-ENT-…)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Internal Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+                            <textarea
+                              className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              rows={2}
+                              value={licenseForm.notes}
+                              onChange={e => setLicenseForm(f => ({ ...f, notes: e.target.value }))}
+                              placeholder="Any internal comments…"
+                            />
+                          </div>
+                          <div className="flex justify-between gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setLicenseWizardStep(1)}>← Back</Button>
+                            <Button className="bg-regis-navy hover:bg-blue-900 text-white" disabled={!licenseForm.address || !licenseForm.contactNumber} onClick={() => setLicenseWizardStep(3)}>
+                              Next →
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step 3: Review & Issue */}
+                      {licenseWizardStep === 3 && (
+                        <div className="space-y-4">
+                          <div className="bg-gray-50 border rounded-lg p-4 space-y-2 text-sm">
+                            <div className="flex justify-between"><span className="text-gray-500">Organization</span><span className="font-medium">{licenseForm.orgName}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">OU</span><span className="font-medium">{allOUs?.find(o => o.id === licenseForm.ouId)?.name}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Address</span><span className="font-medium text-right max-w-[55%]">{licenseForm.address}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Contact</span><span className="font-medium">{licenseForm.contactNumber}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-500">Version</span><span className={`font-medium px-2 py-0.5 rounded text-xs ${licenseForm.version === 'enterprise' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{licenseForm.version === 'enterprise' ? 'Enterprise' : 'Professional'}</span></div>
+                            {licenseForm.notes && <div className="flex justify-between"><span className="text-gray-500">Notes</span><span className="font-medium text-right max-w-[55%]">{licenseForm.notes}</span></div>}
+                            {!editLicenseId && <div className="flex justify-between pt-1 border-t mt-2"><span className="text-gray-500">Key (auto-generated)</span><span className="font-mono text-xs text-regis-navy">{licenseForm.version === 'enterprise' ? 'APL-ENT-XXXX-XXXX-XXXX' : 'APL-PRO-XXXX-XXXX-XXXX'}</span></div>}
+                          </div>
+                          <div className="flex justify-between gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setLicenseWizardStep(2)}>← Back</Button>
+                            <Button
+                              className="bg-regis-gold hover:bg-amber-600 text-white"
+                              disabled={issueLicenseMutation.isPending || updateLicenseMutation.isPending}
+                              onClick={() => {
+                                if (editLicenseId) {
+                                  updateLicenseMutation.mutate({ id: editLicenseId, data: { orgName: licenseForm.orgName, address: licenseForm.address, contactNumber: licenseForm.contactNumber, version: licenseForm.version, notes: licenseForm.notes } });
+                                } else {
+                                  issueLicenseMutation.mutate(licenseForm);
+                                }
+                              }}
+                            >
+                              {(issueLicenseMutation.isPending || updateLicenseMutation.isPending) ? <Loader2 size={14} className="animate-spin mr-1" /> : <ShieldCheck size={14} className="mr-1" />}
+                              {editLicenseId ? 'Save Changes' : 'Issue License'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              );
+            })()}
+
+            {/* ── Privilege Admin: OU license card + branding editor ────── */}
+            {user?.role === 'privilege_admin' && (() => {
+              const lic = myLicense;
+              return (
+                <div className="space-y-6">
+                  {/* License card */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <ShieldCheck size={18} className="text-regis-gold" />
+                        Your Software License
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {myLicenseLoading ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-500 py-4 justify-center"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+                      ) : !lic ? (
+                        <div className="text-center py-8 text-gray-400 text-sm">
+                          <ShieldCheck size={32} className="mx-auto mb-2 opacity-30" />
+                          No license has been issued for your organization yet.
+                          <br />Contact your Super Admin to request one.
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{lic.orgName}</p></div>
+                            <div><p className="text-gray-500 text-xs">Version</p><p className="font-semibold capitalize">{lic.version}</p></div>
+                            <div><p className="text-gray-500 text-xs">Address</p><p className="font-medium">{lic.address}</p></div>
+                            <div><p className="text-gray-500 text-xs">Contact</p><p className="font-medium">{lic.contactNumber}</p></div>
+                            <div><p className="text-gray-500 text-xs">Status</p>
+                              <span className={`inline-flex text-xs px-2 py-0.5 rounded-full font-medium ${lic.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {lic.isActive ? 'Active' : 'Revoked'}
+                              </span>
+                            </div>
+                            <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{lic.issuedAt ? new Date(lic.issuedAt).toLocaleDateString() : '—'}</p></div>
+                          </div>
+                          <div>
+                            <p className="text-gray-500 text-xs mb-1">License Key</p>
+                            <div className="flex items-center gap-2 bg-gray-50 border rounded px-3 py-2 font-mono text-xs text-regis-navy">
+                              <Key size={12} className="text-gray-400 shrink-0" />
+                              <span className="flex-1">{lic.licenseKey}</span>
+                              <button className="text-gray-400 hover:text-regis-navy" onClick={() => { navigator.clipboard.writeText(lic.licenseKey); toast({ title: "Copied!", description: "License key copied." }); }}>
+                                <Copy size={12} />
+                              </button>
+                            </div>
+                          </div>
+                          <div><p className="text-gray-500 text-xs mb-1">SPDX License</p><p className="text-sm font-mono">{lic.spdxLicense ?? 'Apache-2.0'}</p></div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Branding editor — only if license active */}
+                  {lic?.isActive && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <Building2 size={18} className="text-regis-gold" />
+                          Organization Branding
+                        </CardTitle>
+                        <p className="text-sm text-gray-500 mt-1">Customize your organization's logo and brand colors.</p>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Logo URL</label>
+                          <Input className="mt-1" placeholder="https://cdn.example.com/logo.png" value={brandingForm.logoUrl} onChange={e => setBrandingForm(f => ({ ...f, logoUrl: e.target.value }))} />
+                          {brandingForm.logoUrl && (
+                            <img src={brandingForm.logoUrl} alt="Logo preview" className="mt-2 h-12 rounded border object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Primary Color</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <input type="color" value={brandingForm.primaryColor} onChange={e => setBrandingForm(f => ({ ...f, primaryColor: e.target.value }))} className="h-9 w-12 rounded border cursor-pointer" />
+                              <Input className="flex-1 font-mono text-sm" value={brandingForm.primaryColor} onChange={e => setBrandingForm(f => ({ ...f, primaryColor: e.target.value }))} />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Accent Color</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <input type="color" value={brandingForm.accentColor} onChange={e => setBrandingForm(f => ({ ...f, accentColor: e.target.value }))} className="h-9 w-12 rounded border cursor-pointer" />
+                              <Input className="flex-1 font-mono text-sm" value={brandingForm.accentColor} onChange={e => setBrandingForm(f => ({ ...f, accentColor: e.target.value }))} />
+                            </div>
+                          </div>
+                        </div>
+                        <Button className="bg-regis-navy hover:bg-blue-900 text-white" disabled={updateBrandingMutation.isPending} onClick={() => updateBrandingMutation.mutate(brandingForm)}>
+                          {updateBrandingMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Save size={14} className="mr-1" />}
+                          Save Branding
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── Standard Admin / Standard User: read-only license card ── */}
+            {(user?.role === 'standard_admin' || user?.role === 'standard_user') && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ShieldCheck size={18} className="text-regis-gold" />
+                    Software License
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {myLicenseLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 py-4 justify-center"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+                  ) : !myLicense ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">
+                      <ShieldCheck size={32} className="mx-auto mb-2 opacity-30" />
+                      No license information available.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div><p className="text-gray-500 text-xs">Organization</p><p className="font-semibold">{myLicense.orgName}</p></div>
+                        <div><p className="text-gray-500 text-xs">Version</p><p className="font-semibold capitalize">{myLicense.version}</p></div>
+                        <div><p className="text-gray-500 text-xs">Address</p><p className="font-medium">{myLicense.address}</p></div>
+                        <div><p className="text-gray-500 text-xs">Contact</p><p className="font-medium">{myLicense.contactNumber}</p></div>
+                        <div><p className="text-gray-500 text-xs">Status</p>
+                          <span className={`inline-flex text-xs px-2 py-0.5 rounded-full font-medium ${myLicense.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {myLicense.isActive ? 'Active' : 'Revoked'}
+                          </span>
+                        </div>
+                        <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{myLicense.issuedAt ? new Date(myLicense.issuedAt).toLocaleDateString() : '—'}</p></div>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs mb-1">License Key</p>
+                        <div className="flex items-center gap-2 bg-gray-50 border rounded px-3 py-2 font-mono text-xs text-regis-navy">
+                          <Key size={12} className="text-gray-400 shrink-0" />
+                          <span>{myLicense.licenseKey}</span>
+                        </div>
+                      </div>
+                      <div><p className="text-gray-500 text-xs mb-1">SPDX License</p><p className="text-sm font-mono">{myLicense.spdxLicense ?? 'Apache-2.0'}</p></div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
         </Tabs>
 
         {/* Roster NOTES popup */}

@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, getSession } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User } from "@shared/schema";
+import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User, insertOULicenseSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { Resend } from "resend";
@@ -1989,6 +1989,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error cancelling scheduled departure:", error);
       res.status(500).json({ message: "Failed to cancel scheduled departure" });
+    }
+  });
+
+  // ── SOFTWARE LICENSE ROUTES ──────────────────────────────────────────────────
+  function generateLicenseKey(version: string): string {
+    const prefix = version === 'enterprise' ? 'ENT' : 'PRO';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const rand = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return `APL-${prefix}-${rand(4)}-${rand(4)}-${rand(4)}`;
+  }
+
+  // GET /api/licenses/my — own OU's license (all authenticated users)
+  app.get('/api/licenses/my', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.session?.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(401).json({ message: 'Unauthorized' });
+      if (!user.ouId) return res.json(null);
+      const license = await storage.getLicenseByOU(user.ouId);
+      res.json(license ?? null);
+    } catch (e) {
+      res.status(500).json({ message: 'Failed to fetch license' });
+    }
+  });
+
+  // GET /api/admin/licenses — all licenses (Super Admin)
+  app.get('/api/admin/licenses', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const licenses = await storage.getAllLicenses();
+      res.json(licenses);
+    } catch (e) {
+      res.status(500).json({ message: 'Failed to fetch licenses' });
+    }
+  });
+
+  // POST /api/admin/licenses — issue new license (Super Admin)
+  app.post('/api/admin/licenses', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { ouId, orgName, address, contactNumber, version, notes } = req.body;
+      if (!ouId || !orgName || !address || !contactNumber || !version) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+      const existing = await storage.getLicenseByOU(ouId);
+      if (existing) return res.status(409).json({ message: 'License already exists for this OU' });
+      const licenseKey = generateLicenseKey(version);
+      const license = await storage.createLicense({
+        ouId, orgName, address, contactNumber, version, notes: notes || null,
+        licenseKey, spdxLicense: 'Apache-2.0', issuedBy: req.currentUser.id, isActive: true,
+      });
+      res.json(license);
+    } catch (e) {
+      res.status(500).json({ message: 'Failed to issue license' });
+    }
+  });
+
+  // PATCH /api/admin/licenses/:id — modify license (Super Admin)
+  app.patch('/api/admin/licenses/:id', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { orgName, address, contactNumber, version, notes, isActive } = req.body;
+      const updated = await storage.updateLicense(req.params.id, { orgName, address, contactNumber, version, notes, isActive });
+      if (!updated) return res.status(404).json({ message: 'License not found' });
+      res.json(updated);
+    } catch (e) {
+      res.status(500).json({ message: 'Failed to update license' });
+    }
+  });
+
+  // PATCH /api/licenses/branding — Privilege Admin updates their OU branding
+  app.patch('/api/licenses/branding', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { logoUrl, primaryColor, accentColor } = req.body;
+      const ouId = req.currentUser.role === 'superadmin' ? req.body.ouId : req.currentUser.ouId;
+      if (!ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const license = await storage.getLicenseByOU(ouId);
+      if (!license) return res.status(403).json({ message: 'No active license for this OU' });
+      const ou = await storage.updateOUBranding(ouId, { logoUrl, primaryColor, accentColor });
+      res.json(ou);
+    } catch (e) {
+      res.status(500).json({ message: 'Failed to update branding' });
     }
   });
 

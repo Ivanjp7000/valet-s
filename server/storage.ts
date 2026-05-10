@@ -7,6 +7,7 @@ import {
   ticketGuestTrips,
   faqs,
   systemSettings,
+  ouLicenses,
   type User,
   type UpsertUser,
   type OrganizationalUnit,
@@ -22,6 +23,8 @@ import {
   type InsertFaq,
   type SystemSetting,
   type InsertSystemSetting,
+  type OULicense,
+  type InsertOULicense,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull } from "drizzle-orm";
@@ -102,6 +105,13 @@ export interface IStorage {
 
   // Scheduled departure
   getDueScheduledDepartures(): Promise<ValetTicket[]>;
+
+  // OU License operations
+  createLicense(license: Omit<InsertOULicense, 'id' | 'issuedAt' | 'updatedAt'> & { licenseKey: string }): Promise<OULicense>;
+  getLicenseByOU(ouId: string): Promise<OULicense | undefined>;
+  getAllLicenses(): Promise<OULicense[]>;
+  updateLicense(id: string, data: Partial<OULicense>): Promise<OULicense | undefined>;
+  updateOUBranding(ouId: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string }): Promise<OrganizationalUnit | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -674,6 +684,30 @@ export class DatabaseStorage implements IStorage {
       .where(or(eq(valetTickets.carPhoto, photoPath), eq(valetTickets.platePhotoUrl, photoPath)))
       .limit(1);
     return ticket;
+  }
+
+  async createLicense(license: Omit<InsertOULicense, 'id' | 'issuedAt' | 'updatedAt'> & { licenseKey: string }): Promise<OULicense> {
+    const [lic] = await db.insert(ouLicenses).values(license).returning();
+    return lic;
+  }
+
+  async getLicenseByOU(ouId: string): Promise<OULicense | undefined> {
+    const [lic] = await db.select().from(ouLicenses).where(eq(ouLicenses.ouId, ouId)).limit(1);
+    return lic;
+  }
+
+  async getAllLicenses(): Promise<OULicense[]> {
+    return await db.select().from(ouLicenses).orderBy(desc(ouLicenses.issuedAt));
+  }
+
+  async updateLicense(id: string, data: Partial<OULicense>): Promise<OULicense | undefined> {
+    const [lic] = await db.update(ouLicenses).set({ ...data, updatedAt: new Date() }).where(eq(ouLicenses.id, id)).returning();
+    return lic;
+  }
+
+  async updateOUBranding(ouId: string, data: { logoUrl?: string; primaryColor?: string; accentColor?: string }): Promise<OrganizationalUnit | undefined> {
+    const [ou] = await db.update(organizationalUnits).set({ ...data, updatedAt: new Date() }).where(eq(organizationalUnits.id, ouId)).returning();
+    return ou;
   }
 }
 

@@ -33,6 +33,10 @@ export const organizationalUnits = pgTable("organizational_units", {
   contactEmail: varchar("contact_email"),
   contactPhone: varchar("contact_phone"),
   isActive: boolean("is_active").default(true),
+  // Cosmetic branding (editable by Privilege Admin after license is issued)
+  logoUrl: varchar("logo_url"),
+  primaryColor: varchar("primary_color").default("#1a2744"),
+  accentColor: varchar("accent_color").default("#c9a84c"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -157,6 +161,30 @@ export const ticketGuestTrips = pgTable("ticket_guest_trips", {
 
 export type InsertTicketGuestTrip = typeof ticketGuestTrips.$inferInsert;
 export type TicketGuestTrip = typeof ticketGuestTrips.$inferSelect;
+
+// Software Licenses — one per OU, issued by Super Admin
+export const ouLicenses = pgTable("ou_licenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ouId: varchar("ou_id").notNull().references(() => organizationalUnits.id, { onDelete: 'cascade' }),
+  orgName: varchar("org_name").notNull(),
+  address: text("address").notNull(),
+  contactNumber: varchar("contact_number").notNull(),
+  version: varchar("version").notNull(), // 'professional' | 'enterprise'
+  licenseKey: varchar("license_key").notNull().unique(),
+  spdxLicense: varchar("spdx_license").default("Apache-2.0").notNull(),
+  issuedBy: varchar("issued_by").references(() => users.id),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  issuedAt: timestamp("issued_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type InsertOULicense = typeof ouLicenses.$inferInsert;
+export type OULicense = typeof ouLicenses.$inferSelect;
+
+export const insertOULicenseSchema = createInsertSchema(ouLicenses).omit({
+  id: true, licenseKey: true, spdxLicense: true, issuedAt: true, updatedAt: true,
+});
 
 // FAQ entries table
 export const faqs = pgTable("faqs", {
