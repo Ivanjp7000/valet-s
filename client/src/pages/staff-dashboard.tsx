@@ -1569,6 +1569,15 @@ export default function StaffDashboard() {
                   New Valet Ticket
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant={showVehicleRoster ? "default" : "outline"}
+                className={showVehicleRoster ? "bg-regis-navy text-white hover:bg-regis-navy/90" : "border-regis-navy text-regis-navy hover:bg-regis-navy/10"}
+                onClick={() => setShowVehicleRoster(v => !v)}
+              >
+                <List size={16} className="mr-1 sm:mr-2" />
+                Vehicle Roster
+              </Button>
               {user?.role === 'privilege_admin' && (
                 <Button
                   size="sm"
@@ -1580,15 +1589,6 @@ export default function StaffDashboard() {
                   V-info Import
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant={showVehicleRoster ? "default" : "outline"}
-                className={showVehicleRoster ? "bg-regis-navy text-white hover:bg-regis-navy/90" : "border-regis-navy text-regis-navy hover:bg-regis-navy/10"}
-                onClick={() => setShowVehicleRoster(v => !v)}
-              >
-                <List size={16} className="mr-1 sm:mr-2" />
-                Vehicle Roster
-              </Button>
             </div>
 
             {/* Vehicle Roster Panel */}
