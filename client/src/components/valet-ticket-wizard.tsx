@@ -234,6 +234,16 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const [showBrandGrid, setShowBrandGrid] = useState(true);
   const [editingBrands, setEditingBrands] = useState(false);
   const [newBrandInput, setNewBrandInput] = useState("");
+  const [brandFontSize, setBrandFontSize] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('wizard-brand-font') || '0', 10); } catch { return 0; }
+  });
+  const changeBrandFont = (delta: number) => {
+    setBrandFontSize(prev => {
+      const next = Math.max(-2, Math.min(6, prev + delta));
+      localStorage.setItem('wizard-brand-font', String(next));
+      return next;
+    });
+  };
 
   const DEFAULT_BRANDS = [
     'Toyota', 'Lexus', 'Honda', 'Nissan', 'Mazda', 'Subaru',
@@ -549,14 +559,34 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium text-gray-700">Car Make</label>
-              <button
-                type="button"
-                onClick={() => setShowBrandGrid(!showBrandGrid)}
-                className="flex items-center gap-1 text-xs font-medium text-regis-gold hover:text-yellow-600 border border-regis-gold hover:border-yellow-600 rounded-md px-2 py-1 transition-colors"
-              >
-                {showBrandGrid ? <ChevronUp size={12} /> : <Plus size={12} />}
-                {showBrandGrid ? "Hide Brands" : "Add Brand"}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Brand font size controls */}
+                <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => changeBrandFont(-1)}
+                    disabled={brandFontSize <= -2}
+                    className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                    title="Smaller text"
+                  >A-</button>
+                  <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">{brandFontSize > 0 ? `+${brandFontSize}` : brandFontSize}</span>
+                  <button
+                    type="button"
+                    onClick={() => changeBrandFont(1)}
+                    disabled={brandFontSize >= 6}
+                    className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                    title="Larger text"
+                  >A+</button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBrandGrid(!showBrandGrid)}
+                  className="flex items-center gap-1 text-xs font-medium text-regis-gold hover:text-yellow-600 border border-regis-gold hover:border-yellow-600 rounded-md px-2 py-1 transition-colors"
+                >
+                  {showBrandGrid ? <ChevronUp size={12} /> : <Plus size={12} />}
+                  {showBrandGrid ? "Hide Brands" : "Add Brand"}
+                </button>
+              </div>
             </div>
             {showBrandGrid && (
               <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -574,7 +604,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                     return (
                       <div key={brand} className="relative">
                         {editingBrands ? (
-                          <span className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border ${color}`}>
+                          <span
+                            style={{ fontSize: 12 + brandFontSize * 2 }}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-full font-medium border ${color}`}
+                          >
                             {brand}
                             <button
                               type="button"
@@ -587,13 +620,14 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                         ) : (
                           <button
                             type="button"
+                            style={{ fontSize: 12 + brandFontSize * 2 }}
                             onClick={() => {
                               setFormData({ ...formData, carMake: brand });
                               setCarMakeSearch(brand);
                               setShowCarMakeDropdown(false);
                               setShowBrandGrid(false);
                             }}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                            className={`px-3 py-1.5 rounded-full font-medium border transition-all ${
                               formData.carMake === brand
                                 ? "bg-regis-gold border-regis-gold text-white shadow-sm"
                                 : color
