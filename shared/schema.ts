@@ -286,11 +286,11 @@ export const VISITOR_TYPES = {
 } as const;
 
 export const RESTAURANT_SUB_TYPES = {
-  regine: 'Regine',
-  laveduta: 'LaVeduta',
+  regine: 'RÉGINE',
+  le_petit: 'Le Petit Chef',
   wajo: 'Wajo',
-  st_regis_bar: 'St. Regis Bar',
-  le_petit: 'Le Petit',
+  laveduta: 'La Veduta',
+  st_regis_bar: 'The St. Regis Bar',
 } as const;
 
 // Common car colors

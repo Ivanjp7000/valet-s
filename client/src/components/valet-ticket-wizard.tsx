@@ -440,48 +440,47 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Visitor Type</h3>
         <div className="grid grid-cols-1 gap-3">
           {(Object.entries(VISITOR_TYPES) as [VisitorType, string][]).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => {
-                const autoRoom = key === 'hotel_guest' ? '' : key === 'event' ? 'Event' : key === 'others' ? 'Others' : '';
-                setFormData({ ...formData, visitorType: key, visitorSubType: "", roomNumber: autoRoom });
-              }}
-              className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
-                formData.visitorType === key 
-                  ? "border-regis-gold bg-regis-gold/10" 
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              data-testid={`visitor-type-${key}`}
-            >
-              {getVisitorTypeIcon(key)}
-              <span className="font-medium">{label}</span>
-              {formData.visitorType === key && <Check className="ml-auto text-regis-gold" size={20} />}
-            </button>
+            <div key={key}>
+              <button
+                onClick={() => {
+                  const autoRoom = key === 'hotel_guest' ? '' : key === 'event' ? 'Event' : key === 'others' ? 'Others' : '';
+                  setFormData({ ...formData, visitorType: key, visitorSubType: "", roomNumber: autoRoom });
+                }}
+                className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                  formData.visitorType === key
+                    ? "border-regis-gold bg-regis-gold/10"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+                data-testid={`visitor-type-${key}`}
+              >
+                {getVisitorTypeIcon(key)}
+                <span className="font-medium">{label}</span>
+                {formData.visitorType === key && <Check className="ml-auto text-regis-gold" size={20} />}
+              </button>
+
+              {/* Restaurant sub-options appear inline, immediately below */}
+              {key === 'restaurant' && formData.visitorType === 'restaurant' && (
+                <div className="mt-2 ml-4 grid grid-cols-2 gap-2">
+                  {(Object.entries(RESTAURANT_SUB_TYPES) as [RestaurantSubType, string][]).map(([rKey, rLabel]) => (
+                    <button
+                      key={rKey}
+                      onClick={() => setFormData({ ...formData, visitorSubType: rKey, roomNumber: rLabel })}
+                      className={`px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all text-left ${
+                        formData.visitorSubType === rKey
+                          ? "border-regis-gold bg-regis-gold/10 text-regis-navy"
+                          : "border-gray-200 hover:border-gray-300 text-gray-700"
+                      }`}
+                      data-testid={`restaurant-${rKey}`}
+                    >
+                      {rLabel}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>
-
-      {formData.visitorType === "restaurant" && (
-        <div>
-          <h3 className="text-lg font-semibold text-regis-navy mb-3">Restaurant</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {(Object.entries(RESTAURANT_SUB_TYPES) as [RestaurantSubType, string][]).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setFormData({ ...formData, visitorSubType: key, roomNumber: label })}
-                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                  formData.visitorSubType === key 
-                    ? "border-regis-gold bg-regis-gold/10" 
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-                data-testid={`restaurant-${key}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div>
         <h3 className="text-lg font-semibold text-regis-navy mb-3">Vehicle Details</h3>
