@@ -2036,36 +2036,50 @@ export default function StaffDashboard() {
                 {(() => {
                   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
                   const departedTodayCount = activeTickets?.filter(t => t.status === 'completed' && t.updatedAt && new Date(t.updatedAt) >= todayStart).length || 0;
+                  const retrievingCount = activeTickets?.filter(t => ['retrieving', 'transit', 'preparing'].includes(t.status)).length || 0;
                   return (
-                    <div className="grid grid-cols-4 gap-1.5">
-                      <button
-                        className="bg-blue-50 active:bg-blue-100 rounded-lg p-2 text-center w-full focus:outline-none"
-                        onClick={() => scrollToPanel('in-house')}
-                      >
-                        <p className="text-lg font-bold text-blue-600">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
-                        <p className="text-xs text-blue-500 font-medium leading-tight">Cars In House</p>
-                      </button>
-                      <button
-                        className="bg-blue-50 active:bg-blue-100 rounded-lg p-2 text-center w-full focus:outline-none"
-                        onClick={() => scrollToPanel('guest-out')}
-                      >
-                        <p className="text-lg font-bold text-blue-700">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</p>
-                        <p className="text-xs text-blue-500 font-medium leading-tight">Car Will Return</p>
-                      </button>
-                      <button
-                        className="bg-green-50 active:bg-green-100 rounded-lg p-2 text-center w-full focus:outline-none"
-                        onClick={() => scrollToPanel('ready')}
-                      >
-                        <p className="text-lg font-bold text-green-600">{activeTickets?.filter(t => t.status === 'ready').length || 0}</p>
-                        <p className="text-xs text-green-600 font-medium leading-tight">Ready for Collection</p>
-                      </button>
-                      <button
-                        className="bg-gray-50 active:bg-gray-100 rounded-lg p-2 text-center w-full focus:outline-none"
-                        onClick={() => scrollToPanel('departed-today')}
-                      >
-                        <p className="text-lg font-bold text-gray-700">{departedTodayCount}</p>
-                        <p className="text-xs text-gray-500 font-medium leading-tight">Departed Today</p>
-                      </button>
+                    <div className="space-y-2">
+                      {/* Row 1: 3 statuses */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          className="rounded-xl border-2 border-blue-400 bg-blue-50 active:bg-blue-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
+                          onClick={() => scrollToPanel('in-house')}
+                        >
+                          <p className="text-2xl font-extrabold text-blue-700 leading-none">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
+                          <p className="text-[10px] text-blue-600 font-semibold leading-tight mt-1">Cars In House</p>
+                        </button>
+                        <button
+                          className="rounded-xl border-2 border-indigo-400 bg-indigo-50 active:bg-indigo-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
+                          onClick={() => scrollToPanel('guest-out')}
+                        >
+                          <p className="text-2xl font-extrabold text-indigo-700 leading-none">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</p>
+                          <p className="text-[10px] text-indigo-600 font-semibold leading-tight mt-1">Car Will Return</p>
+                        </button>
+                        <button
+                          className="rounded-xl border-2 border-amber-400 bg-amber-50 active:bg-amber-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
+                          onClick={() => scrollToPanel('retrievals')}
+                        >
+                          <p className="text-2xl font-extrabold text-amber-700 leading-none">{retrievingCount}</p>
+                          <p className="text-[10px] text-amber-600 font-semibold leading-tight mt-1">Retrieving Car</p>
+                        </button>
+                      </div>
+                      {/* Row 2: 2 statuses */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          className="rounded-xl border-2 border-green-400 bg-green-50 active:bg-green-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
+                          onClick={() => scrollToPanel('ready')}
+                        >
+                          <p className="text-2xl font-extrabold text-green-700 leading-none">{activeTickets?.filter(t => t.status === 'ready').length || 0}</p>
+                          <p className="text-[10px] text-green-600 font-semibold leading-tight mt-1">Ready for Collection</p>
+                        </button>
+                        <button
+                          className="rounded-xl border-2 border-gray-400 bg-gray-50 active:bg-gray-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
+                          onClick={() => scrollToPanel('departed-today')}
+                        >
+                          <p className="text-2xl font-extrabold text-gray-700 leading-none">{departedTodayCount}</p>
+                          <p className="text-[10px] text-gray-600 font-semibold leading-tight mt-1">Departed Today</p>
+                        </button>
+                      </div>
                     </div>
                   );
                 })()}
