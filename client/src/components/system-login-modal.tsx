@@ -45,7 +45,8 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
     setError("");
     setIsLoading(true);
     try {
-      const data = await apiRequest("POST", "/api/auth/local", { username, password });
+      const res = await apiRequest("POST", "/api/auth/local", { username, password });
+      const data = await res.json();
       if (data.requiresTwoFactor) {
         setPendingUserId(data.userId);
         setPendingEmail(data.email || "");
