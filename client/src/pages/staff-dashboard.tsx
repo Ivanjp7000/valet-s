@@ -1541,7 +1541,7 @@ export default function StaffDashboard() {
             src={valetBanner6}
             alt="Valet-S"
             className="w-full h-auto block"
-            style={{ marginTop: '-10%', marginBottom: '-10%' }}
+            style={{ marginTop: '-18%', marginBottom: '-18%' }}
           />
         </div>
       </div>
