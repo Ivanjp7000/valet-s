@@ -676,6 +676,17 @@ export default function StaffDashboard() {
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [showVehicleRoster, setShowVehicleRoster] = useState(false);
   const [showGSHub, setShowGSHub] = useState(false);
+
+  const { data: gsOpenCount = 0 } = useQuery<number>({
+    queryKey: ["/api/gs/messages/open-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/gs/messages", { credentials: "include" });
+      if (!res.ok) return 0;
+      const msgs: { status: string }[] = await res.json();
+      return msgs.filter(m => m.status === "open").length;
+    },
+    refetchInterval: 15000,
+  });
   const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
   const [rosterDate, setRosterDate] = useState<Date>(new Date());
   const [copiedRowId, setCopiedRowId] = useState<string | null>(null);
@@ -1720,11 +1731,16 @@ export default function StaffDashboard() {
               <Button
                 size="sm"
                 variant={showGSHub ? "default" : "outline"}
-                className={showGSHub ? "bg-regis-gold text-regis-navy hover:bg-regis-gold/90 font-semibold" : "border-regis-gold text-regis-navy hover:bg-regis-gold/10"}
+                className={`relative ${showGSHub ? "bg-regis-gold text-regis-navy hover:bg-regis-gold/90 font-semibold" : "border-regis-gold text-regis-navy hover:bg-regis-gold/10"}`}
                 onClick={() => { setShowGSHub(v => !v); setShowVehicleRoster(false); }}
               >
                 <MessageSquare size={16} className="mr-1 sm:mr-2" />
                 GS Hub
+                {gsOpenCount > 0 && !showGSHub && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                    {gsOpenCount > 99 ? "99+" : gsOpenCount}
+                  </span>
+                )}
               </Button>
               {user?.role === 'privilege_admin' && (
                 <Button
