@@ -496,7 +496,9 @@ export class DatabaseStorage implements IStorage {
 
   // Additional methods for admin functionality
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.isActive, true)).orderBy(asc(users.firstName));
+    return await db.select().from(users)
+      .where(and(eq(users.isActive, true), eq(users.accountStatus, 'active')))
+      .orderBy(asc(users.firstName));
   }
 
   async createUser(userData: Omit<UpsertUser, 'id'>): Promise<User> {
@@ -521,7 +523,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(users)
-      .where(and(eq(users.ouId, ouId), eq(users.isActive, true)))
+      .where(and(eq(users.ouId, ouId), eq(users.isActive, true), eq(users.accountStatus, 'active')))
       .orderBy(asc(users.firstName));
   }
 
