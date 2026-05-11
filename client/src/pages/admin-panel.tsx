@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car, BarChart2, Database, TrendingUp, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, ShieldCheck } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import valetBanner7a from "@assets/ValetS-Banner7a_1778476300539.png";
 import { Link } from "wouter";
 import { apiRequest, queryClient as qc } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -580,6 +581,15 @@ export default function AdminPanel() {
               </a>
             </div>
           </div>
+        </div>
+        {/* Full-width banner — desktop only */}
+        <div className="hidden sm:block w-full overflow-hidden">
+          <img
+            src={valetBanner7a}
+            alt="Valet-S"
+            className="w-full h-auto block"
+            style={{ marginTop: '-3%', marginBottom: '-3%' }}
+          />
         </div>
       </div>
 
