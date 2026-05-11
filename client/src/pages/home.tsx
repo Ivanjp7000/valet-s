@@ -179,7 +179,7 @@ export default function Home() {
         {/* Standard View - hidden on mobile when compact is active */}
         <div className={compactView ? "hidden sm:block" : ""}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            <Card className="shadow-lg" data-testid="card-staff-dashboard">
+            <Card className="shadow-lg" data-testid="card-staff-dashboard" style={{ transform: 'scale(0.93)', transformOrigin: 'top center' }}>
               <CardContent className="p-6 sm:p-8 text-center">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
                   <Gauge className="text-blue-600" size={28} />
@@ -195,7 +195,7 @@ export default function Home() {
             </Card>
 
             {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
-              <Card className="shadow-lg" data-testid="card-admin-panel">
+              <Card className="shadow-lg" data-testid="card-admin-panel" style={{ transform: 'scale(0.93)', transformOrigin: 'top center' }}>
                 <CardContent className="p-6 sm:p-8 text-center">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-regis-gold/20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
                     {user?.role === 'superadmin' ? (
@@ -221,7 +221,7 @@ export default function Home() {
               </Card>
             )}
 
-            <Card className="shadow-lg" data-testid="card-documentation">
+            <Card className="shadow-lg" data-testid="card-documentation" style={{ transform: 'scale(0.93)', transformOrigin: 'top center' }}>
               <CardContent className="p-6 sm:p-8 text-center">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
                   <BookOpen className="text-gray-500" size={28} />
