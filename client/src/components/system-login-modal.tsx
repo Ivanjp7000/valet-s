@@ -167,9 +167,20 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
           )}
 
           {!otpStep && (
-            <Button variant="ghost" onClick={onClose} className="w-full text-gray-500 hover:text-gray-700">
-              Cancel
-            </Button>
+            <>
+              <Button variant="ghost" onClick={onClose} className="w-full text-gray-500 hover:text-gray-700">
+                Cancel
+              </Button>
+              <div className="text-center mt-3">
+                <button
+                  type="button"
+                  className="text-[11px] text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                  onClick={() => {/* instructions coming */}}
+                >
+                  create account
+                </button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
