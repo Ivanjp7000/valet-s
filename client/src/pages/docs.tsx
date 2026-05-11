@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, User, ShieldCheck, Shield, Crown, Ticket, Car, Clock, MapPin, Users, Building, Settings, FileText, BarChart2, Upload, Key, Eye } from "lucide-react";
+import { ChevronLeft, User, ShieldCheck, Shield, Crown, Ticket, Car, Clock, MapPin, Users, Building, Settings, FileText, BarChart2, Upload, Key, Eye, MessageSquare, CalendarDays, UserCheck, Lock, Bell } from "lucide-react";
 import { Link } from "wouter";
 
 type Role = "superadmin" | "privilege_admin" | "standard_admin" | "standard_user" | undefined;
@@ -98,12 +98,17 @@ export default function Docs() {
             <Item
               icon={<Users size={14} />}
               title="All Users & Roles"
-              desc="Create accounts at any role level (Super Admin, Privilege Admin, Standard Admin) and assign them to any OU. Reset passwords and manage access globally."
+              desc="Create accounts at any role level (Super Admin, Privilege Admin, Standard Admin, Standard User) and assign them to any OU. Reset credentials and manage access globally."
+            />
+            <Item
+              icon={<UserCheck size={14} />}
+              title="Registration Approvals & Auto-Provisioning"
+              desc="Review self-registered accounts awaiting activation. @stregis.com staff who log in via the /sro portal are auto-provisioned instantly — you receive a notification badge and can see all new accounts in the Registrations tab."
             />
             <Item
               icon={<Settings size={14} />}
               title="System Settings"
-              desc="Configure global system parameters including session behavior, licence keys, and feature flags that apply across all organizations."
+              desc="Configure global system parameters including session behaviour, licence keys, and feature flags that apply across all organizations."
             />
             <Item
               icon={<ShieldCheck size={14} />}
@@ -120,6 +125,21 @@ export default function Docs() {
               title="FAQ Management"
               desc="Edit the guest-facing FAQ content shown on the public valet portal. Changes take effect immediately for all guests."
             />
+            <Item
+              icon={<MessageSquare size={14} />}
+              title="GS Hub — Full Access"
+              desc="Access the shared Guest Services communication channel. As Super Admin you have full GS member powers — view and manage all messages, convert requests into calendar events, moderate content, and manage who belongs to the GS group via the Members tab."
+            />
+            <Item
+              icon={<CalendarDays size={14} />}
+              title="GS Hub — Shared Calendar"
+              desc="The GS calendar tracks VIP arrivals, weddings, special events, and transport schedules across the property. Add, edit, and delete events directly. Click any date to see that day's events, or use Events View for a full sorted table of all upcoming events."
+            />
+            <Item
+              icon={<Lock size={14} />}
+              title="Two-Factor Login (OTP)"
+              desc="Every staff login uses a one-time passcode (OTP) sent to the registered email address. Even if login credentials were ever compromised, no one can access the system without also controlling the inbox. This is industry-standard two-factor security — no static passwords, no replay attacks, and automatic expiry after each session."
+            />
           </Section>
         )}
 
@@ -134,12 +154,12 @@ export default function Docs() {
             <Item
               icon={<Building size={14} />}
               title="Manage Locations"
-              desc="Create, edit, and delete physical valet locations within your organization. Each location gets its own name and is visible to assigned staff."
+              desc="Create, edit, and delete physical valet locations within your organization. Each location gets its own name and is visible only to assigned staff."
             />
             <Item
               icon={<Users size={14} />}
               title="Manage Staff Accounts"
-              desc="Create Standard Admin accounts within your OU. Assign them to specific locations using Location Scopes — staff without scopes see all OU data."
+              desc="Create Standard Admin and Standard User accounts within your OU. Assign location scopes to restrict access — staff without scopes see all OU data."
             />
             <Item
               icon={<Key size={14} />}
@@ -160,6 +180,21 @@ export default function Docs() {
               icon={<FileText size={14} />}
               title="Export Data"
               desc="Download ticket records as CSV or JSON for any date range. Use for reporting, handover notes, or external processing."
+            />
+            <Item
+              icon={<MessageSquare size={14} />}
+              title="GS Hub — Communication & Coordination"
+              desc="Access the shared Guest Services hub to post and reply to operational messages. As a Privilege Admin you have full GS member powers — reply to any message, convert requests into calendar events, and manage GS group membership via the Members tab."
+            />
+            <Item
+              icon={<CalendarDays size={14} />}
+              title="GS Hub — Shared Calendar"
+              desc="Plan and coordinate property events in the shared calendar. Add VIP arrivals, weddings, transport schedules, and special events. Click any date to filter events for that day, or open Events View for a complete chronological table."
+            />
+            <Item
+              icon={<Lock size={14} />}
+              title="Two-Factor Login (OTP)"
+              desc="Your account is protected by OTP-based two-factor authentication. Each login sends a unique one-time code to your email — valid for a single use and a short window. This means stolen credentials alone are never enough to gain access, keeping the system secure even in shared-device hotel environments."
             />
           </Section>
         )}
@@ -190,7 +225,7 @@ export default function Docs() {
             <Item
               icon={<Car size={14} />}
               title="Car Photos"
-              desc="Attach a photo to any ticket using the camera or upload. Use the plate scanner (OCR) to auto-fill the Japanese licence plate field."
+              desc="Attach a photo to any ticket using the camera or file upload. Use the plate scanner (OCR) to auto-fill the Japanese licence plate field."
             />
             <Item
               icon={<BarChart2 size={14} />}
@@ -202,13 +237,33 @@ export default function Docs() {
               title="Audit Log"
               desc="Browse a daily record of all ticket activity — who changed what and when. Filter by date for historical review."
             />
+            <Item
+              icon={<MessageSquare size={14} />}
+              title="GS Hub — Guest Services Channel"
+              desc="Post messages to the GS team about upcoming arrivals, VIP guests, transport needs, or special requests. If you are a GS member, you can also reply to messages and convert them into calendar events. Non-members can post messages and receive replies but cannot moderate."
+            />
+            <Item
+              icon={<CalendarDays size={14} />}
+              title="GS Hub — Shared Calendar"
+              desc="View the shared property calendar to stay informed about VIP arrivals, weddings, and events happening across the property. GS members can add and edit events directly from the calendar tab. Click any date to see that day's events, or open Events View for a full list."
+            />
+            <Item
+              icon={<Bell size={14} />}
+              title="GS Hub — Acknowledgements"
+              desc="When GS adds your message to the calendar, you receive an in-app prompt to acknowledge and confirm you've seen it. This closes the loop between operations and Guest Services."
+            />
+            <Item
+              icon={<Lock size={14} />}
+              title="Two-Factor Login (OTP)"
+              desc="Your login is secured with a one-time passcode sent to your email every time you sign in. There are no static passwords to remember or share — each code is valid for one use only. This protects the system in hotel shift environments where devices are often shared between staff."
+            />
           </Section>
         )}
 
         {/* ── STANDARD USER ───────────────────────────────── */}
         {isStandardUser && (
           <Section
-            title="Standard User — Read-Only Access"
+            title="Standard User"
             icon={<Eye size={18} className="text-green-600" />}
             badge="Standard User"
             badgeColor="bg-green-600"
@@ -231,7 +286,22 @@ export default function Docs() {
             <Item
               icon={<Clock size={14} />}
               title="Process Tracking"
-              desc="Monitor the full retrieval workflow with live countdown timers for each stage. Read-only — no ticket creation or status changes."
+              desc="Monitor the full retrieval workflow with live countdown timers for each stage."
+            />
+            <Item
+              icon={<MessageSquare size={14} />}
+              title="GS Hub — Guest Services Channel"
+              desc="Post messages to the GS team about upcoming arrivals or special guest needs. If your account is added to the GS group by a Privilege Admin, you will also be able to reply to messages and help manage the shared event calendar."
+            />
+            <Item
+              icon={<CalendarDays size={14} />}
+              title="GS Hub — Shared Calendar"
+              desc="View the shared property calendar to see upcoming VIP arrivals, weddings, events, and transport schedules. GS members can add and manage events. All staff can click any date to see that day's schedule, or use Events View for a full chronological list."
+            />
+            <Item
+              icon={<Lock size={14} />}
+              title="Two-Factor Login (OTP)"
+              desc="Every time you sign in, a one-time code is sent to your email address. You enter that code to complete your login — no static password needed. This means your account cannot be accessed even if someone knows your email, unless they also have access to your inbox. It is simple, secure, and works on any device."
             />
           </Section>
         )}
@@ -261,7 +331,7 @@ export default function Docs() {
         </Section>
 
         <p className="text-center text-xs text-gray-400 mt-2 mb-6">
-          Valet-S · Documentation v1.0 · Content shown based on your access level.
+          Valet-S · Documentation v1.1 · Content shown based on your access level.
         </p>
       </div>
     </div>
