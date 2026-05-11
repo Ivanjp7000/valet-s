@@ -60,28 +60,8 @@ async function printNameLabel(guestName: string): Promise<void> {
 
   let cursor = H - pad;          // start drawing from top
 
-  // ── Guest name ────────────────────────────────────────────────
-  const displayName = guestName.trim();
-  let nameSize = 9;
-  while (nameSize > 5 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) {
-    nameSize -= 0.5;
-  }
-  cursor -= nameSize;
-  page.drawText(displayName, {
-    x: pad + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
-    y: cursor,
-    font: fontBold,
-    size: nameSize,
-    color: rgb(0.1, 0.12, 0.27),
-  });
-  cursor -= mmToPt(1.5);
-
-  // ── Gold divider ──────────────────────────────────────────────
-  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: rgb(0.79, 0.66, 0.3) });
-  cursor -= mmToPt(1.5);
-
   // ── QR code (18 mm square, centred) ──────────────────────────
-  const qrSize = mmToPt(18);  // 51 pt — fits comfortably
+  const qrSize = mmToPt(18);
   if (qrImage) {
     page.drawImage(qrImage, {
       x: (W - qrSize) / 2,
@@ -92,7 +72,7 @@ async function printNameLabel(guestName: string): Promise<void> {
   }
   cursor -= qrSize + mmToPt(1.5);
 
-  // ── "Visit  Valet-s.com" on one line ─────────────────────────
+  // ── "Visit  Valet-s.com" ──────────────────────────────────────
   const visitLabel = 'Visit  Valet-s.com';
   const visitSize  = 5.5;
   page.drawText(visitLabel, {
@@ -101,6 +81,25 @@ async function printNameLabel(guestName: string): Promise<void> {
     font,
     size: visitSize,
     color: rgb(0.35, 0.35, 0.35),
+  });
+  cursor -= visitSize + mmToPt(1.5);
+
+  // ── Gold divider ──────────────────────────────────────────────
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: rgb(0.79, 0.66, 0.3) });
+  cursor -= mmToPt(1.5);
+
+  // ── Guest name (bottom) ───────────────────────────────────────
+  const displayName = guestName.trim();
+  let nameSize = 9;
+  while (nameSize > 5 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) {
+    nameSize -= 0.5;
+  }
+  page.drawText(displayName, {
+    x: pad + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
+    y: cursor - nameSize,
+    font: fontBold,
+    size: nameSize,
+    color: rgb(0.1, 0.12, 0.27),
   });
 
   // ── Open PDF ──────────────────────────────────────────────────
