@@ -1,40 +1,55 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 export function useWebSocket() {
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const ws = useRef<WebSocket | null>(null);
+  const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmounted = useRef(false);
 
-  useEffect(() => {
+  const connect = useCallback(() => {
+    if (unmounted.current) return;
+
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
-    
-    ws.current = new WebSocket(wsUrl);
 
-    ws.current.onopen = () => {
+    const socket = new WebSocket(wsUrl);
+    ws.current = socket;
+
+    socket.onopen = () => {
+      if (unmounted.current) return;
       setIsConnected(true);
-      console.log('WebSocket connected');
     };
 
-    ws.current.onmessage = (event) => {
+    socket.onmessage = (event) => {
+      if (unmounted.current) return;
       setLastMessage(event.data);
     };
 
-    ws.current.onclose = () => {
+    socket.onclose = () => {
+      if (unmounted.current) return;
       setIsConnected(false);
-      console.log('WebSocket disconnected');
+      // Auto-reconnect after 3 seconds
+      reconnectTimeout.current = setTimeout(() => {
+        if (!unmounted.current) connect();
+      }, 3000);
     };
 
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    return () => {
-      if (ws.current) {
-        ws.current.close();
-      }
+    socket.onerror = () => {
+      socket.close();
     };
   }, []);
+
+  useEffect(() => {
+    unmounted.current = false;
+    connect();
+
+    return () => {
+      unmounted.current = true;
+      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+      if (ws.current) ws.current.close();
+    };
+  }, [connect]);
 
   const sendMessage = (message: any) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -42,9 +57,5 @@ export function useWebSocket() {
     }
   };
 
-  return {
-    lastMessage,
-    isConnected,
-    sendMessage,
-  };
+  return { lastMessage, isConnected, sendMessage };
 }

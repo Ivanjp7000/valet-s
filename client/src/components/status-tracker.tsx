@@ -55,8 +55,21 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
-    refetchInterval: 2000,
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true, // keep polling even when phone screen is off / tab is backgrounded
+    refetchOnWindowFocus: true,
   });
+
+  // Force an immediate refetch whenever the phone comes back to the foreground
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName] });
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [ticketNumber, guestName, queryClient]);
 
   const currentStage = ticket ? getStageFromStatus(ticket.status) : -1;
   const isReady = ticket?.status === "ready";
