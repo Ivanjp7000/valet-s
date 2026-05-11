@@ -1535,12 +1535,13 @@ export default function StaffDashboard() {
             </a>
           </div>
         </div>
-        {/* Full-width banner — desktop only */}
-        <div className="hidden sm:block w-full">
+        {/* Full-width banner — desktop only, white padding clipped */}
+        <div className="hidden sm:block w-full overflow-hidden">
           <img
             src={valetBanner6}
             alt="Valet-S"
-            className="w-full h-auto"
+            className="w-full h-auto block"
+            style={{ marginTop: '-10%', marginBottom: '-10%' }}
           />
         </div>
       </div>
