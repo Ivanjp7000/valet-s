@@ -276,6 +276,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user = await storage.getUserByEmail(username);
       }
 
+      // Auto-provision new @stregis.com accounts on first login via /sro
+      if (!user && username.includes('@') && username.toLowerCase().endsWith('@stregis.com')) {
+        const ST_REGIS_OSAKA_OU_ID = 'dd16ee22-1d40-4db2-8cde-6a726673451a';
+        const emailLower = username.trim().toLowerCase();
+        const nameParts = emailLower.split('@')[0].replace(/[._-]/g, ' ').split(' ');
+        const firstName = nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1);
+        const lastName = nameParts.slice(1).map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+        user = await storage.createUser({
+          username: emailLower,
+          email: emailLower,
+          firstName: firstName || emailLower,
+          lastName: lastName || '',
+          role: 'standard_user',
+          twoFactorEnabled: true,
+          isActive: true,
+          accountStatus: 'active',
+          ouId: ST_REGIS_OSAKA_OU_ID,
+        } as any);
+        // Notify all superadmins via WebSocket
+        broadcastToOU(ST_REGIS_OSAKA_OU_ID, {
+          type: 'new_stregis_account',
+          data: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, createdAt: (user as any).createdAt },
+        });
+        console.log(`[SRO] Auto-provisioned new account: ${emailLower}`);
+      }
+
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
@@ -1194,6 +1220,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== PENDING REGISTRATIONS (Super Admin Only) =====
+  // New auto-approved @stregis.com accounts (last 30 days)
+  app.get('/api/admin/new-stregis-accounts', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const allUsers = await storage.getAllUsers();
+      const newAccounts = allUsers.filter((u: any) =>
+        u.email?.toLowerCase().endsWith('@stregis.com') &&
+        u.accountStatus === 'active' &&
+        u.createdAt && new Date(u.createdAt) >= since &&
+        !u.password
+      ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(newAccounts.map((u: any) => ({
+        id: u.id, firstName: u.firstName, lastName: u.lastName,
+        email: u.email, createdAt: u.createdAt, role: u.role,
+      })));
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch new accounts" });
+    }
+  });
+
   app.get('/api/admin/pending-registrations', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const pending = await storage.getPendingRegistrations();

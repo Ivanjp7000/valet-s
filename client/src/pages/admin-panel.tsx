@@ -20,6 +20,18 @@ import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, SafeUser, UserLocationScope, ValetTicket } from "@shared/schema";
 import { format } from "date-fns";
 
+function RegistrationsBadge() {
+  const { data: pending } = useQuery<any[]>({ queryKey: ['/api/admin/pending-registrations'] });
+  const { data: newStregis } = useQuery<any[]>({ queryKey: ['/api/admin/new-stregis-accounts'] });
+  const total = (pending?.length ?? 0) + (newStregis?.length ?? 0);
+  if (!total) return null;
+  return (
+    <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold bg-red-500 text-white">
+      {total > 9 ? '9+' : total}
+    </span>
+  );
+}
+
 function PendingRegistrationsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -30,6 +42,11 @@ function PendingRegistrationsTab() {
 
   const { data: pending, isLoading } = useQuery<any[]>({
     queryKey: ['/api/admin/pending-registrations'],
+    refetchInterval: 15000,
+  });
+
+  const { data: newStregisAccounts } = useQuery<any[]>({
+    queryKey: ['/api/admin/new-stregis-accounts'],
     refetchInterval: 15000,
   });
 
@@ -64,13 +81,67 @@ function PendingRegistrationsTab() {
     approveMutation.mutate({ id: approveTarget.id, ouId: approveOU, role: approveRole });
   };
 
+  const newCount = (newStregisAccounts?.length ?? 0) + (pending?.length ?? 0);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Pending Registrations</h2>
+        <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Registrations</h2>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Self-registered accounts waiting for review. You must assign an OU and role before activating.
+          Self-registered accounts awaiting review, plus new @stregis.com accounts auto-approved via the SRO portal.
         </p>
+      </div>
+
+      {/* Auto-approved @stregis.com accounts */}
+      {Array.isArray(newStregisAccounts) && newStregisAccounts.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">New @stregis.com Accounts</h3>
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+              Auto-Approved · {newStregisAccounts.length}
+            </span>
+          </div>
+          <Card className="border-emerald-200">
+            <CardContent className="p-0">
+              <div className="divide-y divide-gray-100">
+                {newStregisAccounts.map((acc) => (
+                  <div key={acc.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-bold text-emerald-700">
+                        {(acc.firstName?.[0] || '?').toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-gray-900">
+                        {[acc.firstName, acc.lastName].filter(Boolean).join(' ') || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{acc.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] text-gray-400">
+                        {acc.createdAt ? format(new Date(acc.createdAt), 'MMM d, HH:mm') : '—'}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        ✓ Active
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-gray-700">Pending Approval</h3>
+          {Array.isArray(pending) && pending.length > 0 && (
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+              {pending.length} waiting
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Approval Dialog */}
@@ -815,6 +886,7 @@ export default function AdminPanel() {
                   <UserCheck size={14} />
                   <span className="hidden sm:inline">Registrations</span>
                   <span className="sm:hidden">Regs</span>
+                  <RegistrationsBadge />
                 </TabsTrigger>
               )}
               <TabsTrigger value="reports" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-reports">
