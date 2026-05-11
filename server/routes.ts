@@ -1179,7 +1179,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const user = await storage.getUser(id);
-      if (!user || (user as any).accountStatus !== 'pending_approval') return res.status(404).json({ message: "Not found" });
+      const status = (user as any).accountStatus;
+      if (!user || (status !== 'pending_approval' && status !== 'pending_email_verification')) return res.status(404).json({ message: "Not found" });
       await storage.updateUser(id, { accountStatus: 'active' } as any);
       if (user.email) {
         const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');

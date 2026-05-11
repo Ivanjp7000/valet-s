@@ -52,8 +52,7 @@ function PendingRegistrationsTab() {
       <div>
         <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Pending Registrations</h2>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Accounts that have verified their email and are awaiting administrator approval.
-          @stregis.com accounts are approved automatically.
+          All self-registered accounts waiting for review. You can approve or reject at any stage.
         </p>
       </div>
 
@@ -61,7 +60,7 @@ function PendingRegistrationsTab() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="animate-spin text-grayis-400" size={24} />
+              <Loader2 className="animate-spin text-gray-400" size={24} />
             </div>
           ) : !pending || pending.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 text-center">
@@ -72,26 +71,35 @@ function PendingRegistrationsTab() {
           ) : (
             <div className="divide-y divide-gray-100">
               {pending.map((reg) => (
-                <div key={reg.id} className="flex items-center justify-between gap-3 px-4 py-4">
-                  <div className="min-w-0">
+                <div key={reg.id} className="flex items-start justify-between gap-3 px-4 py-4">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                         <span className="text-xs font-bold text-blue-700">
                           {(reg.firstName?.[0] || '?').toUpperCase()}
                         </span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium text-sm text-gray-900">
                           {[reg.firstName, reg.lastName].filter(Boolean).join(' ') || 'Unknown'}
                         </p>
                         <p className="text-xs text-gray-500 truncate">{reg.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 mt-2 ml-10">
+                    <div className="flex items-center gap-2 mt-2 ml-10 flex-wrap">
                       <Clock size={11} className="text-gray-400" />
                       <span className="text-[11px] text-gray-400">
-                        Submitted {reg.createdAt ? format(new Date(reg.createdAt), 'MMM d, yyyy') : '—'}
+                        {reg.createdAt ? format(new Date(reg.createdAt), 'MMM d, yyyy HH:mm') : '—'}
                       </span>
+                      {reg.accountStatus === 'pending_email_verification' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                          ⏳ Awaiting email verification
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">
+                          ✓ Email verified — awaiting approval
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">

@@ -183,7 +183,13 @@ export class DatabaseStorage implements IStorage {
 
   async getPendingRegistrations(): Promise<User[]> {
     return await db.select().from(users)
-      .where(eq(users.accountStatus, 'pending_approval'))
+      .where(and(
+        eq(users.isActive, true),
+        or(
+          eq(users.accountStatus, 'pending_approval'),
+          eq(users.accountStatus, 'pending_email_verification')
+        )
+      ))
       .orderBy(asc(users.createdAt));
   }
 
