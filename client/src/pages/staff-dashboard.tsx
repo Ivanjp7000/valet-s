@@ -4443,6 +4443,10 @@ export default function StaffDashboard() {
               <DialogTitle>Add Staff User</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 flex gap-2">
+                <Mail size={14} className="shrink-0 mt-0.5" />
+                <span>A welcome email will be sent automatically. The user logs in with their email — a verification code is sent every time. No password needed.</span>
+              </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Email</label>
                 <Input
@@ -4478,8 +4482,9 @@ export default function StaffDashboard() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="standard">Standard Staff</SelectItem>
-                    <SelectItem value="superadmin">Super Admin</SelectItem>
+                    <SelectItem value="standard_user">Standard User (view only)</SelectItem>
+                    <SelectItem value="standard_admin">Standard Admin (operational)</SelectItem>
+                    <SelectItem value="privilege_admin">Privilege Admin (OU management)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -4489,7 +4494,7 @@ export default function StaffDashboard() {
                   disabled={addUserMutation.isPending}
                   className="flex-1 bg-regis-navy hover:bg-blue-900"
                 >
-                  {addUserMutation.isPending ? "Adding..." : "Add User"}
+                  {addUserMutation.isPending ? "Adding..." : "Create & Send Invite"}
                 </Button>
                 <Button
                   variant="outline"

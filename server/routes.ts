@@ -173,6 +173,40 @@ async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullNam
   });
 }
 
+async function sendWelcomeEmail(toEmail: string, fullName: string): Promise<void> {
+  const { client, fromEmail } = await getResendClient();
+  const loginUrl = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000';
+  await client.emails.send({
+    from: fromEmail,
+    to: toEmail,
+    subject: "Your account is ready — St. Regis Osaka Valet System",
+    html: `
+      <div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">
+        <div style="background:#1a2744;padding:28px 36px;text-align:center">
+          <p style="color:#c9a84c;letter-spacing:3px;font-size:11px;text-transform:uppercase;margin:0 0 6px">St. Regis Osaka</p>
+          <h1 style="color:#fff;font-size:20px;font-weight:400;margin:0">Welcome to the Valet System</h1>
+        </div>
+        <div style="padding:36px">
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${fullName},</p>
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Your account has been created. Here is how to log in:</p>
+          <ol style="color:#555;font-size:15px;line-height:1.9;margin:0 0 28px;padding-left:20px">
+            <li>Go to the login page and enter your email address: <strong>${toEmail}</strong></li>
+            <li>A 6-digit verification code will be sent to this inbox</li>
+            <li>Enter the code to access the system</li>
+          </ol>
+          <p style="color:#888;font-size:13px;line-height:1.6;margin:0 0 28px">No password is required — you will receive a new code every time you log in.</p>
+          <div style="text-align:center;margin-bottom:28px">
+            <a href="${loginUrl}" style="background:#1a2744;color:#fff;text-decoration:none;padding:14px 32px;border-radius:4px;font-size:15px;display:inline-block">Go to Login</a>
+          </div>
+        </div>
+        <div style="background:#f4f2ee;padding:16px 36px;text-align:center">
+          <p style="color:#aaa;font-size:12px;margin:0">St. Regis Osaka &nbsp;·&nbsp; Valet Services</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 async function sendApprovalEmail(toEmail: string, fullName: string): Promise<void> {
   const { client, fromEmail } = await getResendClient();
   await client.emails.send({
@@ -1813,8 +1847,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: finalRole,
         ouId: finalOuId || null,
         locationId: locationId || null,
-        mustChangePassword,
+        mustChangePassword: false,
       });
+
+      // Send welcome email with OTP login instructions
+      const fullName = `${firstName} ${lastName}`.trim();
+      try {
+        await sendWelcomeEmail(email, fullName);
+        console.log(`[createUser] Welcome email sent to ${email}`);
+      } catch (emailErr: any) {
+        console.error(`[createUser] Welcome email failed for ${email}:`, emailErr?.message || emailErr);
+      }
+
       res.json(newUser);
     } catch (error) {
       console.error("Error creating user:", error);
