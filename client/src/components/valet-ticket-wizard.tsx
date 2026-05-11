@@ -102,8 +102,26 @@ async function printNameLabel(guestName: string): Promise<void> {
   ctx.textAlign = 'center';
   ctx.fillText(displayName, W / 2, H - pad);
 
-  // ── Write final image into the already-open tab ───────────────
-  const dataUrl = canvas.toDataURL('image/png');
+  // ── Share / display the label ────────────────────────────────
+  // On iPhone: use Web Share API to send the real PNG file directly to
+  // Phomemo (or any app) via the native iOS share sheet.
+  // On desktop: fall back to showing the image in the already-open tab.
+  const blob: Blob = await new Promise(resolve =>
+    canvas.toBlob(b => resolve(b!), 'image/png')
+  );
+
+  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+  if (isMobile && navigator.canShare) {
+    const file = new File([blob], 'valet-label.png', { type: 'image/png' });
+    if (navigator.canShare({ files: [file] })) {
+      win.close();   // close the placeholder tab — not needed on mobile
+      await navigator.share({ files: [file], title: 'Valet Label' });
+      return;
+    }
+  }
+
+  // Desktop fallback — show image + instructions in the open tab
+  const dataUrl = URL.createObjectURL(blob);
   win.document.open();
   win.document.write(`<!DOCTYPE html>
 <html>
@@ -124,10 +142,8 @@ async function printNameLabel(guestName: string): Promise<void> {
 <body>
   <img src="${dataUrl}" alt="Valet Label">
   <div class="tip">
-    <b>iPhone → Phomemo:</b><br>
-    Long-press the image → <b>Save to Photos</b><br>
-    Then open <b>Phomemo app</b><br>
-    → Print from Album → select → Print
+    <b>Desktop:</b> Ctrl/Cmd+P → select Phomemo M110s<br>
+    → set paper size 30×38mm → Print
   </div>
 </body>
 </html>`);
