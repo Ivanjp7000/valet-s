@@ -206,6 +206,60 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// GS Members — users designated as GS team handlers (manage replies + calendar)
+export const gsMembers = pgTable("gs_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ouId: varchar("ou_id").notNull().references(() => organizationalUnits.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  addedBy: varchar("added_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// GS Messages — any staff can send, GS members handle
+export const gsMessages = pgTable("gs_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ouId: varchar("ou_id").notNull().references(() => organizationalUnits.id, { onDelete: 'cascade' }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderName: varchar("sender_name").notNull(),
+  content: text("content").notNull(),
+  status: varchar("status").default("open").notNull(), // 'open' | 'scheduled' | 'resolved'
+  calendarEventId: varchar("calendar_event_id"), // set after converting to calendar event
+  acknowledgedAt: timestamp("acknowledged_at"), // when sender acknowledged the calendar entry
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// GS Replies — from GS members to messages
+export const gsReplies = pgTable("gs_replies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id").notNull().references(() => gsMessages.id, { onDelete: 'cascade' }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderName: varchar("sender_name").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Calendar Events — shared OU schedule visible to all staff
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ouId: varchar("ou_id").notNull().references(() => organizationalUnits.id, { onDelete: 'cascade' }),
+  title: varchar("title").notNull(),
+  eventDate: varchar("event_date").notNull(), // YYYY-MM-DD
+  startTime: varchar("start_time"), // HH:MM
+  endTime: varchar("end_time"), // HH:MM
+  details: text("details"),
+  category: varchar("category").default("general"), // 'general' | 'vip' | 'wedding' | 'event' | 'transport'
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdByName: varchar("created_by_name").notNull(),
+  sourceMessageId: varchar("source_message_id"), // FK to gsMessages if converted from message
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type GsMember = typeof gsMembers.$inferSelect;
+export type GsMessage = typeof gsMessages.$inferSelect;
+export type GsReply = typeof gsReplies.$inferSelect;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+
 // Guest Name Imports — pre-imported lists for autocomplete, auto-expire after 24h
 export const guestNameImports = pgTable("guest_name_imports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

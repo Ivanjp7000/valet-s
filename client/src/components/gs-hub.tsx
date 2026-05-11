@@ -1,0 +1,634 @@
+import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MessageSquare, Calendar, Plus, Send, ChevronDown, ChevronUp, CheckCircle2, CalendarPlus, Clock, Tag, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+
+type GsMessage = {
+  id: string;
+  ouId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  status: string;
+  calendarEventId: string | null;
+  acknowledgedAt: string | null;
+  createdAt: string;
+  replies: GsReply[];
+};
+
+type GsReply = {
+  id: string;
+  messageId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+};
+
+type CalendarEvent = {
+  id: string;
+  ouId: string;
+  title: string;
+  eventDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  details: string | null;
+  category: string;
+  createdBy: string;
+  createdByName: string;
+  sourceMessageId: string | null;
+  createdAt: string;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  general: "General",
+  vip: "VIP",
+  wedding: "Wedding",
+  event: "Event",
+  transport: "Transport",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  general: "bg-blue-100 text-blue-700 border-blue-200",
+  vip: "bg-purple-100 text-purple-700 border-purple-200",
+  wedding: "bg-pink-100 text-pink-700 border-pink-200",
+  event: "bg-amber-100 text-amber-700 border-amber-200",
+  transport: "bg-green-100 text-green-700 border-green-200",
+};
+
+const STATUS_DOT: Record<string, string> = {
+  open: "bg-yellow-400",
+  scheduled: "bg-blue-500",
+  resolved: "bg-gray-400",
+};
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function fmtDate(d: string) {
+  const [y, mo, day] = d.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${months[parseInt(mo)-1]} ${parseInt(day)}, ${y}`;
+}
+
+// ── Compose dialog ────────────────────────────────────────────────────────────
+function ComposeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [content, setContent] = useState("");
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const send = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/gs/messages", { content }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+      toast({ title: "Message sent to GS" });
+      setContent("");
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to send", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare size={18} className="text-regis-gold" />
+            Message to GS
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-gray-500">Describe the event, arrival, or request. GS team will handle and add to the calendar if needed.</p>
+        <Textarea
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="e.g. Wedding party arriving at 15:00 — 4 cars, bride: Yamamoto, white sedan + black SUV"
+          rows={4}
+          className="resize-none"
+        />
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => send.mutate()} disabled={!content.trim() || send.isPending}
+            className="bg-regis-navy hover:bg-regis-navy/90 text-white gap-2">
+            <Send size={14} /> Send to GS
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Convert-to-Event dialog ───────────────────────────────────────────────────
+function ConvertToEventDialog({ message, open, onClose }: { message: GsMessage | null; open: boolean; onClose: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [title, setTitle] = useState("");
+  const [eventDate, setEventDate] = useState(today);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [category, setCategory] = useState("general");
+  const [details, setDetails] = useState("");
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const save = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/gs/messages/" + message!.id + "/convert-to-event", {
+      title, eventDate, startTime: startTime || undefined, endTime: endTime || undefined, category, details: details || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+      qc.invalidateQueries({ queryKey: ["/api/calendar/events"] });
+      toast({ title: "Added to Calendar", description: "Sender will be notified." });
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to save event", variant: "destructive" }),
+  });
+
+  if (!message) return null;
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarPlus size={18} className="text-regis-gold" />
+            Add to Calendar
+          </DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-gray-500 bg-gray-50 rounded p-2 border line-clamp-2">"{message.content}"</div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Event Title *</label>
+            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Wedding Arrival – Yamamoto" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Date *</label>
+              <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Category</label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Start Time</label>
+              <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">End Time</label>
+              <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Additional Details</label>
+            <Textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Car numbers, guest names, special instructions…" rows={2} className="resize-none" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => save.mutate()} disabled={!title.trim() || !eventDate || save.isPending}
+            className="bg-regis-navy hover:bg-regis-navy/90 text-white gap-2">
+            <CalendarPlus size={14} /> Save to Calendar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Add/Edit Calendar Event dialog ────────────────────────────────────────────
+function CalendarEventDialog({ event, open, onClose }: { event?: CalendarEvent; open: boolean; onClose: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [title, setTitle] = useState(event?.title ?? "");
+  const [eventDate, setEventDate] = useState(event?.eventDate ?? today);
+  const [startTime, setStartTime] = useState(event?.startTime ?? "");
+  const [endTime, setEndTime] = useState(event?.endTime ?? "");
+  const [category, setCategory] = useState(event?.category ?? "general");
+  const [details, setDetails] = useState(event?.details ?? "");
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const save = useMutation({
+    mutationFn: () => event
+      ? apiRequest("PATCH", "/api/calendar/events/" + event.id, { title, eventDate, startTime: startTime || undefined, endTime: endTime || undefined, category, details: details || undefined })
+      : apiRequest("POST", "/api/calendar/events", { title, eventDate, startTime: startTime || undefined, endTime: endTime || undefined, category, details: details || undefined }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/calendar/events"] });
+      toast({ title: event ? "Event updated" : "Event created" });
+      onClose();
+    },
+    onError: () => toast({ title: "Failed to save event", variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarPlus size={18} className="text-regis-gold" />
+            {event ? "Edit Event" : "Add Calendar Event"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Event Title *</label>
+            <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. VIP Lunch – Suzuki Party" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Date *</label>
+              <Input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Category</label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Start Time</label>
+              <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">End Time</label>
+              <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Details</label>
+            <Textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Car numbers, guest names, special instructions…" rows={2} className="resize-none" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => save.mutate()} disabled={!title.trim() || !eventDate || save.isPending}
+            className="bg-regis-navy hover:bg-regis-navy/90 text-white">
+            {event ? "Update" : "Add to Calendar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Single message card ───────────────────────────────────────────────────────
+function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; currentUserId: string; isGSMember: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [convertOpen, setConvertOpen] = useState(false);
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const reply = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/gs/messages/${msg.id}/reply`, { content: replyText }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/gs/messages"] }); setReplyText(""); setExpanded(true); },
+    onError: () => toast({ title: "Failed to send reply", variant: "destructive" }),
+  });
+
+  const acknowledge = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/gs/messages/${msg.id}/acknowledge`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/gs/messages"] }); toast({ title: "Acknowledged!" }); },
+    onError: () => toast({ title: "Failed to acknowledge", variant: "destructive" }),
+  });
+
+  const isMine = msg.senderId === currentUserId;
+  const hasReplies = msg.replies.length > 0;
+  const isScheduled = msg.status === "scheduled";
+  const isAcknowledged = !!msg.acknowledgedAt;
+
+  return (
+    <div className={`rounded-lg border ${isScheduled ? "border-blue-200 bg-blue-50/40" : "border-gray-200 bg-white"} p-3 space-y-2`}>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[msg.status] || "bg-gray-300"}`} />
+          <span className="text-xs font-bold text-gray-700 truncate">{msg.senderName}</span>
+          <span className="text-xs text-gray-400">{timeAgo(msg.createdAt)}</span>
+          {isScheduled && (
+            <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-medium">On Calendar</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {hasReplies && (
+            <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-600">
+              <MessageSquare size={12} />
+              <span>{msg.replies.length}</span>
+              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Message content */}
+      <p className="text-sm text-gray-800 leading-relaxed">{msg.content}</p>
+
+      {/* Replies */}
+      {(expanded || !hasReplies) && hasReplies && (
+        <div className="pl-3 border-l-2 border-gray-200 space-y-2 mt-1">
+          {msg.replies.map(r => (
+            <div key={r.id}>
+              <span className="text-xs font-semibold text-gray-600">{r.senderName}</span>
+              <span className="text-xs text-gray-400 ml-1">{timeAgo(r.createdAt)}</span>
+              <p className="text-xs text-gray-700 mt-0.5">{r.content}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Acknowledge button — shown to original sender when event has been added to calendar */}
+      {isScheduled && isMine && !isAcknowledged && (
+        <div className="pt-1 border-t border-blue-200">
+          <p className="text-xs text-blue-600 mb-1.5">GS has added this to the calendar. Please confirm you've seen it.</p>
+          <Button size="sm" onClick={() => acknowledge.mutate()} disabled={acknowledge.isPending}
+            className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
+            <CheckCircle2 size={13} /> Confirm & Acknowledge
+          </Button>
+        </div>
+      )}
+      {isScheduled && isMine && isAcknowledged && (
+        <div className="flex items-center gap-1 text-xs text-green-600 pt-1 border-t border-blue-200">
+          <CheckCircle2 size={12} /> Acknowledged
+        </div>
+      )}
+
+      {/* GS Member actions */}
+      {isGSMember && (
+        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+          {/* Reply input */}
+          <div className="flex flex-1 gap-1.5">
+            <Input
+              value={replyText}
+              onChange={e => setReplyText(e.target.value)}
+              placeholder="Reply…"
+              className="h-7 text-xs flex-1"
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && replyText.trim()) { e.preventDefault(); reply.mutate(); } }}
+            />
+            <Button size="sm" onClick={() => reply.mutate()} disabled={!replyText.trim() || reply.isPending}
+              className="h-7 px-2 bg-gray-700 hover:bg-gray-800 text-white"><Send size={12} /></Button>
+          </div>
+          {!isScheduled && (
+            <Button size="sm" variant="outline" onClick={() => setConvertOpen(true)}
+              className="h-7 text-xs gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 flex-shrink-0">
+              <CalendarPlus size={12} /> Calendar
+            </Button>
+          )}
+        </div>
+      )}
+
+      <ConvertToEventDialog message={msg} open={convertOpen} onClose={() => setConvertOpen(false)} />
+    </div>
+  );
+}
+
+// ── Calendar view ─────────────────────────────────────────────────────────────
+function CalendarView({ isGSMember }: { isGSMember: boolean }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth()); // 0-indexed
+  const [addOpen, setAddOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState<CalendarEvent | undefined>();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: events = [] } = useQuery<CalendarEvent[]>({
+    queryKey: ["/api/calendar/events"],
+    queryFn: async () => {
+      const res = await fetch("/api/calendar/events", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const deleteEvent = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/calendar/events/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/calendar/events"] }); toast({ title: "Event deleted" }); },
+  });
+
+  const prevMonth = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const nextMonth = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
+
+  const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const monthStr = `${year}-${(month + 1).toString().padStart(2, "0")}`;
+  const monthEvents = events.filter(e => e.eventDate.startsWith(monthStr));
+
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const eventsForDay = (day: number) => monthEvents.filter(e => {
+    const [,, d] = e.eventDate.split("-");
+    return parseInt(d) === day;
+  });
+
+  return (
+    <div className="space-y-3">
+      {/* Month navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button onClick={prevMonth} className="p-1 rounded hover:bg-gray-100"><ChevronLeft size={16} /></button>
+          <span className="text-sm font-semibold text-gray-700 w-36 text-center">{MONTH_NAMES[month]} {year}</span>
+          <button onClick={nextMonth} className="p-1 rounded hover:bg-gray-100"><ChevronRight size={16} /></button>
+        </div>
+        {isGSMember && (
+          <Button size="sm" onClick={() => setAddOpen(true)}
+            className="h-7 text-xs bg-regis-navy hover:bg-regis-navy/90 text-white gap-1">
+            <Plus size={12} /> Add Event
+          </Button>
+        )}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="rounded-lg border border-gray-200 overflow-hidden">
+        <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+          {DAY_NAMES.map(d => <div key={d} className="text-center text-xs font-semibold text-gray-500 py-1.5">{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) => {
+            if (!day) return <div key={`e${i}`} className="min-h-[56px] border-r border-b border-gray-100 bg-gray-50/40" />;
+            const dayStr = `${year}-${(month + 1).toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+            const dayEvents = eventsForDay(day);
+            const isToday = dayStr === todayStr;
+            return (
+              <div key={day} className={`min-h-[56px] border-r border-b border-gray-100 p-1 ${isToday ? "bg-regis-gold/10" : ""}`}>
+                <div className={`text-xs font-semibold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? "bg-regis-navy text-white" : "text-gray-600"}`}>
+                  {day}
+                </div>
+                <div className="space-y-0.5">
+                  {dayEvents.slice(0, 2).map(ev => (
+                    <div key={ev.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate font-medium border cursor-pointer hover:opacity-80 ${CATEGORY_COLORS[ev.category] || CATEGORY_COLORS.general}`}
+                      onClick={() => isGSMember && setEditEvent(ev)}
+                      title={`${ev.title}${ev.startTime ? " · " + ev.startTime : ""}`}>
+                      {ev.startTime ? ev.startTime + " " : ""}{ev.title}
+                    </div>
+                  ))}
+                  {dayEvents.length > 2 && <div className="text-[10px] text-gray-400 pl-1">+{dayEvents.length - 2} more</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Upcoming events list */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">This Month's Events</p>
+        {monthEvents.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">No events this month</p>
+        ) : (
+          <div className="space-y-1.5">
+            {monthEvents.map(ev => (
+              <div key={ev.id} className={`flex items-start gap-2 rounded-lg border p-2.5 ${CATEGORY_COLORS[ev.category] || CATEGORY_COLORS.general}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold">{ev.title}</span>
+                    <span className="text-[10px] opacity-70">{fmtDate(ev.eventDate)}</span>
+                    {ev.startTime && <span className="text-[10px] font-semibold">{ev.startTime}{ev.endTime ? "–" + ev.endTime : ""}</span>}
+                  </div>
+                  {ev.details && <p className="text-xs mt-0.5 opacity-80">{ev.details}</p>}
+                  <p className="text-[10px] opacity-60 mt-0.5">By {ev.createdByName}</p>
+                </div>
+                {isGSMember && (
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={() => setEditEvent(ev)} className="p-1 rounded hover:bg-black/10"><Pencil size={12} /></button>
+                    <button onClick={() => { if (confirm("Delete this event?")) deleteEvent.mutate(ev.id); }} className="p-1 rounded hover:bg-red-100 text-red-600"><Trash2 size={12} /></button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {addOpen && <CalendarEventDialog open={addOpen} onClose={() => setAddOpen(false)} />}
+      {editEvent && <CalendarEventDialog event={editEvent} open={!!editEvent} onClose={() => setEditEvent(undefined)} />}
+    </div>
+  );
+}
+
+// ── Main GS Hub component ─────────────────────────────────────────────────────
+export function GSHub({ wsSignal }: { wsSignal?: number }) {
+  const { user } = useAuth();
+  const [tab, setTab] = useState<"messages" | "calendar">("messages");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const qc = useQueryClient();
+
+  const { data: messages = [], isLoading } = useQuery<GsMessage[]>({
+    queryKey: ["/api/gs/messages"],
+    queryFn: async () => {
+      const res = await fetch("/api/gs/messages", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: 15000,
+  });
+
+  const { data: isMember = false } = useQuery<boolean>({
+    queryKey: ["/api/gs/members/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/gs/members/me", { credentials: "include" });
+      if (!res.ok) return false;
+      const d = await res.json();
+      return !!d.isMember;
+    },
+  });
+
+  const pendingCount = messages.filter(m => m.senderId === user?.id && m.status === "scheduled" && !m.acknowledgedAt).length;
+  const openCount = messages.filter(m => m.status === "open").length;
+
+  return (
+    <div className="space-y-3">
+      {/* Tabs */}
+      <div className="flex items-center gap-2">
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-1">
+          <button
+            onClick={() => setTab("messages")}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${tab === "messages" ? "bg-regis-navy text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+            <MessageSquare size={13} /> Messages
+            {openCount > 0 && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab === "messages" ? "bg-white/20 text-white" : "bg-amber-500 text-white"}`}>{openCount}</span>}
+          </button>
+          <button
+            onClick={() => setTab("calendar")}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${tab === "calendar" ? "bg-regis-navy text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+            <Calendar size={13} /> Calendar
+          </button>
+        </div>
+        <Button size="sm" onClick={() => setComposeOpen(true)}
+          className="h-8 text-xs bg-regis-gold hover:bg-regis-gold/90 text-regis-navy font-bold gap-1 flex-shrink-0">
+          <Plus size={12} /> Message GS
+        </Button>
+      </div>
+
+      {/* Pending acknowledgements banner */}
+      {pendingCount > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <CheckCircle2 size={14} className="text-blue-500 flex-shrink-0" />
+          <p className="text-xs text-blue-700">
+            <strong>{pendingCount}</strong> of your messages {pendingCount === 1 ? "has" : "have"} been added to the calendar — please confirm below.
+          </p>
+        </div>
+      )}
+
+      {/* GS Member badge */}
+      {isMember && (
+        <div className="flex items-center gap-1.5 text-xs text-purple-700">
+          <Tag size={12} /> <span className="font-semibold">GS Member</span> — you can reply and manage the calendar
+        </div>
+      )}
+
+      {/* Content */}
+      {tab === "messages" && (
+        <div className="space-y-2">
+          {isLoading ? (
+            <p className="text-xs text-gray-400 text-center py-6">Loading…</p>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <MessageSquare size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No messages yet</p>
+              <p className="text-xs mt-1">Send a message to GS to get started</p>
+            </div>
+          ) : (
+            messages.map(m => (
+              <MessageCard key={m.id} msg={m} currentUserId={user?.id ?? ""} isGSMember={isMember} />
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === "calendar" && <CalendarView isGSMember={isMember} />}
+
+      <ComposeDialog open={composeOpen} onClose={() => setComposeOpen(false)} />
+    </div>
+  );
+}

@@ -10,6 +10,10 @@ import {
   ouLicenses,
   guestNameImports,
   sessionAuditLog,
+  gsMembers,
+  gsMessages,
+  gsReplies,
+  calendarEvents,
   type User,
   type UpsertUser,
   type OrganizationalUnit,
@@ -28,6 +32,11 @@ import {
   type OULicense,
   type InsertOULicense,
   type SessionAuditLog,
+  type GsMember,
+  type GsMessage,
+  type GsReply,
+  type CalendarEvent,
+  type GuestNameImport,
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull, gt, ilike, lt } from "drizzle-orm";
@@ -129,6 +138,21 @@ export interface IStorage {
   getActiveSessionAudits(ouId?: string): Promise<SessionAuditLog[]>;
   getArchivedSessionAudits(date: string, ouId?: string): Promise<SessionAuditLog[]>;
   getAuditArchiveDates(ouId?: string): Promise<string[]>;
+
+  // GS Hub operations
+  getGSMembers(ouId: string): Promise<GsMember[]>;
+  isGSMember(ouId: string, userId: string): Promise<boolean>;
+  addGSMember(ouId: string, userId: string, addedBy: string): Promise<GsMember>;
+  removeGSMember(ouId: string, userId: string): Promise<void>;
+  getGSMessages(ouId: string): Promise<(GsMessage & { replies: GsReply[] })[]>;
+  createGSMessage(data: { ouId: string; senderId: string; senderName: string; content: string }): Promise<GsMessage>;
+  addGSReply(messageId: string, data: { senderId: string; senderName: string; content: string }): Promise<GsReply>;
+  markGSMessageScheduled(messageId: string, calendarEventId: string): Promise<GsMessage | undefined>;
+  acknowledgeGSMessage(messageId: string): Promise<GsMessage | undefined>;
+  getCalendarEvents(ouId: string): Promise<CalendarEvent[]>;
+  createCalendarEvent(data: { ouId: string; title: string; eventDate: string; startTime?: string; endTime?: string; details?: string; category?: string; createdBy: string; createdByName: string; sourceMessageId?: string }): Promise<CalendarEvent>;
+  updateCalendarEvent(id: string, data: Partial<{ title: string; eventDate: string; startTime: string; endTime: string; details: string; category: string }>): Promise<CalendarEvent | undefined>;
+  deleteCalendarEvent(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -827,6 +851,73 @@ export class DatabaseStorage implements IStorage {
       ouId ? [ouId] : []
     );
     return rows.rows.map(r => r.snapshot_date);
+  }
+
+  // ── GS Hub ────────────────────────────────────────────────────────────────
+
+  async getGSMembers(ouId: string): Promise<GsMember[]> {
+    return db.select().from(gsMembers).where(eq(gsMembers.ouId, ouId)).orderBy(asc(gsMembers.createdAt));
+  }
+
+  async isGSMember(ouId: string, userId: string): Promise<boolean> {
+    const [row] = await db.select().from(gsMembers).where(and(eq(gsMembers.ouId, ouId), eq(gsMembers.userId, userId)));
+    return !!row;
+  }
+
+  async addGSMember(ouId: string, userId: string, addedBy: string): Promise<GsMember> {
+    const [row] = await db.insert(gsMembers).values({ ouId, userId, addedBy }).returning();
+    return row;
+  }
+
+  async removeGSMember(ouId: string, userId: string): Promise<void> {
+    await db.delete(gsMembers).where(and(eq(gsMembers.ouId, ouId), eq(gsMembers.userId, userId)));
+  }
+
+  async getGSMessages(ouId: string): Promise<(GsMessage & { replies: GsReply[] })[]> {
+    const messages = await db.select().from(gsMessages).where(eq(gsMessages.ouId, ouId)).orderBy(desc(gsMessages.createdAt));
+    const messageIds = messages.map(m => m.id);
+    const replies = messageIds.length > 0
+      ? await db.select().from(gsReplies).where(inArray(gsReplies.messageId, messageIds)).orderBy(asc(gsReplies.createdAt))
+      : [];
+    return messages.map(m => ({ ...m, replies: replies.filter(r => r.messageId === m.id) }));
+  }
+
+  async createGSMessage(data: { ouId: string; senderId: string; senderName: string; content: string }): Promise<GsMessage> {
+    const [row] = await db.insert(gsMessages).values({ ...data, status: 'open' }).returning();
+    return row;
+  }
+
+  async addGSReply(messageId: string, data: { senderId: string; senderName: string; content: string }): Promise<GsReply> {
+    const [row] = await db.insert(gsReplies).values({ messageId, ...data }).returning();
+    return row;
+  }
+
+  async markGSMessageScheduled(messageId: string, calendarEventId: string): Promise<GsMessage | undefined> {
+    const [row] = await db.update(gsMessages).set({ status: 'scheduled', calendarEventId }).where(eq(gsMessages.id, messageId)).returning();
+    return row;
+  }
+
+  async acknowledgeGSMessage(messageId: string): Promise<GsMessage | undefined> {
+    const [row] = await db.update(gsMessages).set({ acknowledgedAt: new Date() }).where(eq(gsMessages.id, messageId)).returning();
+    return row;
+  }
+
+  async getCalendarEvents(ouId: string): Promise<CalendarEvent[]> {
+    return db.select().from(calendarEvents).where(eq(calendarEvents.ouId, ouId)).orderBy(asc(calendarEvents.eventDate), asc(calendarEvents.startTime));
+  }
+
+  async createCalendarEvent(data: { ouId: string; title: string; eventDate: string; startTime?: string; endTime?: string; details?: string; category?: string; createdBy: string; createdByName: string; sourceMessageId?: string }): Promise<CalendarEvent> {
+    const [row] = await db.insert(calendarEvents).values({ ...data, category: data.category || 'general' }).returning();
+    return row;
+  }
+
+  async updateCalendarEvent(id: string, data: Partial<{ title: string; eventDate: string; startTime: string; endTime: string; details: string; category: string }>): Promise<CalendarEvent | undefined> {
+    const [row] = await db.update(calendarEvents).set({ ...data, updatedAt: new Date() }).where(eq(calendarEvents.id, id)).returning();
+    return row;
+  }
+
+  async deleteCalendarEvent(id: string): Promise<void> {
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, id));
   }
 }
 

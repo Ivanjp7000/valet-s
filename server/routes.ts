@@ -2378,5 +2378,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── GS Hub routes ────────────────────────────────────────────────────────────
+
+  // GET /api/gs/members/me — check if current user is a GS member
+  app.get('/api/gs/members/me', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.json({ isMember: false });
+      const isMember = await storage.isGSMember(user.ouId, user.id);
+      res.json({ isMember });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET /api/gs/members — list GS members for the OU (privilege_admin+)
+  app.get('/api/gs/members', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.json([]);
+      const members = await storage.getGSMembers(user.ouId);
+      res.json(members);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/gs/members/:userId — add GS member (privilege_admin only)
+  app.post('/api/gs/members/:userId', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const { userId } = req.params;
+      const target = await storage.getUser(userId);
+      if (!target || target.ouId !== user.ouId) return res.status(403).json({ message: 'User not in your OU' });
+      const member = await storage.addGSMember(user.ouId, userId, user.id);
+      broadcastToOU(user.ouId, { type: 'gs_member_added', data: member });
+      res.json(member);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // DELETE /api/gs/members/:userId — remove GS member (privilege_admin only)
+  app.delete('/api/gs/members/:userId', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      await storage.removeGSMember(user.ouId, req.params.userId);
+      broadcastToOU(user.ouId, { type: 'gs_member_removed', data: { userId: req.params.userId } });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET /api/gs/messages — all GS messages for the OU
+  app.get('/api/gs/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId && user.role !== 'superadmin') return res.json([]);
+      const ouId = user.ouId!;
+      const msgs = await storage.getGSMessages(ouId);
+      res.json(msgs);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/gs/messages — any authenticated staff can send
+  app.post('/api/gs/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const { content } = req.body;
+      if (!content || typeof content !== 'string' || !content.trim()) {
+        return res.status(400).json({ message: 'content is required' });
+      }
+      const senderName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Staff';
+      const msg = await storage.createGSMessage({ ouId: user.ouId, senderId: user.id, senderName, content: content.trim() });
+      broadcastToOU(user.ouId, { type: 'gs_message', data: msg });
+      res.json(msg);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/gs/messages/:id/reply — GS member replies
+  app.post('/api/gs/messages/:id/reply', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const isMember = await storage.isGSMember(user.ouId, user.id);
+      if (!isMember && user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only GS members can reply' });
+      }
+      const { content } = req.body;
+      if (!content || typeof content !== 'string' || !content.trim()) {
+        return res.status(400).json({ message: 'content is required' });
+      }
+      const senderName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'GS';
+      const reply = await storage.addGSReply(req.params.id, { senderId: user.id, senderName, content: content.trim() });
+      broadcastToOU(user.ouId, { type: 'gs_reply', data: { messageId: req.params.id, reply } });
+      res.json(reply);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/gs/messages/:id/convert-to-event — GS member converts message to calendar event
+  app.post('/api/gs/messages/:id/convert-to-event', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const isMember = await storage.isGSMember(user.ouId, user.id);
+      if (!isMember && user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only GS members can add to calendar' });
+      }
+      const { title, eventDate, startTime, endTime, category, details } = req.body;
+      if (!title || !eventDate) return res.status(400).json({ message: 'title and eventDate are required' });
+      const createdByName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'GS';
+      const event = await storage.createCalendarEvent({
+        ouId: user.ouId, title, eventDate, startTime, endTime, category, details,
+        createdBy: user.id, createdByName, sourceMessageId: req.params.id,
+      });
+      await storage.markGSMessageScheduled(req.params.id, event.id);
+      broadcastToOU(user.ouId, { type: 'gs_event_created', data: { event, messageId: req.params.id } });
+      res.json(event);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/gs/messages/:id/acknowledge — original sender confirms they saw the calendar entry
+  app.post('/api/gs/messages/:id/acknowledge', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      const msg = await storage.acknowledgeGSMessage(req.params.id);
+      if (msg && user.ouId) broadcastToOU(user.ouId, { type: 'gs_acknowledged', data: msg });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // ── Calendar routes ───────────────────────────────────────────────────────────
+
+  // GET /api/calendar/events — all calendar events for the OU
+  app.get('/api/calendar/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId && user.role !== 'superadmin') return res.json([]);
+      const events = await storage.getCalendarEvents(user.ouId!);
+      res.json(events);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // POST /api/calendar/events — GS member creates event directly
+  app.post('/api/calendar/events', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const isMember = await storage.isGSMember(user.ouId, user.id);
+      if (!isMember && user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only GS members can create events' });
+      }
+      const { title, eventDate, startTime, endTime, category, details } = req.body;
+      if (!title || !eventDate) return res.status(400).json({ message: 'title and eventDate are required' });
+      const createdByName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'GS';
+      const event = await storage.createCalendarEvent({
+        ouId: user.ouId, title, eventDate, startTime, endTime, category, details,
+        createdBy: user.id, createdByName,
+      });
+      broadcastToOU(user.ouId, { type: 'gs_event_created', data: { event } });
+      res.json(event);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // PATCH /api/calendar/events/:id — GS member updates event
+  app.patch('/api/calendar/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const isMember = await storage.isGSMember(user.ouId, user.id);
+      if (!isMember && user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only GS members can edit events' });
+      }
+      const { title, eventDate, startTime, endTime, category, details } = req.body;
+      const event = await storage.updateCalendarEvent(req.params.id, { title, eventDate, startTime, endTime, category, details });
+      if (event) broadcastToOU(user.ouId, { type: 'gs_event_updated', data: event });
+      res.json(event);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // DELETE /api/calendar/events/:id — GS member deletes event
+  app.delete('/api/calendar/events/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      const isMember = await storage.isGSMember(user.ouId, user.id);
+      if (!isMember && user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Only GS members can delete events' });
+      }
+      await storage.deleteCalendarEvent(req.params.id);
+      broadcastToOU(user.ouId, { type: 'gs_event_deleted', data: { id: req.params.id } });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   return httpServer;
 }

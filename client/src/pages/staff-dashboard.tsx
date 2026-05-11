@@ -16,7 +16,8 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity, MessageSquare } from "lucide-react";
+import { GSHub } from "@/components/gs-hub";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import valetBanner6 from "@assets/ValetS-Banner6_1778475115501.png";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -573,8 +574,8 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
 }
 
 // ── Draggable, collapsible dashboard panel ──────────────────────────────────
-const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'ready', 'guest-out', 'departed-today', 'departed-history'];
-const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed-today', 'departed-history'];
+const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'ready', 'guest-out', 'gs-hub', 'departed-today', 'departed-history'];
+const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'gs-hub', 'departed-today', 'departed-history'];
 
 const SECTION_FONT_MIN = 10;
 const SECTION_FONT_MAX = 22;
@@ -1262,6 +1263,11 @@ export default function StaffDashboard() {
           const cancelled = data.data;
           setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== cancelled?.ticketNumber));
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+        }
+        if (['gs_message', 'gs_reply', 'gs_event_created', 'gs_event_updated', 'gs_event_deleted', 'gs_acknowledged', 'gs_member_added', 'gs_member_removed'].includes(data.type)) {
+          queryClient.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/gs/members/me"] });
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
@@ -2483,6 +2489,20 @@ export default function StaffDashboard() {
                           );
                         }
 
+                        if (panelId === 'gs-hub') return (
+                          <SortablePanel key="gs-hub" id="gs-hub"
+                            title="GS Hub"
+                            icon={<MessageSquare size={14} className="text-regis-gold" />}
+                            borderClass="border-regis-gold/30"
+                            expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('gs-hub')} onFontSizeChange={s => setSectionFont('gs-hub', s)}
+                          >
+                            <div className="mt-2">
+                              <GSHub />
+                            </div>
+                          </SortablePanel>
+                        );
+
                         return null;
                       })}
                     </div>
@@ -2983,6 +3003,21 @@ export default function StaffDashboard() {
                                 </>
                               );
                             })()}
+                          </SortablePanel>
+                        );
+
+                        if (panelId === 'gs-hub') return (
+                          <SortablePanel key="gs-hub" id="gs-hub"
+                            title="GS Hub"
+                            badge={<span className="ml-2 text-[10px] font-semibold bg-regis-gold/20 text-regis-navy px-2 py-0.5 rounded-full">Messaging & Calendar</span>}
+                            icon={<MessageSquare className="text-regis-gold" size={18} />}
+                            borderClass="border-regis-gold/30"
+                            expanded={isExpanded} onToggle={toggle}
+                            fontSize={getSectionFontSize('gs-hub')} onFontSizeChange={s => setSectionFont('gs-hub', s)}
+                          >
+                            <div className="mt-3">
+                              <GSHub />
+                            </div>
                           </SortablePanel>
                         );
 
