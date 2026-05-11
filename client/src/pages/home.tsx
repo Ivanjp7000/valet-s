@@ -76,7 +76,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 sm:py-4">
         {/* Compact View Toggle - visible on mobile only */}
         <div className="sm:hidden flex justify-end mb-3">
           <Button
@@ -277,7 +277,7 @@ export default function Home() {
           </div>
 
           {/* Banner image — desktop only, below the cards */}
-          <div className="hidden sm:flex justify-center mt-8 sm:mt-10">
+          <div className="hidden sm:flex justify-center mt-4 sm:mt-5">
             <img
               src={valetBanner}
               alt="Valet Service"
