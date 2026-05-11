@@ -675,6 +675,7 @@ export default function StaffDashboard() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [showVehicleRoster, setShowVehicleRoster] = useState(false);
+  const [showGSHub, setShowGSHub] = useState(false);
   const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
   const [rosterDate, setRosterDate] = useState<Date>(new Date());
   const [copiedRowId, setCopiedRowId] = useState<string | null>(null);
@@ -1711,10 +1712,19 @@ export default function StaffDashboard() {
                 size="sm"
                 variant={showVehicleRoster ? "default" : "outline"}
                 className={showVehicleRoster ? "bg-regis-navy text-white hover:bg-regis-navy/90" : "border-regis-navy text-regis-navy hover:bg-regis-navy/10"}
-                onClick={() => setShowVehicleRoster(v => !v)}
+                onClick={() => { setShowVehicleRoster(v => !v); setShowGSHub(false); }}
               >
                 <List size={16} className="mr-1 sm:mr-2" />
                 Vehicle Roster
+              </Button>
+              <Button
+                size="sm"
+                variant={showGSHub ? "default" : "outline"}
+                className={showGSHub ? "bg-regis-gold text-regis-navy hover:bg-regis-gold/90 font-semibold" : "border-regis-gold text-regis-navy hover:bg-regis-gold/10"}
+                onClick={() => { setShowGSHub(v => !v); setShowVehicleRoster(false); }}
+              >
+                <MessageSquare size={16} className="mr-1 sm:mr-2" />
+                GS Hub
               </Button>
               {user?.role === 'privilege_admin' && (
                 <Button
@@ -2146,7 +2156,14 @@ export default function StaffDashboard() {
               );
             })()}
 
-            {!showVehicleRoster && (<>
+            {/* GS Hub Inline Panel */}
+            {showGSHub && (
+              <div className="mt-2">
+                <GSHub user={user} />
+              </div>
+            )}
+
+            {!showVehicleRoster && !showGSHub && (<>
             {/* Standard View for Mobile */}
             <div className="space-y-3 sm:hidden">
                 {/* Compact Stats Row — tap any to jump to that section */}
