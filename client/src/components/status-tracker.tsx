@@ -129,7 +129,7 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
   const stages = [
     {
       id: 0,
-      name: "Retrieving Car",
+      name: "Locating Car",
       description: "Our valet is locating your vehicle",
       icon: Search,
     },
@@ -299,7 +299,7 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
           <div className="w-16 h-16 bg-regis-gold rounded-full flex items-center justify-center mx-auto mb-4">
             <Car className="text-white" size={24} />
           </div>
-          <h2 className="text-xl font-semibold mb-2">Retrieving Your Vehicle</h2>
+          <h2 className="text-xl font-semibold mb-2">Locating Your Vehicle</h2>
           <p className="text-blue-200 text-sm">Ticket #{ticketNumber}</p>
         </div>
 
