@@ -2118,7 +2118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/admin/licenses — issue new license (Super Admin)
   app.post('/api/admin/licenses', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const { ouId, orgName, address, contactNumber, version, notes } = req.body;
+      const { ouId, orgName, address, contactNumber, version, notes, validTo } = req.body;
       if (!ouId || !orgName || !address || !contactNumber || !version) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
@@ -2127,6 +2127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const licenseKey = generateLicenseKey(version);
       const license = await storage.createLicense({
         ouId, orgName, address, contactNumber, version, notes: notes || null,
+        validTo: validTo ? new Date(validTo) : null,
         licenseKey, spdxLicense: 'Apache-2.0', issuedBy: req.currentUser.id, isActive: true,
       });
       res.json(license);
@@ -2138,8 +2139,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PATCH /api/admin/licenses/:id — modify license (Super Admin)
   app.patch('/api/admin/licenses/:id', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const { orgName, address, contactNumber, version, notes, isActive } = req.body;
-      const updated = await storage.updateLicense(req.params.id, { orgName, address, contactNumber, version, notes, isActive });
+      const { orgName, address, contactNumber, version, notes, isActive, validTo } = req.body;
+      const updated = await storage.updateLicense(req.params.id, { orgName, address, contactNumber, version, notes, isActive, validTo: validTo ? new Date(validTo) : null });
       if (!updated) return res.status(404).json({ message: 'License not found' });
       res.json(updated);
     } catch (e) {

@@ -734,7 +734,7 @@ export default function StaffDashboard() {
   // License wizard state
   const [licenseWizardOpen, setLicenseWizardOpen] = useState(false);
   const [licenseWizardStep, setLicenseWizardStep] = useState(1);
-  const [licenseForm, setLicenseForm] = useState({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '' });
+  const [licenseForm, setLicenseForm] = useState({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '', validTo: '' });
   const [editLicenseId, setEditLicenseId] = useState<string | null>(null);
   const [brandingForm, setBrandingForm] = useState({ logoUrl: '', primaryColor: '#1a2744', accentColor: '#c9a84c' });
   const [showBranding, setShowBranding] = useState(false);
@@ -980,7 +980,7 @@ export default function StaffDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/licenses/my"] });
       setLicenseWizardOpen(false);
       setLicenseWizardStep(1);
-      setLicenseForm({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '' });
+      setLicenseForm({ ouId: '', orgName: '', address: '', contactNumber: '', version: 'professional', notes: '', validTo: '' });
       setEditLicenseId(null);
       toast({ title: "License issued", description: "A new software license has been issued successfully." });
     },
@@ -3835,13 +3835,13 @@ export default function StaffDashboard() {
 
               function openIssueWizard(ou?: OrganizationalUnit) {
                 setEditLicenseId(null);
-                setLicenseForm({ ouId: ou?.id ?? '', orgName: ou?.name ?? '', address: '', contactNumber: '', version: 'professional', notes: '' });
+                setLicenseForm({ ouId: ou?.id ?? '', orgName: ou?.name ?? '', address: '', contactNumber: '', version: 'professional', notes: '', validTo: '' });
                 setLicenseWizardStep(1);
                 setLicenseWizardOpen(true);
               }
               function openEditWizard(lic: OULicense) {
                 setEditLicenseId(lic.id);
-                setLicenseForm({ ouId: lic.ouId, orgName: lic.orgName, address: lic.address, contactNumber: lic.contactNumber, version: lic.version, notes: lic.notes ?? '' });
+                setLicenseForm({ ouId: lic.ouId, orgName: lic.orgName, address: lic.address, contactNumber: lic.contactNumber, version: lic.version, notes: lic.notes ?? '', validTo: lic.validTo ? new Date(lic.validTo).toISOString().split('T')[0] : '' });
                 setLicenseWizardStep(1);
                 setLicenseWizardOpen(true);
               }
@@ -4025,6 +4025,10 @@ export default function StaffDashboard() {
                             </Select>
                           </div>
                           <div>
+                            <label className="text-sm font-medium text-gray-700">Valid To <span className="text-gray-400 font-normal">(expiry date)</span></label>
+                            <Input type="date" className="mt-1" value={licenseForm.validTo} onChange={e => setLicenseForm(f => ({ ...f, validTo: e.target.value }))} />
+                          </div>
+                          <div>
                             <label className="text-sm font-medium text-gray-700">Internal Notes <span className="text-gray-400 font-normal">(optional)</span></label>
                             <textarea
                               className="w-full mt-1 border border-gray-300 rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -4054,6 +4058,7 @@ export default function StaffDashboard() {
                             <div className="flex justify-between"><span className="text-gray-500">Address</span><span className="font-medium text-right max-w-[55%]">{licenseForm.address}</span></div>
                             <div className="flex justify-between"><span className="text-gray-500">Contact</span><span className="font-medium">{licenseForm.contactNumber}</span></div>
                             <div className="flex justify-between"><span className="text-gray-500">Version</span><span className={`font-medium px-2 py-0.5 rounded text-xs ${licenseForm.version === 'enterprise' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{licenseForm.version === 'enterprise' ? 'Enterprise' : 'Professional'}</span></div>
+                            {licenseForm.validTo && <div className="flex justify-between"><span className="text-gray-500">Valid To</span><span className="font-medium">{new Date(licenseForm.validTo).toLocaleDateString()}</span></div>}
                             {licenseForm.notes && <div className="flex justify-between"><span className="text-gray-500">Notes</span><span className="font-medium text-right max-w-[55%]">{licenseForm.notes}</span></div>}
                             {!editLicenseId && <div className="flex justify-between pt-1 border-t mt-2"><span className="text-gray-500">Key (auto-generated)</span><span className="font-mono text-xs text-regis-navy">{licenseForm.version === 'enterprise' ? 'APL-ENT-XXXX-XXXX-XXXX' : 'APL-PRO-XXXX-XXXX-XXXX'}</span></div>}
                           </div>
@@ -4064,7 +4069,7 @@ export default function StaffDashboard() {
                               disabled={issueLicenseMutation.isPending || updateLicenseMutation.isPending}
                               onClick={() => {
                                 if (editLicenseId) {
-                                  updateLicenseMutation.mutate({ id: editLicenseId, data: { orgName: licenseForm.orgName, address: licenseForm.address, contactNumber: licenseForm.contactNumber, version: licenseForm.version, notes: licenseForm.notes } });
+                                  updateLicenseMutation.mutate({ id: editLicenseId, data: { orgName: licenseForm.orgName, address: licenseForm.address, contactNumber: licenseForm.contactNumber, version: licenseForm.version, notes: licenseForm.notes, validTo: licenseForm.validTo || null } });
                                 } else {
                                   issueLicenseMutation.mutate(licenseForm);
                                 }
@@ -4126,6 +4131,7 @@ export default function StaffDashboard() {
                               </span>
                             </div>
                             <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{lic.issuedAt ? new Date(lic.issuedAt).toLocaleDateString() : '—'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Valid To</p><p className="font-medium">{lic.validTo ? new Date(lic.validTo).toLocaleDateString() : '—'}</p></div>
                           </div>
                           <div>
                             <p className="text-gray-500 text-xs mb-1">License Key</p>
@@ -4234,6 +4240,7 @@ export default function StaffDashboard() {
                           </span>
                         </div>
                         <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{myLicense.issuedAt ? new Date(myLicense.issuedAt).toLocaleDateString() : '—'}</p></div>
+                        <div><p className="text-gray-500 text-xs">Valid To</p><p className="font-medium">{myLicense.validTo ? new Date(myLicense.validTo).toLocaleDateString() : '—'}</p></div>
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs mb-1">License Key</p>

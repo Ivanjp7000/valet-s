@@ -175,6 +175,7 @@ export const ouLicenses = pgTable("ou_licenses", {
   issuedBy: varchar("issued_by").references(() => users.id),
   isActive: boolean("is_active").default(true),
   notes: text("notes"),
+  validTo: timestamp("valid_to"),
   issuedAt: timestamp("issued_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
