@@ -16,7 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
-import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity, MessageSquare } from "lucide-react";
+import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity, MessageSquare, Mail } from "lucide-react";
 import { GSHub } from "@/components/gs-hub";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import valetBanner6 from "@assets/ValetS-Banner6_1778475115501.png";
