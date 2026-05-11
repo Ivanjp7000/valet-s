@@ -102,12 +102,21 @@ async function printNameLabel(guestName: string): Promise<void> {
     color: rgb(0.1, 0.12, 0.27),
   });
 
-  // ── Open PDF ──────────────────────────────────────────────────
+  // ── Save / open PDF ───────────────────────────────────────────
+  // On iPhone, window.open() shares a blob:// URL which Phomemo cannot receive.
+  // Triggering a download saves the real PDF file so the user can open it
+  // from the Files app → Share → Phomemo → Print.
   const pdfBytes = await doc.save();
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const blob    = new Blob([pdfBytes], { type: 'application/pdf' });
   const blobUrl = URL.createObjectURL(blob);
-  const win = window.open(blobUrl, '_blank');
-  if (win) win.focus();
+
+  const a = document.createElement('a');
+  a.href     = blobUrl;
+  a.download = 'valet-label.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
   setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 }
 
