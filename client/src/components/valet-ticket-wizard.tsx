@@ -29,16 +29,10 @@ const fmtGuest = (name: string | null | undefined) =>
  * Opens as a PDF in a new tab — works with any AirPrint / Phomemo-compatible
  * printer on iPhone, Android, or desktop (Phomemo app or browser print dialog).
  */
-async function printNameLabel(guestName: string): Promise<void> {
-  // Open the window SYNCHRONOUSLY (before any await) so the browser
-  // doesn't treat it as a popup from an async context and block it.
-  const win = window.open('', '_blank');
-  if (!win) {
-    alert('Pop-ups are blocked. Please allow pop-ups for this site and try again.');
-    return;
-  }
-  win.document.write('<html><body style="margin:0;background:#e5e5e5;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#555">Generating label…</body></html>');
-  win.document.close();
+async function printNameLabel(
+  guestName: string,
+  setDataUrl: (url: string) => void,
+): Promise<void> {
 
   // 30mm × 38mm at 300 DPI → 354 × 449 px canvas
   const DPI    = 300;
@@ -103,51 +97,8 @@ async function printNameLabel(guestName: string): Promise<void> {
   ctx.fillText(displayName, W / 2, H - pad);
 
   // ── Share / display the label ────────────────────────────────
-  // On iPhone: use Web Share API to send the real PNG file directly to
-  // Phomemo (or any app) via the native iOS share sheet.
-  // On desktop: fall back to showing the image in the already-open tab.
-  const blob: Blob = await new Promise(resolve =>
-    canvas.toBlob(b => resolve(b!), 'image/png')
-  );
-
-  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-  if (isMobile && navigator.canShare) {
-    const file = new File([blob], 'valet-label.png', { type: 'image/png' });
-    if (navigator.canShare({ files: [file] })) {
-      win.close();   // close the placeholder tab — not needed on mobile
-      await navigator.share({ files: [file], title: 'Valet Label' });
-      return;
-    }
-  }
-
-  // Desktop fallback — show image + instructions in the open tab
-  const dataUrl = URL.createObjectURL(blob);
-  win.document.open();
-  win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Valet Label</title>
-  <style>
-    body{margin:0;background:#e5e5e5;display:flex;flex-direction:column;
-         align-items:center;justify-content:center;min-height:100vh;
-         font-family:sans-serif;padding:20px;box-sizing:border-box}
-    img{border:1px solid #ccc;box-shadow:0 2px 12px rgba(0,0,0,.2);
-        width:177px;height:224px;display:block}
-    .tip{margin-top:18px;background:#fff;border-radius:10px;padding:14px 18px;
-         max-width:320px;font-size:14px;color:#333;line-height:1.7;text-align:center}
-    .tip b{color:#111}
-  </style>
-</head>
-<body>
-  <img src="${dataUrl}" alt="Valet Label">
-  <div class="tip">
-    <b>Desktop:</b> Ctrl/Cmd+P → select Phomemo M110s<br>
-    → set paper size 30×38mm → Print
-  </div>
-</body>
-</html>`);
-  win.document.close();
+  // Pass the finished image back to the React component to show in a dialog
+  setDataUrl(canvas.toDataURL('image/png'));
 }
 
 /**
@@ -356,6 +307,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
+  const [labelDataUrl, setLabelDataUrl] = useState<string | null>(null);
   const [carMakeSearch, setCarMakeSearch] = useState("");
   const [showCarMakeDropdown, setShowCarMakeDropdown] = useState(false);
   const [showBrandGrid, setShowBrandGrid] = useState(true);
@@ -635,9 +587,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </button>
           <button
             type="button"
-            title="Print name label — Phomemo M110s&#10;iPhone/Android: tap Share → Open in Phomemo app → Print&#10;Desktop: Ctrl+P → select Phomemo M110s → set paper 50×70mm"
             disabled={!formData.guestName.trim()}
-            onClick={() => printNameLabel(formData.guestName)}
+            onClick={() => printNameLabel(formData.guestName, setLabelDataUrl)}
             className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-500 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Printer size={12} />
@@ -1386,6 +1337,37 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         }}
         onClose={() => setShowTicketScanner(false)}
       />
+    )}
+
+    {/* Label preview dialog */}
+    {labelDataUrl && (
+      <Dialog open={!!labelDataUrl} onOpenChange={() => setLabelDataUrl(null)}>
+        <DialogContent className="max-w-xs text-center">
+          <DialogHeader>
+            <DialogTitle>Name Label</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-2">
+            <img
+              src={labelDataUrl}
+              alt="Valet label"
+              style={{ width: 177, height: 224, border: '1px solid #ddd', borderRadius: 4 }}
+            />
+            <div className="text-sm text-gray-600 bg-amber-50 border border-amber-200 rounded-lg p-3 text-left leading-relaxed">
+              <p className="font-semibold text-amber-800 mb-1">iPhone → Phomemo</p>
+              <p>1. <b>Long-press</b> the image above</p>
+              <p>2. Tap <b>"Save to Photos"</b></p>
+              <p>3. Open <b>Phomemo app</b></p>
+              <p>4. Find the image in your photos &amp; print</p>
+            </div>
+            <button
+              onClick={() => setLabelDataUrl(null)}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Close
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     )}
     </>
   );
