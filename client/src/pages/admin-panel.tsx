@@ -1408,10 +1408,10 @@ export default function AdminPanel() {
               })();
 
               const statusCounts = [
-                { name: 'In House', value: tickets.filter(t => t.status === 'active').length, color: '#1e3a5f' },
+                { name: 'Cars Parked On-Site', value: tickets.filter(t => t.status === 'active').length, color: '#1e3a5f' },
                 { name: 'Retrieving', value: tickets.filter(t => t.status === 'retrieving' || t.status === 'transit').length, color: '#f59e0b' },
                 { name: 'Ready', value: tickets.filter(t => t.status === 'ready').length, color: '#10b981' },
-                { name: 'Car Will Return', value: tickets.filter(t => t.status === 'out_with_guest').length, color: '#3b82f6' },
+                { name: 'Out Returning Later', value: tickets.filter(t => t.status === 'out_with_guest').length, color: '#3b82f6' },
                 { name: 'Departed', value: tickets.filter(t => t.status === 'completed').length, color: '#6b7280' },
               ].filter(s => s.value > 0);
 

@@ -1218,7 +1218,7 @@ export default function StaffDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
-      toast({ title: "Welcome Back", description: "Guest has returned, car moved to In House" });
+      toast({ title: "Welcome Back", description: "Guest has returned, car moved to Cars Parked On-Site" });
     },
   });
 
@@ -2028,7 +2028,7 @@ export default function StaffDashboard() {
                   {/* Footer totals */}
                   <div className="border border-t-0 border-black px-3 py-1 bg-gray-50 flex justify-between text-xs text-gray-500">
                     <span>合計 Total: {tickets.length} 台</span>
-                    <span>In House: {tickets.filter(t => !['completed','cancelled'].includes(t.status)).length} · Departed: {tickets.filter(t => t.status === 'completed').length}</span>
+                    <span>Cars Parked On-Site: {tickets.filter(t => !['completed','cancelled'].includes(t.status)).length} · Departed: {tickets.filter(t => t.status === 'completed').length}</span>
                   </div>
                 </div>
               );
@@ -2237,14 +2237,14 @@ export default function StaffDashboard() {
                           onClick={() => scrollToPanel('in-house')}
                         >
                           <p style={{ fontSize: numSz }} className="font-extrabold text-blue-700 leading-none">{activeTickets?.filter(t => t.status === 'active').length || 0}</p>
-                          <p style={{ fontSize: lblSz }} className="text-blue-600 font-semibold leading-tight mt-1">Cars In House</p>
+                          <p style={{ fontSize: lblSz }} className="text-blue-600 font-semibold leading-tight mt-1">Cars Parked On-Site</p>
                         </button>
                         <button
                           className="rounded-xl border-2 border-indigo-400 bg-indigo-50 active:bg-indigo-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
                           onClick={() => scrollToPanel('guest-out')}
                         >
                           <p style={{ fontSize: numSz }} className="font-extrabold text-indigo-700 leading-none">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</p>
-                          <p style={{ fontSize: lblSz }} className="text-indigo-600 font-semibold leading-tight mt-1">Car Will Return</p>
+                          <p style={{ fontSize: lblSz }} className="text-indigo-600 font-semibold leading-tight mt-1">Out Returning Later</p>
                         </button>
                         <button
                           className="rounded-xl border-2 border-amber-400 bg-amber-50 active:bg-amber-100 p-2.5 text-center w-full focus:outline-none shadow-sm"
@@ -2356,7 +2356,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'guest-out') return (
                           <SortablePanel key="guest-out" id="guest-out"
-                            title={`Car Will Return (${activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})`}
+                            title={`Out Returning Later (${activeTickets?.filter(t => t.status === 'out_with_guest').length || 0})`}
                             icon={<Car size={14} />} borderClass="border-blue-200" headerClass="text-blue-700"
                             expanded={isExpanded} onToggle={toggle}
                             fontSize={getSectionFontSize('guest-out')} onFontSizeChange={s => setSectionFont('guest-out', s)}
@@ -2400,7 +2400,7 @@ export default function StaffDashboard() {
                           );
                           return (
                             <SortablePanel key="in-house" id="in-house"
-                              title={`In House (${allActive.length})`}
+                              title={`Cars Parked On-Site (${allActive.length})`}
                               icon={<Clock size={14} />}
                               expanded={isExpanded} onToggle={toggle}
                               fontSize={getSectionFontSize('in-house')} onFontSizeChange={s => setSectionFont('in-house', s)}
@@ -2760,7 +2760,7 @@ export default function StaffDashboard() {
                           );
                           return (
                             <SortablePanel key="in-house" id="in-house"
-                              title="In House"
+                              title="Cars Parked On-Site"
                               badge={<Badge className="bg-regis-navy text-white text-sm px-3 py-1 ml-2">{allActiveD.length}</Badge>}
                               icon={<Clock className="text-regis-navy" size={18} />}
                               expanded={isExpanded} onToggle={toggle}
@@ -2914,7 +2914,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'guest-out') return (
                           <SortablePanel key="guest-out" id="guest-out"
-                            title="Car Will Return"
+                            title="Out Returning Later"
                             badge={<Badge className="bg-blue-600 text-white text-sm px-3 py-1 ml-2">{activeTickets?.filter(t => t.status === 'out_with_guest').length || 0}</Badge>}
                             icon={<Car className="text-blue-700" size={18} />}
                             borderClass="border-blue-200" headerClass="text-blue-700"
@@ -3347,10 +3347,10 @@ export default function StaffDashboard() {
 
                 // Status pie data
                 const statusCounts = [
-                  { name: 'In House', value: allTickets.filter(t => t.status === 'active').length, color: '#1e3a5f' },
+                  { name: 'Cars Parked On-Site', value: allTickets.filter(t => t.status === 'active').length, color: '#1e3a5f' },
                   { name: 'Retrieving', value: allTickets.filter(t => t.status === 'retrieving' || t.status === 'transit').length, color: '#f59e0b' },
                   { name: 'Ready', value: allTickets.filter(t => t.status === 'ready').length, color: '#10b981' },
-                  { name: 'Car Will Return', value: allTickets.filter(t => t.status === 'out_with_guest').length, color: '#3b82f6' },
+                  { name: 'Out Returning Later', value: allTickets.filter(t => t.status === 'out_with_guest').length, color: '#3b82f6' },
                   { name: 'Departed', value: allTickets.filter(t => t.status === 'completed').length, color: '#6b7280' },
                 ].filter(s => s.value > 0);
 
