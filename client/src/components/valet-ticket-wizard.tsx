@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, ScanLine
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, ScanLine, Printer
 } from "lucide-react";
+import qrCodeUrl from "@/assets/qr-valet-s.jpg";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -22,6 +23,104 @@ const stripHonorifics = (name: string) =>
   name.replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
 const fmtGuest = (name: string | null | undefined) =>
   name ? stripHonorifics(name) + ' 様' : '';
+
+/**
+ * Print a 50×70mm name label on a Phomemo thermal printer.
+ * Opens as a PDF in a new tab — works with any AirPrint / Phomemo-compatible
+ * printer on iPhone, Android, or desktop (Phomemo app or browser print dialog).
+ */
+async function printNameLabel(guestName: string): Promise<void> {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+
+  // 50mm × 70mm in points (1 pt = 1/72 inch, 1 mm ≈ 2.8346 pt)
+  const mmToPt = (mm: number) => mm * 2.8346;
+  const W = mmToPt(50);  // 141.73
+  const H = mmToPt(70);  // 198.43
+
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([W, H]);
+  page.setMediaBox(0, 0, W, H);
+
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const font    = await doc.embedFont(StandardFonts.Helvetica);
+
+  // Embed QR code image
+  let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
+  try {
+    const resp = await fetch(qrCodeUrl);
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    try { qrImage = await doc.embedJpg(bytes); } catch {
+      qrImage = await doc.embedPng(bytes);
+    }
+  } catch { /* skip QR if fetch fails */ }
+
+  const padding = mmToPt(3);
+  const innerW = W - padding * 2;
+
+  // ── Guest name ────────────────────────────────────────────────
+  const displayName = guestName.trim();
+  const maxNameSize = 13;
+  let nameSize = maxNameSize;
+  while (nameSize > 7 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) {
+    nameSize -= 0.5;
+  }
+  const nameY = H - padding - nameSize;
+  page.drawText(displayName, {
+    x: padding + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
+    y: nameY,
+    font: fontBold,
+    size: nameSize,
+    color: rgb(0.1, 0.12, 0.27),
+  });
+
+  // ── Divider ───────────────────────────────────────────────────
+  const divY = nameY - mmToPt(2);
+  page.drawRectangle({ x: padding, y: divY, width: innerW, height: 0.5, color: rgb(0.79, 0.66, 0.3) });
+
+  // ── QR code ───────────────────────────────────────────────────
+  const qrSize = mmToPt(26);
+  const qrY = divY - mmToPt(1.5) - qrSize;
+  if (qrImage) {
+    page.drawImage(qrImage, {
+      x: (W - qrSize) / 2,
+      y: qrY,
+      width: qrSize,
+      height: qrSize,
+    });
+  }
+
+  // ── "Visit" label ─────────────────────────────────────────────
+  const visitText = 'Visit';
+  const visitSize = 7;
+  const visitY = qrY - mmToPt(2);
+  page.drawText(visitText, {
+    x: padding + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
+    y: visitY,
+    font,
+    size: visitSize,
+    color: rgb(0.45, 0.45, 0.45),
+  });
+
+  // ── Valet-s.com URL ───────────────────────────────────────────
+  const urlText = 'Valet-s.com';
+  const urlSize = 9;
+  const urlY = visitY - urlSize - mmToPt(0.5);
+  page.drawText(urlText, {
+    x: padding + (innerW - fontBold.widthOfTextAtSize(urlText, urlSize)) / 2,
+    y: urlY,
+    font: fontBold,
+    size: urlSize,
+    color: rgb(0.1, 0.12, 0.27),
+  });
+
+  // ── Open PDF ──────────────────────────────────────────────────
+  const pdfBytes = await doc.save();
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if (win) win.focus();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 
 /**
  * Prepares a plate image for Google Cloud Vision API:
@@ -492,19 +591,31 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            const first = ["Aiden","Blake","Cameron","Dakota","Ellis","Finley","Gray","Harper","Indigo","Jordan","Kendall","Logan","Morgan","Noah","Oakley","Parker","Quinn","Reese","Sage","Taylor","River","Avery","Casey","Drew","Emery","Fallon","Haven","Juno","Kai","Lane","Marlowe","Noel","Onyx","Piper","Remy","Scout","Sloane","Spencer","Sterling","Wynne"];
-            const last = ["Ashford","Bennett","Calloway","Davenport","Elsworth","Fairfax","Graham","Harrington","Ingram","Jennings","Kensington","Langley","Merritt","Northcott","Ogilvy","Pemberton","Quinlan","Radcliffe","Stanton","Thornton","Upton","Vane","Whitmore","Xavier","Yardley","Zealand"];
-            const name = `Mx. ${first[Math.floor(Math.random()*first.length)]} ${last[Math.floor(Math.random()*last.length)]}`;
-            setFormData({ ...formData, guestName: name });
-          }}
-          className="mt-2 inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 rounded-md px-2.5 py-1 transition-colors"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 1 0 5 5"/><path d="M12 2v4m0 0a5 5 0 0 1 5 5"/><circle cx="12" cy="17" r="5"/></svg>
-          Generate Name
-        </button>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const first = ["Aiden","Blake","Cameron","Dakota","Ellis","Finley","Gray","Harper","Indigo","Jordan","Kendall","Logan","Morgan","Noah","Oakley","Parker","Quinn","Reese","Sage","Taylor","River","Avery","Casey","Drew","Emery","Fallon","Haven","Juno","Kai","Lane","Marlowe","Noel","Onyx","Piper","Remy","Scout","Sloane","Spencer","Sterling","Wynne"];
+              const last = ["Ashford","Bennett","Calloway","Davenport","Elsworth","Fairfax","Graham","Harrington","Ingram","Jennings","Kensington","Langley","Merritt","Northcott","Ogilvy","Pemberton","Quinlan","Radcliffe","Stanton","Thornton","Upton","Vane","Whitmore","Xavier","Yardley","Zealand"];
+              const name = `Mx. ${first[Math.floor(Math.random()*first.length)]} ${last[Math.floor(Math.random()*last.length)]}`;
+              setFormData({ ...formData, guestName: name });
+            }}
+            className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 rounded-md px-2.5 py-1 transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 1 0 5 5"/><path d="M12 2v4m0 0a5 5 0 0 1 5 5"/><circle cx="12" cy="17" r="5"/></svg>
+            Generate Name
+          </button>
+          <button
+            type="button"
+            title="Print name label (Phomemo)"
+            disabled={!formData.guestName.trim()}
+            onClick={() => printNameLabel(formData.guestName)}
+            className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-500 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Printer size={12} />
+            Print Label
+          </button>
+        </div>
       </div>
 
       <div>
