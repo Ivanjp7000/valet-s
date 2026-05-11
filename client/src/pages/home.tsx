@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Crown, LogOut, Minimize2, Maximize2, Gauge, ShieldCheck, SlidersHorizontal, BookOpen, LayoutDashboard, Building, MapPin, Users } from "lucide-react";
 import { Link } from "wouter";
+import valetBanner from "@assets/ValetS-Banner1_1778463992078.png";
 import { useQuery } from "@tanstack/react-query";
 import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
 
@@ -50,8 +51,8 @@ export default function Home() {
     <div className="min-h-screen bg-soft-gray">
       <div className="bg-regis-navy text-white">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center flex-shrink-0">
               <Crown className="text-regis-navy" size={24} />
             </div>
             <div>
@@ -63,6 +64,13 @@ export default function Home() {
                 </Badge>
               </div>
             </div>
+            {/* Banner image — desktop only */}
+            <img
+              src={valetBanner}
+              alt="Valet Service"
+              className="hidden sm:block h-14 w-auto rounded-lg object-cover ml-4"
+              style={{ maxWidth: 260 }}
+            />
           </div>
           <a
             href="/api/logout"
