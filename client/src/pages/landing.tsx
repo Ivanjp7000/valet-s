@@ -26,7 +26,7 @@ export default function Landing() {
   const [showCamera, setShowCamera] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showSystemLogin, setShowSystemLogin] = useState(false);
+  const [showSystemLogin, setShowSystemLogin] = useState(() => new URLSearchParams(window.location.search).get("login") === "1");
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");

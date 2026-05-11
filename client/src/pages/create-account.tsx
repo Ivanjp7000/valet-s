@@ -194,7 +194,7 @@ export default function CreateAccount() {
             Already have an account?{" "}
             <button
               className="underline hover:text-gray-600"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/?login=1")}
             >
               Log in
             </button>
