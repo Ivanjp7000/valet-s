@@ -391,7 +391,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</span>
+            <span className="font-bold text-regis-navy cursor-pointer select-none" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }} onClick={onToggleCollapse}>#{ticket.ticketNumber}</span>
             <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${
               ticket.parkingLocation
                 ? 'bg-green-100 text-green-700 border border-green-300'
