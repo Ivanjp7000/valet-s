@@ -424,11 +424,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ST_REGIS_OSAKA_OU_ID = 'dd16ee22-1d40-4db2-8cde-6a726673451a';
       const newStatus = isStRegis ? 'active' : 'pending_approval';
 
+      // Only assign to St. Regis Osaka OU if @stregis.com — others wait for manual approval with no OU
       await storage.updateUser(user.id, {
         accountStatus: newStatus,
         emailVerificationToken: null as any,
         emailVerificationExpiresAt: null as any,
-        ouId: ST_REGIS_OSAKA_OU_ID,
+        ...(isStRegis ? { ouId: ST_REGIS_OSAKA_OU_ID } : {}),
       } as any);
 
       if (isStRegis) {

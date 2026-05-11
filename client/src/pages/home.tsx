@@ -28,6 +28,18 @@ export default function Home() {
     enabled: user?.role === 'superadmin',
   });
 
+  const { data: pendingCount = 0 } = useQuery<number>({
+    queryKey: ["/api/admin/pending-registrations"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/pending-registrations", { credentials: "include" });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return Array.isArray(data) ? data.length : 0;
+    },
+    enabled: user?.role === 'superadmin',
+    refetchInterval: 30000,
+  });
+
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'superadmin': return 'Super Admin';
@@ -113,19 +125,29 @@ export default function Home() {
             {/* Compact Admin Panel */}
             {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
               <Link href="/admin">
-                <div className="bg-white border rounded-lg p-3 flex items-center gap-3 shadow-sm active:bg-gray-50">
-                  <div className="w-10 h-10 bg-regis-gold/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="bg-white border rounded-lg p-3 flex items-center gap-3 shadow-sm active:bg-gray-50 relative">
+                  <div className="w-10 h-10 bg-regis-gold/20 rounded-full flex items-center justify-center flex-shrink-0 relative">
                     {user?.role === 'superadmin' ? (
                       <ShieldCheck className="text-regis-gold" size={20} />
                     ) : (
                       <SlidersHorizontal className="text-regis-gold" size={20} />
                     )}
+                    {pendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                        {pendingCount}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-regis-navy text-sm">
+                    <h3 className="font-semibold text-regis-navy text-sm flex items-center gap-2">
                       {user?.role === 'superadmin' ? 'Super Admin' : 'Admin Panel'}
+                      {pendingCount > 0 && (
+                        <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">{pendingCount} pending</span>
+                      )}
                     </h3>
-                    <p className="text-xs text-gray-500 truncate">Manage settings & users</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {pendingCount > 0 ? `${pendingCount} user${pendingCount > 1 ? "s" : ""} waiting for approval` : "Manage settings & users"}
+                    </p>
                   </div>
                   <Button size="sm" className="bg-regis-gold hover:bg-yellow-600 text-regis-navy text-xs px-3" data-testid="button-admin-panel-compact">
                     Open
@@ -197,16 +219,28 @@ export default function Home() {
             {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
               <Card className="shadow-lg" data-testid="card-admin-panel" style={{ transform: 'scale(0.93)', transformOrigin: 'top center' }}>
                 <CardContent className="p-6 sm:p-8 text-center">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-regis-gold/20 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                    {user?.role === 'superadmin' ? (
-                      <ShieldCheck className="text-regis-gold" size={28} />
-                    ) : (
-                      <SlidersHorizontal className="text-regis-gold" size={28} />
+                  <div className="relative w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4">
+                    <div className="w-full h-full bg-regis-gold/20 rounded-full flex items-center justify-center">
+                      {user?.role === 'superadmin' ? (
+                        <ShieldCheck className="text-regis-gold" size={28} />
+                      ) : (
+                        <SlidersHorizontal className="text-regis-gold" size={28} />
+                      )}
+                    </div>
+                    {pendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                        {pendingCount}
+                      </span>
                     )}
                   </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-regis-navy mb-2">
+                  <h2 className="text-lg sm:text-xl font-semibold text-regis-navy mb-1">
                     {user?.role === 'superadmin' ? 'Super Admin Panel' : 'Admin Panel'}
                   </h2>
+                  {pendingCount > 0 && (
+                    <p className="text-sm font-semibold text-red-600 mb-1">
+                      {pendingCount} user{pendingCount > 1 ? "s" : ""} waiting for approval
+                    </p>
+                  )}
                   <p className="text-gray-600 mb-4 sm:mb-6 text-xs sm:text-sm">
                     {user?.role === 'superadmin'
                       ? 'Manage organizations, locations, all users, and system settings'
