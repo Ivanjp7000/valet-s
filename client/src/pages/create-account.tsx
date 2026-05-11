@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Loader2, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 
 function generateCaptcha() {
   const a = Math.floor(Math.random() * 9) + 1;
@@ -46,15 +45,26 @@ export default function CreateAccount() {
 
     setIsLoading(true);
     try {
-      const data = await apiRequest("POST", "/api/auth/register", {
-        fullName: fullName.trim(),
-        email: email.trim(),
-        captchaAnswer: Number(captchaAnswer),
-        captchaExpected: captcha.answer,
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          email: email.trim(),
+          captchaAnswer: Number(captchaAnswer),
+          captchaExpected: captcha.answer,
+        }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Registration failed. Please try again.");
+        refreshCaptcha();
+        return;
+      }
       setSuccess({ message: data.message, isStRegis: data.isStRegis });
     } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+      setError("Registration failed. Please try again.");
       refreshCaptcha();
     } finally {
       setIsLoading(false);
