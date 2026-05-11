@@ -86,7 +86,7 @@ async function printNameLabel(guestName: string): Promise<void> {
   const url      = URL.createObjectURL(blob);
   const a        = document.createElement('a');
   a.href         = url;
-  a.download     = `valet-label-${guestName.trim().replace(/\s+/g, '-')}.pdf`;
+  a.download     = `${guestName.trim()}.pdf`;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
