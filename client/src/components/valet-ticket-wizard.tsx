@@ -30,94 +30,104 @@ const fmtGuest = (name: string | null | undefined) =>
  * printer on iPhone, Android, or desktop (Phomemo app or browser print dialog).
  */
 async function printNameLabel(guestName: string): Promise<void> {
-  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+  // 30mm × 38mm at 300 DPI → 354 × 449 px canvas
+  const DPI    = 300;
+  const mmToPx = (mm: number) => Math.round((mm / 25.4) * DPI);
 
-  // 30mm wide × 38mm tall — portrait orientation, matches 30mm roll on M110s
-  // (1 pt = 1/72 inch; 1 mm ≈ 2.8346 pt)
-  const mmToPt = (mm: number) => mm * 2.8346;
-  const W = mmToPt(30);  // 85.0 pt
-  const H = mmToPt(38);  // 107.7 pt
+  const W = mmToPx(30);  // 354 px
+  const H = mmToPx(38);  // 449 px
 
-  const doc = await PDFDocument.create();
-  const page = doc.addPage([W, H]);
-  page.setMediaBox(0, 0, W, H);
+  const canvas  = document.createElement('canvas');
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
 
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const font     = await doc.embedFont(StandardFonts.Helvetica);
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
 
-  // Embed QR code image
-  let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
-  try {
-    const resp  = await fetch(qrCodeUrl);
-    const bytes = new Uint8Array(await resp.arrayBuffer());
-    try { qrImage = await doc.embedJpg(bytes); } catch {
-      qrImage = await doc.embedPng(bytes);
-    }
-  } catch { /* skip QR gracefully */ }
+  const pad    = mmToPx(2);      // ~24 px
+  const innerW = W - pad * 2;    // ~306 px
 
-  const pad    = mmToPt(2);      // 2 mm padding all sides
-  const innerW = W - pad * 2;    // 73.7 pt usable width
+  // Load QR code image
+  const loadImg = (src: string): Promise<HTMLImageElement> =>
+    new Promise((res, rej) => {
+      const img = new Image();
+      img.onload  = () => res(img);
+      img.onerror = rej;
+      img.src = src;
+    });
 
-  let cursor = H - pad;          // start drawing from top
+  let qrImg: HTMLImageElement | null = null;
+  try { qrImg = await loadImg(qrCodeUrl); } catch { /* skip */ }
+
+  let cursor = pad;  // y increases downward
 
   // ── QR code (18 mm square, centred) ──────────────────────────
-  const qrSize = mmToPt(18);
-  if (qrImage) {
-    page.drawImage(qrImage, {
-      x: (W - qrSize) / 2,
-      y: cursor - qrSize,
-      width: qrSize,
-      height: qrSize,
-    });
-  }
-  cursor -= qrSize + mmToPt(1.5);
+  const qrSize = mmToPx(18);  // ~213 px
+  if (qrImg) ctx.drawImage(qrImg, (W - qrSize) / 2, cursor, qrSize, qrSize);
+  cursor += qrSize + mmToPx(1.5);
 
-  // ── "Visit  Valet-s.com" ──────────────────────────────────────
-  const visitLabel = 'Visit  Valet-s.com';
-  const visitSize  = 5.5;
-  page.drawText(visitLabel, {
-    x: pad + (innerW - font.widthOfTextAtSize(visitLabel, visitSize)) / 2,
-    y: cursor - visitSize,
-    font,
-    size: visitSize,
-    color: rgb(0.35, 0.35, 0.35),
-  });
-  cursor -= visitSize + mmToPt(1.5);
+  // ── "Visit Valet-s.com" ───────────────────────────────────────
+  const visitPx = mmToPx(1.8);  // ~21 px
+  ctx.font      = `${visitPx}px Arial, sans-serif`;
+  ctx.fillStyle = '#666666';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Visit  Valet-s.com', W / 2, cursor);
+  cursor += visitPx + mmToPx(1.5);
 
   // ── Gold divider ──────────────────────────────────────────────
-  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: rgb(0.79, 0.66, 0.3) });
-  cursor -= mmToPt(1.5);
+  ctx.fillStyle = '#c9a84c';
+  ctx.fillRect(pad, cursor, innerW, 2);
+  cursor += 2 + mmToPx(1.5);
 
-  // ── Guest name (bottom) ───────────────────────────────────────
+  // ── Guest name — pinned to bottom ─────────────────────────────
   const displayName = guestName.trim();
-  let nameSize = 9;
-  while (nameSize > 5 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) {
-    nameSize -= 0.5;
+  let namePx = mmToPx(3.5);  // ~41 px ≈ bold 9 pt
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold ${namePx}px Arial, sans-serif`;
+  while (namePx > mmToPx(2) && ctx.measureText(displayName).width > innerW) {
+    namePx -= 1;
+    ctx.font = `bold ${namePx}px Arial, sans-serif`;
   }
-  page.drawText(displayName, {
-    x: pad + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
-    y: cursor - nameSize,
-    font: fontBold,
-    size: nameSize,
-    color: rgb(0.1, 0.12, 0.27),
-  });
+  ctx.fillStyle = '#1a1f45';
+  ctx.textAlign = 'center';
+  ctx.fillText(displayName, W / 2, H - pad);
 
-  // ── Save / open PDF ───────────────────────────────────────────
-  // On iPhone, window.open() shares a blob:// URL which Phomemo cannot receive.
-  // Triggering a download saves the real PDF file so the user can open it
-  // from the Files app → Share → Phomemo → Print.
-  const pdfBytes = await doc.save();
-  const blob    = new Blob([pdfBytes], { type: 'application/pdf' });
-  const blobUrl = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href     = blobUrl;
-  a.download = 'valet-label.pdf';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  // ── Open image in new tab with iPhone instructions ─────────────
+  const dataUrl = canvas.toDataURL('image/png');
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Valet Label</title>
+  <style>
+    body{margin:0;background:#e5e5e5;display:flex;flex-direction:column;
+         align-items:center;justify-content:center;min-height:100vh;
+         font-family:sans-serif;padding:20px;box-sizing:border-box}
+    img{border:1px solid #ccc;box-shadow:0 2px 12px rgba(0,0,0,.2);
+        width:177px;height:224px}
+    .tip{margin-top:18px;background:#fff;border-radius:10px;padding:14px 18px;
+         max-width:320px;font-size:14px;color:#333;line-height:1.6;text-align:center}
+    .tip b{color:#111}
+  </style>
+</head>
+<body>
+  <img src="${dataUrl}" alt="Valet Label">
+  <div class="tip">
+    <b>iPhone → Phomemo:</b><br>
+    Long-press the image above<br>
+    → <b>Save to Photos</b><br>
+    Then open <b>Phomemo app</b><br>
+    → Print from Album → select image → Print
+  </div>
+</body>
+</html>`);
+    win.document.close();
+  }
 }
 
 /**
