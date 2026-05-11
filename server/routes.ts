@@ -99,28 +99,18 @@ function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Resend integration — credential proxy (never cached; tokens expire)
-async function getResendClient(): Promise<{ client: Resend; fromEmail: string }> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? 'repl ' + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL
-    : null;
-  if (!xReplitToken) throw new Error('X-Replit-Token not found for repl/depl');
-  const connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
-    { headers: { 'Accept': 'application/json', 'X-Replit-Token': xReplitToken } }
-  ).then(r => r.json()).then((d: any) => d.items?.[0]);
-  if (!connectionSettings?.settings?.api_key) throw new Error('Resend not connected');
+// Resend client — uses RESEND_API_KEY secret directly
+function getResendClient(): { client: Resend; fromEmail: string } {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY is not set');
   return {
-    client: new Resend(connectionSettings.settings.api_key),
-    fromEmail: connectionSettings.settings.from_email || 'noreply@resend.dev',
+    client: new Resend(apiKey),
+    fromEmail: 'onboarding@resend.dev',
   };
 }
 
 async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
-  const { client, fromEmail } = await getResendClient();
+  const { client, fromEmail } = getResendClient();
   await client.emails.send({
     from: fromEmail,
     to: toEmail,
@@ -145,7 +135,7 @@ async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
 }
 
 async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullName: string): Promise<void> {
-  const { client, fromEmail } = await getResendClient();
+  const { client, fromEmail } = getResendClient();
   await client.emails.send({
     from: fromEmail,
     to: toEmail,
@@ -174,7 +164,7 @@ async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullNam
 }
 
 async function sendWelcomeEmail(toEmail: string, fullName: string): Promise<void> {
-  const { client, fromEmail } = await getResendClient();
+  const { client, fromEmail } = getResendClient();
   const loginUrl = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000';
   await client.emails.send({
     from: fromEmail,
@@ -208,7 +198,7 @@ async function sendWelcomeEmail(toEmail: string, fullName: string): Promise<void
 }
 
 async function sendApprovalEmail(toEmail: string, fullName: string): Promise<void> {
-  const { client, fromEmail } = await getResendClient();
+  const { client, fromEmail } = getResendClient();
   await client.emails.send({
     from: fromEmail,
     to: toEmail,
