@@ -18,6 +18,7 @@ import type { RetrievalRequest } from "@/components/retrieval-notification-popup
 import { CircularTimer } from "@/components/circular-timer";
 import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import valetBanner6 from "@assets/ValetS-Banner6_1778475115501.png";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -1509,6 +1510,15 @@ export default function StaffDashboard() {
               <h1 className="text-base sm:text-xl font-bold text-regis-navy truncate">Dashboard</h1>
               <p className="text-xs sm:text-sm text-gray-600 truncate">The St. Regis Osaka</p>
             </div>
+          </div>
+          {/* Banner image — desktop only */}
+          <div className="hidden sm:flex flex-1 justify-center px-4">
+            <img
+              src={valetBanner6}
+              alt="Valet-S"
+              className="h-12 w-auto object-contain"
+              style={{ maxWidth: 420 }}
+            />
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link href="/">
