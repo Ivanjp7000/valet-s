@@ -24,37 +24,115 @@ function PendingRegistrationsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [approveTarget, setApproveTarget] = useState<any>(null);
+  const [approveOU, setApproveOU] = useState("");
+  const [approveRole, setApproveRole] = useState("");
+
   const { data: pending, isLoading } = useQuery<any[]>({
     queryKey: ['/api/admin/pending-registrations'],
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
+  const { data: ous } = useQuery<any[]>({ queryKey: ['/api/ous'] });
+
   const approveMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/admin/pending-registrations/${id}/approve`),
+    mutationFn: ({ id, ouId, role }: { id: string; ouId: string; role: string }) =>
+      apiRequest("POST", `/api/admin/pending-registrations/${id}/approve`, { ouId, role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
-      toast({ title: "Account approved", description: "The user will receive a confirmation email." });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setApproveTarget(null);
+      setApproveOU("");
+      setApproveRole("");
+      toast({ title: "Account approved", description: "The user has been activated and will receive a confirmation email." });
     },
-    onError: () => toast({ title: "Error", description: "Failed to approve account.", variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Error", description: err?.message || "Failed to approve account.", variant: "destructive" }),
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/pending-registrations/${id}/reject`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
-      toast({ title: "Account rejected", description: "The registration has been removed." });
+      toast({ title: "Registration rejected", description: "The account has been removed." });
     },
     onError: () => toast({ title: "Error", description: "Failed to reject account.", variant: "destructive" }),
   });
+
+  const handleApproveSubmit = () => {
+    if (!approveOU) { toast({ title: "Required", description: "Please select an Organization.", variant: "destructive" }); return; }
+    if (!approveRole) { toast({ title: "Required", description: "Please select a Role.", variant: "destructive" }); return; }
+    approveMutation.mutate({ id: approveTarget.id, ouId: approveOU, role: approveRole });
+  };
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Pending Registrations</h2>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          All self-registered accounts waiting for review. You can approve or reject at any stage.
+          Self-registered accounts waiting for review. You must assign an OU and role before activating.
         </p>
       </div>
+
+      {/* Approval Dialog */}
+      <Dialog open={!!approveTarget} onOpenChange={(open) => { if (!open) { setApproveTarget(null); setApproveOU(""); setApproveRole(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-regis-navy">Approve Registration</DialogTitle>
+          </DialogHeader>
+          {approveTarget && (
+            <div className="space-y-4 pt-2">
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="font-medium text-sm text-gray-900">{[approveTarget.firstName, approveTarget.lastName].filter(Boolean).join(' ')}</p>
+                <p className="text-xs text-gray-500">{approveTarget.email}</p>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                You must assign an Organization and Role before this account is activated.
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Organization (OU) *</label>
+                  <Select value={approveOU} onValueChange={setApproveOU}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select organization..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(ous || []).map((ou: any) => (
+                        <SelectItem key={ou.id} value={ou.id}>{ou.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Role *</label>
+                  <Select value={approveRole} onValueChange={setApproveRole}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard_user">Standard User (view only)</SelectItem>
+                      <SelectItem value="standard_admin">Standard Admin (operational access)</SelectItem>
+                      <SelectItem value="privilege_admin">Privilege Admin (OU management)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-1"
+                  onClick={handleApproveSubmit}
+                  disabled={approveMutation.isPending || !approveOU || !approveRole}
+                >
+                  {approveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                  Approve & Activate
+                </Button>
+                <Button variant="outline" onClick={() => { setApproveTarget(null); setApproveOU(""); setApproveRole(""); }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-0">
@@ -93,11 +171,11 @@ function PendingRegistrationsTab() {
                       </span>
                       {reg.accountStatus === 'pending_email_verification' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
-                          ⏳ Awaiting email verification
+                          ⏳ Awaiting email click
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-700">
-                          ✓ Email verified — awaiting approval
+                          ✓ Email verified
                         </span>
                       )}
                     </div>
@@ -106,8 +184,8 @@ function PendingRegistrationsTab() {
                     <Button
                       size="sm"
                       className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 px-3 gap-1"
-                      onClick={() => approveMutation.mutate(reg.id)}
-                      disabled={approveMutation.isPending || rejectMutation.isPending}
+                      onClick={() => setApproveTarget(reg)}
+                      disabled={rejectMutation.isPending}
                     >
                       <UserCheck size={13} /> Approve
                     </Button>
@@ -116,7 +194,7 @@ function PendingRegistrationsTab() {
                       variant="outline"
                       className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-8 px-3 gap-1"
                       onClick={() => rejectMutation.mutate(reg.id)}
-                      disabled={approveMutation.isPending || rejectMutation.isPending}
+                      disabled={rejectMutation.isPending}
                     >
                       <UserX size={13} /> Reject
                     </Button>

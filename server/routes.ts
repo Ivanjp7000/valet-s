@@ -409,16 +409,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emailVerificationExpiresAt: expiresAt,
           ouId: null as any,
           password: null as any,
-          role: 'standard_admin',
+          role: 'standard_user',
         } as any);
       } else {
-        // Brand new user
+        // Brand new user — no OU, no admin role; admin assigns both during approval
         await storage.createUser({
           username: emailLower,
           email: emailLower,
           firstName,
           lastName,
-          role: 'standard_admin',
+          role: 'standard_user',
           twoFactorEnabled: true,
           isActive: true,
           accountStatus: 'pending_email_verification',
@@ -1178,13 +1178,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/pending-registrations/:id/approve', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const { ouId, role } = req.body;
+      if (!ouId) return res.status(400).json({ message: "You must assign an Organization (OU) before approving." });
+      if (!role || !['privilege_admin', 'standard_admin', 'standard_user'].includes(role)) {
+        return res.status(400).json({ message: "You must assign a valid role before approving." });
+      }
       const user = await storage.getUser(id);
       const status = (user as any).accountStatus;
       if (!user || (status !== 'pending_approval' && status !== 'pending_email_verification')) return res.status(404).json({ message: "Not found" });
-      await storage.updateUser(id, { accountStatus: 'active' } as any);
+      await storage.updateUser(id, { accountStatus: 'active', ouId, role } as any);
       if (user.email) {
         const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-        sendApprovalEmail(user.email, fullName || 'there').catch((e: any) => console.error("[approve] email failed:", e));
+        try {
+          await sendApprovalEmail(user.email, fullName || 'there');
+          console.log(`[approve] Email sent to ${user.email}`);
+        } catch (e: any) {
+          console.error("[approve] Email failed:", e?.message || e);
+        }
       }
       res.json({ success: true });
     } catch (err) {
