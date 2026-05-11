@@ -52,16 +52,35 @@ export function RetrievalNotificationPopup({
   onAccept,
   onDismiss,
 }: RetrievalNotificationPopupProps) {
-  const playedRef = useRef<Set<string>>(new Set());
+  const intervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
+  // Repeat alert every 4 seconds per pending request until accepted/dismissed
   useEffect(() => {
+    // Start alerting for new requests
     requests.forEach((r) => {
-      if (!playedRef.current.has(r.ticketNumber)) {
-        playedRef.current.add(r.ticketNumber);
-        playAlertSound();
+      if (!intervalsRef.current.has(r.ticketNumber)) {
+        playAlertSound(); // play immediately
+        const id = setInterval(() => playAlertSound(), 4000);
+        intervalsRef.current.set(r.ticketNumber, id);
+      }
+    });
+
+    // Stop alerting for requests no longer in the list (accepted or dismissed)
+    const active = new Set(requests.map((r) => r.ticketNumber));
+    intervalsRef.current.forEach((id, ticketNumber) => {
+      if (!active.has(ticketNumber)) {
+        clearInterval(id);
+        intervalsRef.current.delete(ticketNumber);
       }
     });
   }, [requests]);
+
+  // Clean up all intervals on unmount
+  useEffect(() => {
+    return () => {
+      intervalsRef.current.forEach((id) => clearInterval(id));
+    };
+  }, []);
 
   if (requests.length === 0) return null;
 

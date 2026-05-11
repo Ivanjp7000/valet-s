@@ -1845,13 +1845,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = localUserId || passportUserId;
 
       if (!userId) {
-        ws.close(1008, 'Unauthorized');
+        // Unauthenticated connection — allow as public (customer status-tracking)
+        clients.set(ws, { ouId: null, role: 'public' });
+        ws.on('close', () => clients.delete(ws));
+        ws.on('error', () => clients.delete(ws));
         return;
       }
 
       const user = await storage.getUser(userId);
       if (!user) {
-        ws.close(1008, 'Unauthorized');
+        clients.set(ws, { ouId: null, role: 'public' });
+        ws.on('close', () => clients.delete(ws));
+        ws.on('error', () => clients.delete(ws));
         return;
       }
 
@@ -2208,11 +2213,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }, 60 * 1000);
 
   // Broadcast to clients in the same OU (super admins receive all broadcasts)
+  // Public (unauthenticated / customer) connections receive ticket_status_updated
+  // so the customer status-tracking page updates in real time.
   function broadcastToOU(ouId: string | null | undefined, message: any) {
     const messageStr = JSON.stringify(message);
     clients.forEach((info, client) => {
       if (client.readyState !== WebSocket.OPEN) return;
       if (info.role === 'superadmin') {
+        client.send(messageStr);
+      } else if (info.role === 'public' && message.type === 'ticket_status_updated') {
         client.send(messageStr);
       } else if (ouId && info.ouId === ouId) {
         client.send(messageStr);

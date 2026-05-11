@@ -40,7 +40,7 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   const currentStage = ticket ? getStageFromStatus(ticket.status) : -1;
