@@ -1502,23 +1502,14 @@ export default function StaffDashboard() {
         }
       />
 
-      <div className="border-b bg-white px-3 sm:px-6 py-3 sm:py-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+      <div className="border-b bg-white">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
             <Crown className="text-regis-navy flex-shrink-0" size={20} />
             <div className="min-w-0">
               <h1 className="text-base sm:text-xl font-bold text-regis-navy truncate">Dashboard</h1>
               <p className="text-xs sm:text-sm text-gray-600 truncate">The St. Regis Osaka</p>
             </div>
-          </div>
-          {/* Banner image — desktop only */}
-          <div className="hidden sm:flex flex-1 justify-center px-4">
-            <img
-              src={valetBanner6}
-              alt="Valet-S"
-              className="h-12 w-auto object-contain"
-              style={{ maxWidth: 420 }}
-            />
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link href="/">
@@ -1543,6 +1534,14 @@ export default function StaffDashboard() {
               </Button>
             </a>
           </div>
+        </div>
+        {/* Full-width banner — desktop only */}
+        <div className="hidden sm:block w-full">
+          <img
+            src={valetBanner6}
+            alt="Valet-S"
+            className="w-full h-auto"
+          />
         </div>
       </div>
 
