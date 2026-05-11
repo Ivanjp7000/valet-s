@@ -146,9 +146,6 @@ export default function CreateAccount() {
                 className="focus:border-regis-gold"
                 autoComplete="email"
               />
-              <p className="text-[10px] text-gray-400 mt-1">
-                @stregis.com addresses are approved instantly
-              </p>
             </div>
 
             <div>
