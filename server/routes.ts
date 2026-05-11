@@ -358,27 +358,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (captchaAnswer === undefined || captchaExpected === undefined) return res.status(400).json({ message: "Please complete the verification" });
       if (String(captchaAnswer).trim() !== String(captchaExpected).trim()) return res.status(400).json({ message: "Incorrect answer — please try again" });
 
-      // Check for duplicate — also look for inactive (soft-deleted) records
-      const existingByEmail = await storage.getUserByEmail(emailLower);
-      if (existingByEmail) return res.status(409).json({ message: "An account with this email already exists" });
-      const existingByUsername = await storage.getUserByUsername(emailLower);
-      // If an active record exists, block. If inactive (deleted), we reuse it below.
-      if (existingByUsername && existingByUsername.isActive) {
-        return res.status(409).json({ message: "An account with this email already exists" });
-      }
-
       const nameParts = fullName.trim().split(/\s+/);
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(' ') || '';
-
       const isStRegis = emailLower.endsWith('@stregis.com');
       const ST_REGIS_OSAKA_OU_ID = 'dd16ee22-1d40-4db2-8cde-6a726673451a';
-      const verificationToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+      const domain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim();
+      const baseUrl = domain ? `https://${domain}` : 'http://localhost:5000';
 
-      // Reuse a soft-deleted record if one exists (avoids unique constraint violation)
-      if (existingByUsername && !existingByUsername.isActive) {
-        await storage.updateUser(existingByUsername.id, {
+      // Single lookup — getUserByUsername finds ALL records regardless of isActive
+      const existingUser = await storage.getUserByUsername(emailLower);
+
+      if (existingUser) {
+        if (!existingUser.isActive) {
+          // Soft-deleted — reactivate and restart the registration flow
+        } else if (existingUser.accountStatus === 'active') {
+          return res.status(409).json({ message: "An account with this email already exists. Please log in." });
+        } else if (existingUser.accountStatus === 'pending_approval') {
+          return res.status(409).json({ message: "Your account is already registered and awaiting admin approval. You will be notified by email once approved." });
+        } else if (existingUser.accountStatus === 'pending_email_verification') {
+          // Resend a fresh verification link
+          const newToken = crypto.randomBytes(32).toString('hex');
+          const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          await storage.updateUser(existingUser.id, {
+            firstName, lastName,
+            emailVerificationToken: newToken,
+            emailVerificationExpiresAt: newExpiry,
+          } as any);
+          const verifyUrl = `${baseUrl}/verify-email?token=${newToken}`;
+          try { await sendVerificationEmail(emailLower, verifyUrl, fullName.trim()); } catch {}
+          const msg = isStRegis
+            ? "Almost there! A new verification link has been sent — please check your inbox."
+            : "A new verification link has been sent. Once verified, your account will be reviewed within 48 business hours.";
+          return res.json({ success: true, message: msg, isStRegis });
+        }
+      }
+
+      // Generate token for new or reactivated record
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
+
+      if (existingUser && !existingUser.isActive) {
+        // Reuse soft-deleted record — avoids unique constraint violation on username/email
+        await storage.updateUser(existingUser.id, {
           firstName, lastName,
           isActive: true,
           accountStatus: 'pending_email_verification',
@@ -386,33 +409,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emailVerificationExpiresAt: expiresAt,
           ouId: null as any,
           password: null as any,
+          role: 'standard_admin',
         } as any);
-        const domain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim();
-        const baseUrl = domain ? `https://${domain}` : 'http://localhost:5000';
-        const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
-        try { await sendVerificationEmail(emailLower, verifyUrl, fullName.trim()); } catch {}
-        const message = isStRegis
-          ? "Almost there! Please check your inbox and click the verification link to activate your account."
-          : "Request received! Please check your inbox and click the verification link. Once verified, your account will be reviewed and activated within 48 business hours.";
-        return res.json({ success: true, message, isStRegis });
+      } else {
+        // Brand new user
+        await storage.createUser({
+          username: emailLower,
+          email: emailLower,
+          firstName,
+          lastName,
+          role: 'standard_admin',
+          twoFactorEnabled: true,
+          isActive: true,
+          accountStatus: 'pending_email_verification',
+          emailVerificationToken: verificationToken,
+          emailVerificationExpiresAt: expiresAt,
+        } as any);
       }
-
-      const newUser = await storage.createUser({
-        username: emailLower,
-        email: emailLower,
-        firstName,
-        lastName,
-        role: 'standard_admin',
-        twoFactorEnabled: true,
-        isActive: true,
-        accountStatus: 'pending_email_verification',
-        emailVerificationToken: verificationToken,
-        emailVerificationExpiresAt: expiresAt,
-      } as any);
-
-      const domain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim();
-      const baseUrl = domain ? `https://${domain}` : 'http://localhost:5000';
-      const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
       try {
         await sendVerificationEmail(emailLower, verifyUrl, fullName.trim());
