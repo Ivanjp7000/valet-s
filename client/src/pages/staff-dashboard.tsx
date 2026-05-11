@@ -574,8 +574,8 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
 }
 
 // ── Draggable, collapsible dashboard panel ──────────────────────────────────
-const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'ready', 'guest-out', 'gs-hub', 'departed-today', 'departed-history'];
-const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'gs-hub', 'departed-today', 'departed-history'];
+const DESKTOP_PANELS_DEFAULT = ['in-house', 'retrievals', 'ready', 'guest-out', 'departed-today', 'departed-history'];
+const MOBILE_PANELS_DEFAULT  = ['ready', 'retrievals', 'guest-out', 'in-house', 'departed-today', 'departed-history'];
 
 const SECTION_FONT_MIN = 10;
 const SECTION_FONT_MAX = 22;
@@ -2506,19 +2506,6 @@ export default function StaffDashboard() {
                           );
                         }
 
-                        if (panelId === 'gs-hub') return (
-                          <SortablePanel key="gs-hub" id="gs-hub"
-                            title="GS Hub"
-                            icon={<MessageSquare size={14} className="text-regis-gold" />}
-                            borderClass="border-regis-gold/30"
-                            expanded={isExpanded} onToggle={toggle}
-                            fontSize={getSectionFontSize('gs-hub')} onFontSizeChange={s => setSectionFont('gs-hub', s)}
-                          >
-                            <div className="mt-2">
-                              <GSHub />
-                            </div>
-                          </SortablePanel>
-                        );
 
                         return null;
                       })}
@@ -3023,20 +3010,6 @@ export default function StaffDashboard() {
                           </SortablePanel>
                         );
 
-                        if (panelId === 'gs-hub') return (
-                          <SortablePanel key="gs-hub" id="gs-hub"
-                            title="GS Hub"
-                            badge={<span className="ml-2 text-[10px] font-semibold bg-regis-gold/20 text-regis-navy px-2 py-0.5 rounded-full">Messaging & Calendar</span>}
-                            icon={<MessageSquare className="text-regis-gold" size={18} />}
-                            borderClass="border-regis-gold/30"
-                            expanded={isExpanded} onToggle={toggle}
-                            fontSize={getSectionFontSize('gs-hub')} onFontSizeChange={s => setSectionFont('gs-hub', s)}
-                          >
-                            <div className="mt-3">
-                              <GSHub />
-                            </div>
-                          </SortablePanel>
-                        );
 
                         return null;
                       })}
