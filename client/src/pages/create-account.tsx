@@ -8,13 +8,9 @@ import { Shield, Loader2, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react
 function generateCaptcha() {
   const a = Math.floor(Math.random() * 9) + 1;
   const b = Math.floor(Math.random() * 9) + 1;
-  const ops = ["+", "-", "×"] as const;
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  let answer: number;
-  if (op === "+") answer = a + b;
-  else if (op === "-") answer = Math.max(a, b) - Math.min(a, b);
-  else answer = a * b;
-  const display = op === "-" ? `${Math.max(a, b)} − ${Math.min(a, b)}` : `${a} ${op} ${b}`;
+  const useAdd = Math.random() < 0.5;
+  const answer = useAdd ? a + b : Math.max(a, b) - Math.min(a, b);
+  const display = useAdd ? `${a} + ${b}` : `${Math.max(a, b)} − ${Math.min(a, b)}`;
   return { display, answer };
 }
 
@@ -59,7 +55,9 @@ export default function CreateAccount() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Registration failed. Please try again.");
-        refreshCaptcha();
+        if (data.message?.toLowerCase().includes("answer") || data.message?.toLowerCase().includes("verification")) {
+          refreshCaptcha();
+        }
         return;
       }
       setSuccess({ message: data.message, isStRegis: data.isStRegis });
