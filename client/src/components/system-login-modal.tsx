@@ -172,13 +172,12 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
                 Cancel
               </Button>
               <div className="text-center mt-3">
-                <button
-                  type="button"
+                <a
+                  href="/create-account"
                   className="text-[11px] text-gray-400 hover:text-gray-600 underline underline-offset-2"
-                  onClick={() => {/* instructions coming */}}
                 >
                   create account
-                </button>
+                </a>
               </div>
             </>
           )}

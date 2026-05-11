@@ -9,6 +9,8 @@ import Home from "@/pages/home";
 import StaffDashboard from "@/pages/staff-dashboard";
 import AdminPanel from "@/pages/admin-panel";
 import Docs from "@/pages/docs";
+import CreateAccount from "@/pages/create-account";
+import VerifyEmail from "@/pages/verify-email";
 import NotFound from "@/pages/not-found";
 
 // Version is derived from the build date — updates automatically on every deploy
@@ -36,6 +38,10 @@ function Router() {
 
   return (
     <Switch>
+      {/* Public routes — always accessible */}
+      <Route path="/create-account" component={CreateAccount} />
+      <Route path="/verify-email" component={VerifyEmail} />
+
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
       ) : (

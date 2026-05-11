@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, getSession } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -125,11 +126,75 @@ async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
     to: toEmail,
     subject: "Your Valet System Login Code",
     html: `
-      <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:32px;border:1px solid #e5e7eb;border-radius:8px">
-        <h2 style="color:#1e3a5f;margin-bottom:8px">Valet Management System</h2>
-        <p style="color:#374151;margin-bottom:24px">Your one-time login code is:</p>
-        <div style="background:#f3f4f6;border-radius:8px;padding:24px;text-align:center;letter-spacing:12px;font-size:32px;font-weight:700;color:#1e3a5f">${code}</div>
-        <p style="color:#6b7280;font-size:13px;margin-top:24px">This code expires in 5 minutes. Do not share it with anyone.</p>
+      <div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">
+        <div style="background:#1a2744;padding:28px 36px;text-align:center">
+          <p style="color:#c9a84c;letter-spacing:3px;font-size:11px;text-transform:uppercase;margin:0 0 6px">St. Regis Osaka</p>
+          <h1 style="color:#fff;font-size:20px;font-weight:400;margin:0">Valet Management System</h1>
+        </div>
+        <div style="padding:36px">
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 20px">Your one-time login code is:</p>
+          <div style="background:#f9f7f3;border-left:3px solid #c9a84c;border-radius:4px;padding:24px;text-align:center;letter-spacing:12px;font-size:36px;font-weight:700;color:#1a2744">${code}</div>
+          <p style="color:#888;font-size:13px;margin-top:20px;line-height:1.6">This code expires in <strong>30 minutes</strong> and can only be used once. Do not share it with anyone.</p>
+        </div>
+        <div style="background:#f4f2ee;padding:16px 36px;text-align:center">
+          <p style="color:#aaa;font-size:12px;margin:0">St. Regis Osaka &nbsp;·&nbsp; Valet Services</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullName: string): Promise<void> {
+  const { client, fromEmail } = await getResendClient();
+  await client.emails.send({
+    from: fromEmail,
+    to: toEmail,
+    subject: "Verify your email — St. Regis Osaka Valet System",
+    html: `
+      <div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">
+        <div style="background:#1a2744;padding:28px 36px;text-align:center">
+          <p style="color:#c9a84c;letter-spacing:3px;font-size:11px;text-transform:uppercase;margin:0 0 6px">St. Regis Osaka</p>
+          <h1 style="color:#fff;font-size:20px;font-weight:400;margin:0">Verify Your Email Address</h1>
+        </div>
+        <div style="padding:36px">
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${fullName},</p>
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 28px">Thank you for registering. Please click the button below to verify your email address and activate your account request.</p>
+          <div style="text-align:center;margin-bottom:28px">
+            <a href="${verifyUrl}" style="background:#1a2744;color:#fff;text-decoration:none;padding:14px 32px;border-radius:4px;font-size:15px;display:inline-block">Verify Email Address</a>
+          </div>
+          <p style="color:#888;font-size:13px;line-height:1.6">This link expires in 24 hours. If you did not request an account, you can safely ignore this email.</p>
+          <p style="color:#aaa;font-size:12px;margin-top:16px;word-break:break-all">Or copy this link: ${verifyUrl}</p>
+        </div>
+        <div style="background:#f4f2ee;padding:16px 36px;text-align:center">
+          <p style="color:#aaa;font-size:12px;margin:0">St. Regis Osaka &nbsp;·&nbsp; Valet Services</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+async function sendApprovalEmail(toEmail: string, fullName: string): Promise<void> {
+  const { client, fromEmail } = await getResendClient();
+  await client.emails.send({
+    from: fromEmail,
+    to: toEmail,
+    subject: "Your account has been approved — St. Regis Osaka Valet System",
+    html: `
+      <div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">
+        <div style="background:#1a2744;padding:28px 36px;text-align:center">
+          <p style="color:#c9a84c;letter-spacing:3px;font-size:11px;text-transform:uppercase;margin:0 0 6px">St. Regis Osaka</p>
+          <h1 style="color:#fff;font-size:20px;font-weight:400;margin:0">Account Approved</h1>
+        </div>
+        <div style="padding:36px">
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${fullName},</p>
+          <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 28px">Your account has been approved. You can now log in using your email address. A one-time verification code will be sent to your email each time you log in.</p>
+          <div style="text-align:center;margin-bottom:28px">
+            <a href="${process.env.REPLIT_DOMAINS ? 'https://' + process.env.REPLIT_DOMAINS.split(',')[0] : ''}" style="background:#1a2744;color:#fff;text-decoration:none;padding:14px 32px;border-radius:4px;font-size:15px;display:inline-block">Log In Now</a>
+          </div>
+        </div>
+        <div style="background:#f4f2ee;padding:16px 36px;text-align:center">
+          <p style="color:#aaa;font-size:12px;margin:0">St. Regis Osaka &nbsp;·&nbsp; Valet Services</p>
+        </div>
       </div>
     `,
   });
@@ -170,26 +235,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = req.body;
       
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password required" });
+      if (!username) {
+        return res.status(400).json({ message: "Username or email is required" });
       }
 
-      const user = await storage.getUserByUsername(username);
-      
-      if (!user || !user.password) {
+      // Look up by username first, then by email (for self-registered accounts)
+      let user = await storage.getUserByUsername(username);
+      if (!user && username.includes('@')) {
+        user = await storage.getUserByEmail(username);
+      }
+
+      if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      
-      if (!isValidPassword) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      // Check account status for self-registered accounts
+      if (user.accountStatus === 'pending_email_verification') {
+        return res.status(403).json({ message: "Please verify your email address first. Check your inbox for the verification link." });
+      }
+      if (user.accountStatus === 'pending_approval') {
+        return res.status(403).json({ message: "Your account is pending approval by an administrator. You will receive an email once it is activated." });
       }
 
-      // If 2FA is enabled, send OTP and pause — don't create session yet
-      if (user.twoFactorEnabled && user.email) {
+      // Passwordless accounts (self-registered via email) skip password check
+      const isPasswordlessAccount = !user.password;
+      if (!isPasswordlessAccount) {
+        if (!password) {
+          return res.status(400).json({ message: "Username and password required" });
+        }
+        const isValidPassword = await bcrypt.compare(password, user.password!);
+        if (!isValidPassword) {
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
+      }
+
+      // 2FA: required for self-registered accounts and any account with 2FA enabled
+      if ((user.twoFactorEnabled || isPasswordlessAccount) && user.email) {
         const code = generateOtp();
-        otpStore.set(user.id, { code, expiresAt: Date.now() + 5 * 60 * 1000 });
+        otpStore.set(user.id, { code, expiresAt: Date.now() + 30 * 60 * 1000 }); // 30 minutes
         try {
           await sendOtpEmail(user.email, code);
         } catch (emailErr) {
@@ -261,6 +344,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error verifying OTP:", error);
       res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  // Self-registration — Step 1: submit name + email
+  app.post('/api/auth/register', async (req: any, res) => {
+    try {
+      const { fullName, email, captchaAnswer, captchaExpected } = req.body;
+      if (!fullName || !email) return res.status(400).json({ message: "Full name and email are required" });
+      const emailLower = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailLower)) return res.status(400).json({ message: "Please enter a valid email address" });
+      if (captchaAnswer === undefined || captchaExpected === undefined) return res.status(400).json({ message: "Please complete the verification" });
+      if (String(captchaAnswer).trim() !== String(captchaExpected).trim()) return res.status(400).json({ message: "Incorrect answer — please try again" });
+
+      // Check for duplicate email
+      const existingByEmail = await storage.getUserByEmail(emailLower);
+      if (existingByEmail) return res.status(409).json({ message: "An account with this email already exists" });
+      const existingByUsername = await storage.getUserByUsername(emailLower);
+      if (existingByUsername) return res.status(409).json({ message: "An account with this email already exists" });
+
+      const nameParts = fullName.trim().split(/\s+/);
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const isStRegis = emailLower.endsWith('@stregis.com');
+      const ST_REGIS_OSAKA_OU_ID = 'dd16ee22-1d40-4db2-8cde-6a726673451a';
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+      const newUser = await storage.createUser({
+        username: emailLower,
+        email: emailLower,
+        firstName,
+        lastName,
+        role: 'standard_admin',
+        ouId: ST_REGIS_OSAKA_OU_ID,
+        twoFactorEnabled: true,
+        isActive: true,
+        accountStatus: 'pending_email_verification',
+        emailVerificationToken: verificationToken,
+        emailVerificationExpiresAt: expiresAt,
+      } as any);
+
+      const domain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim();
+      const baseUrl = domain ? `https://${domain}` : 'http://localhost:5000';
+      const verifyUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
+
+      try {
+        await sendVerificationEmail(emailLower, verifyUrl, fullName.trim());
+      } catch (emailErr) {
+        console.error("[register] Failed to send verification email:", emailErr);
+      }
+
+      const message = isStRegis
+        ? "Almost there! Please check your inbox and click the verification link to activate your account."
+        : "Request received! Please check your inbox and click the verification link. Once verified, your account will be reviewed and activated within 48 business hours.";
+
+      res.json({ success: true, message, isStRegis });
+    } catch (err: any) {
+      console.error("[register] Error:", err);
+      res.status(500).json({ message: "Registration failed. Please try again." });
+    }
+  });
+
+  // Self-registration — Step 2: verify email via token link
+  app.get('/api/auth/verify-email', async (req: any, res) => {
+    try {
+      const { token } = req.query;
+      if (!token) return res.redirect('/verify-email?status=invalid');
+
+      const user = await storage.getUserByVerificationToken(token as string);
+      if (!user) return res.redirect('/verify-email?status=invalid');
+      if (!user.emailVerificationExpiresAt || new Date() > user.emailVerificationExpiresAt) {
+        return res.redirect('/verify-email?status=expired');
+      }
+
+      const isStRegis = (user.email || '').toLowerCase().endsWith('@stregis.com');
+      const ST_REGIS_OSAKA_OU_ID = 'dd16ee22-1d40-4db2-8cde-6a726673451a';
+      const newStatus = isStRegis ? 'active' : 'pending_approval';
+
+      await storage.updateUser(user.id, {
+        accountStatus: newStatus,
+        emailVerificationToken: null as any,
+        emailVerificationExpiresAt: null as any,
+        ouId: ST_REGIS_OSAKA_OU_ID,
+      } as any);
+
+      if (isStRegis) {
+        return res.redirect('/verify-email?status=approved');
+      }
+      return res.redirect('/verify-email?status=pending');
+    } catch (err) {
+      console.error("[verify-email] Error:", err);
+      return res.redirect('/verify-email?status=error');
     }
   });
 
@@ -945,6 +1122,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error resetting password:", error);
       res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // ===== PENDING REGISTRATIONS (Super Admin Only) =====
+  app.get('/api/admin/pending-registrations', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const pending = await storage.getPendingRegistrations();
+      res.json(pending.map((u: any) => ({
+        id: u.id, firstName: u.firstName, lastName: u.lastName,
+        email: u.email, createdAt: u.createdAt,
+      })));
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch pending registrations" });
+    }
+  });
+
+  app.post('/api/admin/pending-registrations/:id/approve', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(id);
+      if (!user || (user as any).accountStatus !== 'pending_approval') return res.status(404).json({ message: "Not found" });
+      await storage.updateUser(id, { accountStatus: 'active' } as any);
+      if (user.email) {
+        const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+        sendApprovalEmail(user.email, fullName || 'there').catch((e: any) => console.error("[approve] email failed:", e));
+      }
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to approve registration" });
+    }
+  });
+
+  app.post('/api/admin/pending-registrations/:id/reject', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(id);
+      if (!user) return res.status(404).json({ message: "Not found" });
+      await storage.updateUser(id, { isActive: false } as any);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to reject registration" });
     }
   });
 

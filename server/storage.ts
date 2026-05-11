@@ -48,6 +48,8 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByVerificationToken(token: string): Promise<User | undefined>;
+  getPendingRegistrations(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   getUsersByOU(ouId: string): Promise<User[]>;
@@ -170,6 +172,17 @@ export class DatabaseStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(and(eq(users.email, email), eq(users.isActive, true)));
     return user;
+  }
+
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.emailVerificationToken, token));
+    return user;
+  }
+
+  async getPendingRegistrations(): Promise<User[]> {
+    return await db.select().from(users)
+      .where(eq(users.accountStatus, 'pending_approval'))
+      .orderBy(asc(users.createdAt));
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {

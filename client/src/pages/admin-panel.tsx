@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car, BarChart2, Database, TrendingUp, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, ShieldCheck } from "lucide-react";
+import { Crown, HelpCircle, Settings, Users, LogOut, Edit, Trash2, Plus, Building, MapPin, Shield, TicketIcon, Eye, EyeOff, Home, Car, BarChart2, Database, TrendingUp, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, ShieldCheck, UserCheck, UserX, Clock } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import valetBanner7a from "@assets/ValetS-Banner7a_1778476300539.png";
 import { Link } from "wouter";
@@ -18,6 +18,110 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { ValetTicketWizard } from "@/components/valet-ticket-wizard";
 import type { Faq, SystemSetting, OrganizationalUnit, PhysicalLocation, User, SafeUser, UserLocationScope, ValetTicket } from "@shared/schema";
+import { format } from "date-fns";
+
+function PendingRegistrationsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: pending, isLoading } = useQuery<any[]>({
+    queryKey: ['/api/admin/pending-registrations'],
+    refetchInterval: 30000,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/pending-registrations/${id}/approve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
+      toast({ title: "Account approved", description: "The user will receive a confirmation email." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to approve account.", variant: "destructive" }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/pending-registrations/${id}/reject`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
+      toast({ title: "Account rejected", description: "The registration has been removed." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to reject account.", variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Pending Registrations</h2>
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">
+          Accounts that have verified their email and are awaiting administrator approval.
+          @stregis.com accounts are approved automatically.
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="animate-spin text-grayis-400" size={24} />
+            </div>
+          ) : !pending || pending.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center">
+              <UserCheck size={40} className="text-gray-200 mb-3" />
+              <p className="text-gray-500 font-medium">No pending registrations</p>
+              <p className="text-gray-400 text-xs mt-1">All self-registered accounts have been reviewed</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {pending.map((reg) => (
+                <div key={reg.id} className="flex items-center justify-between gap-3 px-4 py-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-blue-700">
+                          {(reg.firstName?.[0] || '?').toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm text-gray-900">
+                          {[reg.firstName, reg.lastName].filter(Boolean).join(' ') || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{reg.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 mt-2 ml-10">
+                      <Clock size={11} className="text-gray-400" />
+                      <span className="text-[11px] text-gray-400">
+                        Submitted {reg.createdAt ? format(new Date(reg.createdAt), 'MMM d, yyyy') : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 px-3 gap-1"
+                      onClick={() => approveMutation.mutate(reg.id)}
+                      disabled={approveMutation.isPending || rejectMutation.isPending}
+                    >
+                      <UserCheck size={13} /> Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-8 px-3 gap-1"
+                      onClick={() => rejectMutation.mutate(reg.id)}
+                      disabled={approveMutation.isPending || rejectMutation.isPending}
+                    >
+                      <UserX size={13} /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -596,7 +700,7 @@ export default function AdminPanel() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-6' : 'sm:grid-cols-4'}`}>
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-7' : 'sm:grid-cols-4'}`}>
               {isSuperAdmin && (
                 <TabsTrigger value="ous" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-ous">
                   <Building size={14} />
@@ -618,6 +722,13 @@ export default function AdminPanel() {
                 <TabsTrigger value="faqs" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-faqs">
                   <HelpCircle size={14} />
                   <span>FAQs</span>
+                </TabsTrigger>
+              )}
+              {isSuperAdmin && (
+                <TabsTrigger value="registrations" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-registrations">
+                  <UserCheck size={14} />
+                  <span className="hidden sm:inline">Registrations</span>
+                  <span className="sm:hidden">Regs</span>
                 </TabsTrigger>
               )}
               <TabsTrigger value="reports" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-reports">
@@ -1584,6 +1695,13 @@ export default function AdminPanel() {
 
             </>)}
           </TabsContent>
+
+          {/* Pending Registrations Tab */}
+          {isSuperAdmin && (
+            <TabsContent value="registrations" className="space-y-6">
+              <PendingRegistrationsTab />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
