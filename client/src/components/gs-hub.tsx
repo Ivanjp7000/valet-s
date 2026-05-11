@@ -297,15 +297,35 @@ function CalendarEventDialog({ event, open, onClose }: { event?: CalendarEvent; 
 
 // ── Single message card ───────────────────────────────────────────────────────
 function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; currentUserId: string; isGSMember: boolean }) {
-  const [expanded, setExpanded] = useState(false);
+  const [repliesExpanded, setRepliesExpanded] = useState(true);
   const [replyText, setReplyText] = useState("");
+  const [showReplyBox, setShowReplyBox] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const qc = useQueryClient();
   const { toast } = useToast();
 
+  const sendReply = (text: string) => {
+    return apiRequest("POST", `/api/gs/messages/${msg.id}/reply`, { content: text });
+  };
+
   const reply = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/gs/messages/${msg.id}/reply`, { content: replyText }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/gs/messages"] }); setReplyText(""); setExpanded(true); },
+    mutationFn: () => sendReply(replyText),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+      setReplyText("");
+      setShowReplyBox(false);
+      setRepliesExpanded(true);
+    },
+    onError: () => toast({ title: "Failed to send reply", variant: "destructive" }),
+  });
+
+  const quickReply = useMutation({
+    mutationFn: (text: string) => sendReply(text),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+      setRepliesExpanded(true);
+      toast({ title: "Reply sent" });
+    },
     onError: () => toast({ title: "Failed to send reply", variant: "destructive" }),
   });
 
@@ -321,24 +341,22 @@ function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; curre
   const isAcknowledged = !!msg.acknowledgedAt;
 
   return (
-    <div className={`rounded-lg border ${isScheduled ? "border-blue-200 bg-blue-50/40" : "border-gray-200 bg-white"} p-3 space-y-2`}>
+    <div className={`rounded-xl border-2 ${isScheduled ? "border-blue-200 bg-blue-50/30" : "border-gray-200 bg-white"} p-4 space-y-3`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[msg.status] || "bg-gray-300"}`} />
-          <span className="text-xs font-bold text-gray-700 truncate">{msg.senderName}</span>
+          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[msg.status] || "bg-gray-300"}`} />
+          <span className="text-sm font-bold text-gray-800 truncate">{msg.senderName}</span>
           <span className="text-xs text-gray-400">{timeAgo(msg.createdAt)}</span>
-          {isScheduled && (
-            <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full font-medium">On Calendar</span>
-          )}
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {hasReplies && (
-            <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-600">
-              <MessageSquare size={12} />
-              <span>{msg.replies.length}</span>
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isScheduled && (
+            <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+              <Calendar size={10} /> On Calendar
+            </span>
+          )}
+          {msg.status === "open" && (
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">Open</span>
           )}
         </div>
       </div>
@@ -347,22 +365,36 @@ function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; curre
       <p className="text-sm text-gray-800 leading-relaxed">{msg.content}</p>
 
       {/* Replies */}
-      {(expanded || !hasReplies) && hasReplies && (
-        <div className="pl-3 border-l-2 border-gray-200 space-y-2 mt-1">
-          {msg.replies.map(r => (
-            <div key={r.id}>
-              <span className="text-xs font-semibold text-gray-600">{r.senderName}</span>
-              <span className="text-xs text-gray-400 ml-1">{timeAgo(r.createdAt)}</span>
-              <p className="text-xs text-gray-700 mt-0.5">{r.content}</p>
+      {hasReplies && (
+        <div className="space-y-1">
+          <button
+            onClick={() => setRepliesExpanded(e => !e)}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 font-medium"
+          >
+            <MessageSquare size={11} />
+            <span>{msg.replies.length} {msg.replies.length === 1 ? "reply" : "replies"}</span>
+            {repliesExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </button>
+          {repliesExpanded && (
+            <div className="pl-3 border-l-2 border-gray-200 space-y-2">
+              {msg.replies.map(r => (
+                <div key={r.id} className="bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-xs font-semibold text-gray-700">{r.senderName}</span>
+                    <span className="text-[10px] text-gray-400">{timeAgo(r.createdAt)}</span>
+                  </div>
+                  <p className="text-xs text-gray-700">{r.content}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 
       {/* Acknowledge button — shown to original sender when event has been added to calendar */}
       {isScheduled && isMine && !isAcknowledged && (
-        <div className="pt-1 border-t border-blue-200">
-          <p className="text-xs text-blue-600 mb-1.5">GS has added this to the calendar. Please confirm you've seen it.</p>
+        <div className="pt-2 border-t border-blue-200 bg-blue-50 rounded-lg px-3 py-2.5">
+          <p className="text-xs text-blue-700 font-medium mb-2">GS has added this to the calendar. Please confirm you've seen it.</p>
           <Button size="sm" onClick={() => acknowledge.mutate()} disabled={acknowledge.isPending}
             className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
             <CheckCircle2 size={13} /> Confirm & Acknowledge
@@ -370,31 +402,79 @@ function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; curre
         </div>
       )}
       {isScheduled && isMine && isAcknowledged && (
-        <div className="flex items-center gap-1 text-xs text-green-600 pt-1 border-t border-blue-200">
-          <CheckCircle2 size={12} /> Acknowledged
+        <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2 border border-green-200">
+          <CheckCircle2 size={13} /> Acknowledged by sender
         </div>
       )}
 
       {/* GS Member actions */}
       {isGSMember && (
-        <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
-          {/* Reply input */}
-          <div className="flex flex-1 gap-1.5">
-            <Input
-              value={replyText}
-              onChange={e => setReplyText(e.target.value)}
-              placeholder="Reply…"
-              className="h-7 text-xs flex-1"
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && replyText.trim()) { e.preventDefault(); reply.mutate(); } }}
-            />
-            <Button size="sm" onClick={() => reply.mutate()} disabled={!replyText.trim() || reply.isPending}
-              className="h-7 px-2 bg-gray-700 hover:bg-gray-800 text-white"><Send size={12} /></Button>
-          </div>
-          {!isScheduled && (
-            <Button size="sm" variant="outline" onClick={() => setConvertOpen(true)}
-              className="h-7 text-xs gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 flex-shrink-0">
-              <CalendarPlus size={12} /> Calendar
+        <div className="pt-2 border-t-2 border-dashed border-purple-100 space-y-2">
+          <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wide">GS Actions</p>
+
+          {/* Quick action row */}
+          <div className="flex flex-wrap gap-2">
+            {/* Quick "Taken care of" button */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => quickReply.mutate("Thank you — everything is taken care of. Please let us know if you need anything else.")}
+              disabled={quickReply.isPending}
+              className="h-8 text-xs gap-1.5 border-green-300 text-green-700 hover:bg-green-50 font-semibold"
+            >
+              <CheckCircle2 size={13} /> Taken care of
             </Button>
+
+            {/* Custom reply toggle */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowReplyBox(r => !r)}
+              className={`h-8 text-xs gap-1.5 font-semibold ${showReplyBox ? "bg-gray-100 border-gray-400 text-gray-700" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
+            >
+              <MessageSquare size={13} /> {showReplyBox ? "Cancel" : "Write Reply"}
+            </Button>
+
+            {/* Add to calendar */}
+            {!isScheduled && (
+              <Button
+                size="sm"
+                onClick={() => setConvertOpen(true)}
+                className="h-8 text-xs gap-1.5 bg-regis-navy hover:bg-regis-navy/90 text-white font-semibold"
+              >
+                <CalendarPlus size={13} /> Add to Calendar
+              </Button>
+            )}
+          </div>
+
+          {/* Custom reply box */}
+          {showReplyBox && (
+            <div className="space-y-2">
+              <Textarea
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Type your reply to the sender…"
+                rows={2}
+                className="resize-none text-sm"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey && replyText.trim()) {
+                    e.preventDefault();
+                    reply.mutate();
+                  }
+                }}
+              />
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setShowReplyBox(false); setReplyText(""); }} className="h-7 text-xs">Cancel</Button>
+                <Button
+                  size="sm"
+                  onClick={() => reply.mutate()}
+                  disabled={!replyText.trim() || reply.isPending}
+                  className="h-7 text-xs bg-regis-navy hover:bg-regis-navy/90 text-white gap-1.5"
+                >
+                  <Send size={12} /> Send Reply
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -667,6 +747,9 @@ export function GSHub({ wsSignal }: { wsSignal?: number }) {
     },
   });
 
+  // Admins automatically have GS member powers
+  const isGSMember = isMember || isAdmin;
+
   const pendingCount = messages.filter(m => m.senderId === user?.id && m.status === "scheduled" && !m.acknowledgedAt).length;
   const openCount = messages.filter(m => m.status === "open").length;
 
@@ -713,15 +796,17 @@ export function GSHub({ wsSignal }: { wsSignal?: number }) {
       )}
 
       {/* GS Member badge */}
-      {isMember && (
-        <div className="flex items-center gap-1.5 text-xs text-purple-700">
-          <Tag size={12} /> <span className="font-semibold">GS Member</span> — you can reply and manage the calendar
+      {isGSMember && (
+        <div className="flex items-center gap-1.5 text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+          <Tag size={12} />
+          <span className="font-semibold">GS Member</span>
+          <span className="text-purple-500">— tap any message to reply or add it to the calendar</span>
         </div>
       )}
 
       {/* Content */}
       {tab === "messages" && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {isLoading ? (
             <p className="text-xs text-gray-400 text-center py-6">Loading…</p>
           ) : messages.length === 0 ? (
@@ -732,13 +817,13 @@ export function GSHub({ wsSignal }: { wsSignal?: number }) {
             </div>
           ) : (
             messages.map(m => (
-              <MessageCard key={m.id} msg={m} currentUserId={user?.id ?? ""} isGSMember={isMember} />
+              <MessageCard key={m.id} msg={m} currentUserId={user?.id ?? ""} isGSMember={isGSMember} />
             ))
           )}
         </div>
       )}
 
-      {tab === "calendar" && <CalendarView isGSMember={isMember} />}
+      {tab === "calendar" && <CalendarView isGSMember={isGSMember} />}
 
       {tab === "members" && isAdmin && <MembersView />}
 
