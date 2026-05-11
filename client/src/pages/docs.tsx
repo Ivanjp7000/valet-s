@@ -82,74 +82,43 @@ export default function Docs() {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
 
-        {/* ── STANDARD USER ───────────────────────────────── */}
-        {isStandardUser && (
+        {/* ── SUPER ADMIN ─────────────────────────────────── */}
+        {isSuperAdmin && (
           <Section
-            title="Standard User — Read-Only Access"
-            icon={<Eye size={18} className="text-green-600" />}
-            badge="Standard User"
-            badgeColor="bg-green-600"
+            title="Super Admin — System Control"
+            icon={<Crown size={18} className="text-purple-600" />}
+            badge="Super Admin"
+            badgeColor="bg-purple-600"
           >
             <Item
-              icon={<Eye size={14} />}
-              title="View Live Ticket Activity"
-              desc="Log in to see all active valet tickets and their current status in real time — Pending, In Transit, Ready, and Completed."
+              icon={<Building size={14} />}
+              title="Manage Organizations (OUs)"
+              desc="Create and manage client organizations (e.g. Marriott, Sony, Panasonic). Each OU is fully isolated — its data is never visible to other OUs."
             />
             <Item
-              icon={<Car size={14} />}
-              title="Vehicle Roster"
-              desc="Access the Vehicle Roster to see all active vehicles, their assigned parking sector and location, and current ticket status."
+              icon={<Users size={14} />}
+              title="All Users & Roles"
+              desc="Create accounts at any role level (Super Admin, Privilege Admin, Standard Admin) and assign them to any OU. Reset passwords and manage access globally."
             />
             <Item
-              icon={<MapPin size={14} />}
-              title="Licence Plate Information"
-              desc="View licence plate details attached to each ticket, including OCR-scanned Japanese plates where available."
+              icon={<Settings size={14} />}
+              title="System Settings"
+              desc="Configure global system parameters including session behavior, licence keys, and feature flags that apply across all organizations."
             />
             <Item
-              icon={<Clock size={14} />}
-              title="Process Tracking"
-              desc="Monitor the full retrieval workflow with live countdown timers for each stage. Read-only — no ticket creation or status changes."
-            />
-          </Section>
-        )}
-
-        {/* ── STANDARD ADMIN ──────────────────────────────── */}
-        {isStandardAdmin && (
-          <Section
-            title="Operations Dashboard"
-            icon={<Car size={18} className="text-blue-600" />}
-            badge="Standard Admin"
-            badgeColor="bg-blue-600"
-          >
-            <Item
-              icon={<Ticket size={14} />}
-              title="Create Valet Tickets"
-              desc="Use New Ticket to log a vehicle. Enter guest name, room number, car details, plate, and parking sector. A unique 5-digit ticket number is generated automatically."
-            />
-            <Item
-              icon={<Clock size={14} />}
-              title="Update Ticket Status"
-              desc="Move tickets through the workflow: Pending → In Transit → Ready → Completed. Status changes trigger live notifications to the guest's tracking page."
-            />
-            <Item
-              icon={<MapPin size={14} />}
-              title="Parking & Retrieval"
-              desc="Record parking sector and location per ticket. Accept retrieval requests from guests and track the handoff process with timers."
-            />
-            <Item
-              icon={<Car size={14} />}
-              title="Car Photos"
-              desc="Attach a photo to any ticket using the camera or upload. Use the plate scanner (OCR) to auto-fill the Japanese licence plate field."
+              icon={<ShieldCheck size={14} />}
+              title="Licence Management"
+              desc="View and manage per-OU licence status. Licences control feature access and expiry for each client organization."
             />
             <Item
               icon={<BarChart2 size={14} />}
-              title="Daily Stats & Roster"
-              desc="View today's ticket counts by status and toggle the Vehicle Roster to see all active vehicles with their parking positions."
+              title="Global Analytics"
+              desc="Access system-wide statistics across all OUs and locations — total organizations, users, locations, and ticket volumes."
             />
             <Item
               icon={<FileText size={14} />}
-              title="Audit Log"
-              desc="Browse a daily record of all ticket activity — who changed what and when. Filter by date for historical review."
+              title="FAQ Management"
+              desc="Edit the guest-facing FAQ content shown on the public valet portal. Changes take effect immediately for all guests."
             />
           </Section>
         )}
@@ -195,43 +164,74 @@ export default function Docs() {
           </Section>
         )}
 
-        {/* ── SUPER ADMIN ─────────────────────────────────── */}
-        {isSuperAdmin && (
+        {/* ── STANDARD ADMIN ──────────────────────────────── */}
+        {isStandardAdmin && (
           <Section
-            title="Super Admin — System Control"
-            icon={<Crown size={18} className="text-purple-600" />}
-            badge="Super Admin"
-            badgeColor="bg-purple-600"
+            title="Operations Dashboard"
+            icon={<Car size={18} className="text-blue-600" />}
+            badge="Standard Admin"
+            badgeColor="bg-blue-600"
           >
             <Item
-              icon={<Building size={14} />}
-              title="Manage Organizations (OUs)"
-              desc="Create and manage client organizations (e.g. Marriott, Sony, Panasonic). Each OU is fully isolated — its data is never visible to other OUs."
+              icon={<Ticket size={14} />}
+              title="Create Valet Tickets"
+              desc="Use New Ticket to log a vehicle. Enter guest name, room number, car details, plate, and parking sector. A unique 5-digit ticket number is generated automatically."
             />
             <Item
-              icon={<Users size={14} />}
-              title="All Users & Roles"
-              desc="Create accounts at any role level (Super Admin, Privilege Admin, Standard Admin) and assign them to any OU. Reset passwords and manage access globally."
+              icon={<Clock size={14} />}
+              title="Update Ticket Status"
+              desc="Move tickets through the workflow: Pending → In Transit → Ready → Completed. Status changes trigger live notifications to the guest's tracking page."
             />
             <Item
-              icon={<Settings size={14} />}
-              title="System Settings"
-              desc="Configure global system parameters including session behavior, licence keys, and feature flags that apply across all organizations."
+              icon={<MapPin size={14} />}
+              title="Parking & Retrieval"
+              desc="Record parking sector and location per ticket. Accept retrieval requests from guests and track the handoff process with timers."
             />
             <Item
-              icon={<ShieldCheck size={14} />}
-              title="Licence Management"
-              desc="View and manage per-OU licence status. Licences control feature access and expiry for each client organization."
+              icon={<Car size={14} />}
+              title="Car Photos"
+              desc="Attach a photo to any ticket using the camera or upload. Use the plate scanner (OCR) to auto-fill the Japanese licence plate field."
             />
             <Item
               icon={<BarChart2 size={14} />}
-              title="Global Analytics"
-              desc="Access system-wide statistics across all OUs and locations — total organizations, users, locations, and ticket volumes."
+              title="Daily Stats & Roster"
+              desc="View today's ticket counts by status and toggle the Vehicle Roster to see all active vehicles with their parking positions."
             />
             <Item
               icon={<FileText size={14} />}
-              title="FAQ Management"
-              desc="Edit the guest-facing FAQ content shown on the public valet portal. Changes take effect immediately for all guests."
+              title="Audit Log"
+              desc="Browse a daily record of all ticket activity — who changed what and when. Filter by date for historical review."
+            />
+          </Section>
+        )}
+
+        {/* ── STANDARD USER ───────────────────────────────── */}
+        {isStandardUser && (
+          <Section
+            title="Standard User — Read-Only Access"
+            icon={<Eye size={18} className="text-green-600" />}
+            badge="Standard User"
+            badgeColor="bg-green-600"
+          >
+            <Item
+              icon={<Eye size={14} />}
+              title="View Live Ticket Activity"
+              desc="Log in to see all active valet tickets and their current status in real time — Pending, In Transit, Ready, and Completed."
+            />
+            <Item
+              icon={<Car size={14} />}
+              title="Vehicle Roster"
+              desc="Access the Vehicle Roster to see all active vehicles, their assigned parking sector and location, and current ticket status."
+            />
+            <Item
+              icon={<MapPin size={14} />}
+              title="Licence Plate Information"
+              desc="View licence plate details attached to each ticket, including OCR-scanned Japanese plates where available."
+            />
+            <Item
+              icon={<Clock size={14} />}
+              title="Process Tracking"
+              desc="Monitor the full retrieval workflow with live countdown timers for each stage. Read-only — no ticket creation or status changes."
             />
           </Section>
         )}
