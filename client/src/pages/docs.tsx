@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, User, ShieldCheck, Shield, Crown, Ticket, Car, Clock, MapPin, Users, Building, Settings, FileText, BarChart2, Upload, Key, Eye } from "lucide-react";
 import { Link } from "wouter";
 
-type Role = "superadmin" | "privilege_admin" | "admin" | undefined;
+type Role = "superadmin" | "privilege_admin" | "standard_admin" | "standard_user" | undefined;
 
 function Section({ title, icon, badge, badgeColor, children }: {
   title: string;
@@ -53,7 +53,8 @@ export default function Docs() {
 
   const isSuperAdmin = role === "superadmin";
   const isPrivilegeAdmin = role === "privilege_admin" || isSuperAdmin;
-  const isStandardAdmin = role === "admin" || isPrivilegeAdmin;
+  const isStandardAdmin = role === "standard_admin" || isPrivilegeAdmin;
+  const isStandardUser = role === "standard_user" || isStandardAdmin;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -72,8 +73,8 @@ export default function Docs() {
             </div>
           </div>
           {user && (
-            <Badge className="bg-regis-navy text-white text-xs capitalize">
-              {role === "superadmin" ? "Super Admin" : role === "privilege_admin" ? "Privilege Admin" : role === "admin" ? "Standard Admin" : "User"}
+            <Badge className="bg-regis-navy text-white text-xs">
+              {role === "superadmin" ? "Super Admin" : role === "privilege_admin" ? "Privilege Admin" : role === "standard_admin" ? "Standard Admin" : role === "standard_user" ? "Standard User" : "User"}
             </Badge>
           )}
         </div>
@@ -81,29 +82,36 @@ export default function Docs() {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
 
-        {/* ── CUSTOMER / USER ─────────────────────────────── */}
-        <Section
-          title="Guest Self-Service"
-          icon={<User size={18} className="text-gray-500" />}
-          badge="All Users"
-          badgeColor="bg-gray-500"
-        >
-          <Item
-            icon={<Ticket size={14} />}
-            title="Retrieve Your Vehicle"
-            desc="Go to the hotel's valet portal and enter your 5-digit ticket number along with the name on the ticket to request your car."
-          />
-          <Item
-            icon={<Clock size={14} />}
-            title="Live Progress Tracking"
-            desc="Once your request is submitted, track your vehicle's status in real time — from retrieval through transit to ready for pickup."
-          />
-          <Item
-            icon={<Eye size={14} />}
-            title="Countdown Timers"
-            desc="Each stage shows a live countdown so you always know how long until your car is ready."
-          />
-        </Section>
+        {/* ── STANDARD USER ───────────────────────────────── */}
+        {isStandardUser && (
+          <Section
+            title="Standard User — Read-Only Access"
+            icon={<Eye size={18} className="text-green-600" />}
+            badge="Standard User"
+            badgeColor="bg-green-600"
+          >
+            <Item
+              icon={<Eye size={14} />}
+              title="View Live Ticket Activity"
+              desc="Log in to see all active valet tickets and their current status in real time — Pending, In Transit, Ready, and Completed."
+            />
+            <Item
+              icon={<Car size={14} />}
+              title="Vehicle Roster"
+              desc="Access the Vehicle Roster to see all active vehicles, their assigned parking sector and location, and current ticket status."
+            />
+            <Item
+              icon={<MapPin size={14} />}
+              title="Licence Plate Information"
+              desc="View licence plate details attached to each ticket, including OCR-scanned Japanese plates where available."
+            />
+            <Item
+              icon={<Clock size={14} />}
+              title="Process Tracking"
+              desc="Monitor the full retrieval workflow with live countdown timers for each stage. Read-only — no ticket creation or status changes."
+            />
+          </Section>
+        )}
 
         {/* ── STANDARD ADMIN ──────────────────────────────── */}
         {isStandardAdmin && (
@@ -227,6 +235,30 @@ export default function Docs() {
             />
           </Section>
         )}
+
+        {/* ── GUEST SELF-SERVICE ──────────────────────────── */}
+        <Section
+          title="Guest Self-Service"
+          icon={<User size={18} className="text-gray-500" />}
+          badge="All Users"
+          badgeColor="bg-gray-500"
+        >
+          <Item
+            icon={<Ticket size={14} />}
+            title="Retrieve Your Vehicle"
+            desc="Go to the hotel's valet portal and enter your 5-digit ticket number along with the name on the ticket to request your car."
+          />
+          <Item
+            icon={<Clock size={14} />}
+            title="Live Progress Tracking"
+            desc="Once your request is submitted, track your vehicle's status in real time — from retrieval through transit to ready for pickup."
+          />
+          <Item
+            icon={<Eye size={14} />}
+            title="Countdown Timers"
+            desc="Each stage shows a live countdown so you always know how long until your car is ready."
+          />
+        </Section>
 
         <p className="text-center text-xs text-gray-400 mt-2 mb-6">
           Valet-S · Documentation v1.0 · Content shown based on your access level.
