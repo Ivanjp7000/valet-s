@@ -2940,7 +2940,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'departed-today') return (
                           <SortablePanel key="departed-today" id="departed-today"
-                            title="Check Out Departed Today"
+                            title="Checked-Out Departures Today"
                             badge={<span className="ml-2 bg-gray-200 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">{departedToday.length}</span>}
                             icon={<LogOut className="text-gray-600" size={18} />} headerClass="text-gray-600"
                             expanded={isExpanded} onToggle={toggle}
@@ -2959,7 +2959,7 @@ export default function StaffDashboard() {
 
                         if (panelId === 'departed-history') return (
                           <SortablePanel key="departed-history" id="departed-history"
-                            title="Check Out Departed History"
+                            title="Checked-Out Departure History"
                             badge={<span className="ml-2 bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{departedHistory.length}</span>}
                             icon={<LogOut className="text-gray-500" size={18} />} headerClass="text-gray-500"
                             expanded={isExpanded} onToggle={toggle}
