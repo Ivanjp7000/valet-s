@@ -2722,6 +2722,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // PATCH /api/gs/messages/:id — privilege_admin or superadmin edits a message
+  app.patch('/api/gs/messages/:id', isAuthenticated, requireReadAccess, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+      const { content } = req.body;
+      if (!content || typeof content !== 'string' || !content.trim()) {
+        return res.status(400).json({ message: 'Content is required' });
+      }
+      const msg = await storage.updateGSMessage(req.params.id, content.trim());
+      if (!msg) return res.status(404).json({ message: 'Message not found' });
+      if (user.ouId) broadcastToOU(user.ouId, { type: 'gs_message_updated', data: msg });
+      res.json(msg);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // DELETE /api/gs/messages/:id — privilege_admin or superadmin deletes a message
+  app.delete('/api/gs/messages/:id', isAuthenticated, requireReadAccess, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (user.role !== 'privilege_admin' && user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Insufficient permissions' });
+      }
+      await storage.deleteGSMessage(req.params.id);
+      if (user.ouId) broadcastToOU(user.ouId, { type: 'gs_message_deleted', data: { id: req.params.id } });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // ── Calendar routes ───────────────────────────────────────────────────────────
 
   // GET /api/calendar/events — all calendar events for the OU

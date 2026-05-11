@@ -151,6 +151,8 @@ export interface IStorage {
   addGSReply(messageId: string, data: { senderId: string; senderName: string; content: string }): Promise<GsReply>;
   markGSMessageScheduled(messageId: string, calendarEventId: string): Promise<GsMessage | undefined>;
   acknowledgeGSMessage(messageId: string): Promise<GsMessage | undefined>;
+  updateGSMessage(messageId: string, content: string): Promise<GsMessage | undefined>;
+  deleteGSMessage(messageId: string): Promise<void>;
   getCalendarEvents(ouId: string): Promise<CalendarEvent[]>;
   createCalendarEvent(data: { ouId: string; title: string; eventDate: string; startTime?: string; endTime?: string; details?: string; category?: string; createdBy: string; createdByName: string; sourceMessageId?: string }): Promise<CalendarEvent>;
   updateCalendarEvent(id: string, data: Partial<{ title: string; eventDate: string; startTime: string; endTime: string; details: string; category: string }>): Promise<CalendarEvent | undefined>;
@@ -913,6 +915,15 @@ export class DatabaseStorage implements IStorage {
   async acknowledgeGSMessage(messageId: string): Promise<GsMessage | undefined> {
     const [row] = await db.update(gsMessages).set({ acknowledgedAt: new Date() }).where(eq(gsMessages.id, messageId)).returning();
     return row;
+  }
+
+  async updateGSMessage(messageId: string, content: string): Promise<GsMessage | undefined> {
+    const [row] = await db.update(gsMessages).set({ content }).where(eq(gsMessages.id, messageId)).returning();
+    return row;
+  }
+
+  async deleteGSMessage(messageId: string): Promise<void> {
+    await db.delete(gsMessages).where(eq(gsMessages.id, messageId));
   }
 
   async getCalendarEvents(ouId: string): Promise<CalendarEvent[]> {

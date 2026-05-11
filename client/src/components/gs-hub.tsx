@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { MessageSquare, Calendar, Plus, Send, ChevronDown, ChevronUp, CheckCircle2, CalendarPlus, Clock, Tag, Pencil, Trash2, ChevronLeft, ChevronRight, Users, UserCheck, UserX } from "lucide-react";
 
 type GsMessage = {
@@ -296,11 +297,14 @@ function CalendarEventDialog({ event, open, onClose }: { event?: CalendarEvent; 
 }
 
 // ── Single message card ───────────────────────────────────────────────────────
-function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; currentUserId: string; isGSMember: boolean }) {
+function MessageCard({ msg, currentUserId, isGSMember, canModerate }: { msg: GsMessage; currentUserId: string; isGSMember: boolean; canModerate: boolean }) {
   const [repliesExpanded, setRepliesExpanded] = useState(true);
   const [replyText, setReplyText] = useState("");
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editText, setEditText] = useState(msg.content);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -335,6 +339,25 @@ function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; curre
     onError: () => toast({ title: "Failed to acknowledge", variant: "destructive" }),
   });
 
+  const editMessage = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/gs/messages/${msg.id}`, { content: editText.trim() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+      setEditMode(false);
+      toast({ title: "Message updated" });
+    },
+    onError: () => toast({ title: "Failed to update message", variant: "destructive" }),
+  });
+
+  const deleteMessage = useMutation({
+    mutationFn: () => apiRequest("DELETE", `/api/gs/messages/${msg.id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/messages"] });
+      toast({ title: "Message deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete message", variant: "destructive" }),
+  });
+
   const isMine = msg.senderId === currentUserId;
   const hasReplies = msg.replies.length > 0;
   const isScheduled = msg.status === "scheduled";
@@ -361,8 +384,51 @@ function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; curre
         </div>
       </div>
 
-      {/* Message content */}
-      <p className="text-sm text-gray-800 leading-relaxed">{msg.content}</p>
+      {/* Admin moderation controls */}
+      {canModerate && !editMode && (
+        <div className="flex items-center gap-1.5 justify-end">
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => { setEditText(msg.content); setEditMode(true); }}
+            className="h-6 px-2 text-[11px] text-gray-500 hover:text-blue-600 hover:bg-blue-50 gap-1"
+          >
+            <Pencil size={11} /> Edit
+          </Button>
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => setDeleteOpen(true)}
+            className="h-6 px-2 text-[11px] text-gray-500 hover:text-red-600 hover:bg-red-50 gap-1"
+          >
+            <Trash2 size={11} /> Delete
+          </Button>
+        </div>
+      )}
+
+      {/* Message content / edit mode */}
+      {editMode ? (
+        <div className="space-y-2">
+          <Textarea
+            value={editText}
+            onChange={e => setEditText(e.target.value)}
+            rows={3}
+            className="resize-none text-sm"
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEditMode(false)} className="h-7 text-xs">Cancel</Button>
+            <Button
+              size="sm"
+              onClick={() => editMessage.mutate()}
+              disabled={!editText.trim() || editMessage.isPending}
+              className="h-7 text-xs bg-regis-navy hover:bg-regis-navy/90 text-white gap-1.5"
+            >
+              <CheckCircle2 size={12} /> Save Changes
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-800 leading-relaxed">{msg.content}</p>
+      )}
 
       {/* Replies */}
       {hasReplies && (
@@ -480,6 +546,26 @@ function MessageCard({ msg, currentUserId, isGSMember }: { msg: GsMessage; curre
       )}
 
       <ConvertToEventDialog message={msg} open={convertOpen} onClose={() => setConvertOpen(false)} />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the message and all its replies. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMessage.mutate()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -817,7 +903,7 @@ export function GSHub({ wsSignal }: { wsSignal?: number }) {
             </div>
           ) : (
             messages.map(m => (
-              <MessageCard key={m.id} msg={m} currentUserId={user?.id ?? ""} isGSMember={isGSMember} />
+              <MessageCard key={m.id} msg={m} currentUserId={user?.id ?? ""} isGSMember={isGSMember} canModerate={isAdmin} />
             ))
           )}
         </div>
