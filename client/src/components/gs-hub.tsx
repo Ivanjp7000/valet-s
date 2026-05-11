@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Calendar, Plus, Send, ChevronDown, ChevronUp, CheckCircle2, CalendarPlus, Clock, Tag, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { MessageSquare, Calendar, Plus, Send, ChevronDown, ChevronUp, CheckCircle2, CalendarPlus, Clock, Tag, Pencil, Trash2, ChevronLeft, ChevronRight, Users, UserCheck, UserX } from "lucide-react";
 
 type GsMessage = {
   id: string;
@@ -537,10 +537,113 @@ function CalendarView({ isGSMember }: { isGSMember: boolean }) {
   );
 }
 
+// ── Members management view (Privilege Admin / Super Admin only) ───────────────
+type StaffUser = { id: string; firstName: string | null; lastName: string | null; email: string | null; role: string | null; };
+type GsMemberRow = { id: string; userId: string; ouId: string; addedBy: string; createdAt: string; };
+
+function MembersView() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery<StaffUser[]>({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const { data: gsMembers = [], isLoading: membersLoading } = useQuery<GsMemberRow[]>({
+    queryKey: ["/api/gs/members"],
+    queryFn: async () => {
+      const res = await fetch("/api/gs/members", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const memberIds = new Set(gsMembers.map(m => m.userId));
+
+  const addMember = useMutation({
+    mutationFn: (userId: string) => apiRequest("POST", `/api/gs/members/${userId}`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/members"] });
+      qc.invalidateQueries({ queryKey: ["/api/gs/members/me"] });
+      toast({ title: "Added to GS group" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removeMember = useMutation({
+    mutationFn: (userId: string) => apiRequest("DELETE", `/api/gs/members/${userId}`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/gs/members"] });
+      qc.invalidateQueries({ queryKey: ["/api/gs/members/me"] });
+      toast({ title: "Removed from GS group" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const isPending = addMember.isPending || removeMember.isPending;
+
+  if (usersLoading || membersLoading) {
+    return <p className="text-xs text-gray-400 text-center py-6">Loading…</p>;
+  }
+
+  const eligible = allUsers.filter(u => u.role !== 'superadmin');
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500 mb-3">
+        GS Members can reply to messages and manage the shared calendar. Toggle membership below.
+      </p>
+      {eligible.length === 0 && (
+        <p className="text-center text-xs text-gray-400 py-6">No staff users found in your OU.</p>
+      )}
+      {eligible.map(u => {
+        const isMem = memberIds.has(u.id);
+        const name = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || u.id;
+        const roleLabel: Record<string, string> = { privilege_admin: "Privilege Admin", standard_admin: "Standard Admin", standard_user: "Standard User" };
+        return (
+          <div key={u.id} className="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-3 py-2.5 bg-white">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${isMem ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-500"}`}>
+                {name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium truncate">{name}</p>
+                <p className="text-[10px] text-gray-400">{roleLabel[u.role ?? ""] ?? u.role}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {isMem && (
+                <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                  <UserCheck size={10} /> GS
+                </span>
+              )}
+              <Button
+                size="sm"
+                variant={isMem ? "outline" : "default"}
+                className={`h-7 text-[11px] px-2 ${isMem ? "border-red-300 text-red-600 hover:bg-red-50" : "bg-purple-600 hover:bg-purple-700 text-white"}`}
+                disabled={isPending}
+                onClick={() => isMem ? removeMember.mutate(u.id) : addMember.mutate(u.id)}
+              >
+                {isMem ? <><UserX size={11} className="mr-1" />Remove</> : <><UserCheck size={11} className="mr-1" />Add</>}
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main GS Hub component ─────────────────────────────────────────────────────
 export function GSHub({ wsSignal }: { wsSignal?: number }) {
   const { user } = useAuth();
-  const [tab, setTab] = useState<"messages" | "calendar">("messages");
+  const isAdmin = user?.role === 'privilege_admin' || user?.role === 'superadmin';
+  const [tab, setTab] = useState<"messages" | "calendar" | "members">("messages");
   const [composeOpen, setComposeOpen] = useState(false);
   const qc = useQueryClient();
 
@@ -583,11 +686,20 @@ export function GSHub({ wsSignal }: { wsSignal?: number }) {
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${tab === "calendar" ? "bg-regis-navy text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
             <Calendar size={13} /> Calendar
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => setTab("members")}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors ${tab === "members" ? "bg-purple-700 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+              <Users size={13} /> Members
+            </button>
+          )}
         </div>
-        <Button size="sm" onClick={() => setComposeOpen(true)}
-          className="h-8 text-xs bg-regis-gold hover:bg-regis-gold/90 text-regis-navy font-bold gap-1 flex-shrink-0">
-          <Plus size={12} /> Message GS
-        </Button>
+        {tab !== "members" && (
+          <Button size="sm" onClick={() => setComposeOpen(true)}
+            className="h-8 text-xs bg-regis-gold hover:bg-regis-gold/90 text-regis-navy font-bold gap-1 flex-shrink-0">
+            <Plus size={12} /> Message GS
+          </Button>
+        )}
       </div>
 
       {/* Pending acknowledgements banner */}
@@ -627,6 +739,8 @@ export function GSHub({ wsSignal }: { wsSignal?: number }) {
       )}
 
       {tab === "calendar" && <CalendarView isGSMember={isMember} />}
+
+      {tab === "members" && isAdmin && <MembersView />}
 
       <ComposeDialog open={composeOpen} onClose={() => setComposeOpen(false)} />
     </div>
