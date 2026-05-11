@@ -120,7 +120,7 @@ export default function CreateAccount() {
               <Shield className="text-regis-gold" size={22} />
             </div>
             <h2 className="text-xl font-semibold text-regis-navy">Create Account</h2>
-            <p className="text-xs text-gray-400 mt-1">St. Regis Osaka Valet System</p>
+            <p className="text-xs text-gray-400 mt-1">Valet System</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
