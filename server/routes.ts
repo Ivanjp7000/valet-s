@@ -111,7 +111,7 @@ function getResendClient(): { client: Resend; fromEmail: string } {
 
 async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
   const { client, fromEmail } = getResendClient();
-  await client.emails.send({
+  const result = await client.emails.send({
     from: fromEmail,
     to: toEmail,
     subject: "Your Valet System Login Code",
@@ -132,6 +132,8 @@ async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
       </div>
     `,
   });
+  console.log(`[OTP email] to=${toEmail} from=${fromEmail} result=${JSON.stringify(result)}`);
+  if (result.error) throw new Error(`Resend error: ${JSON.stringify(result.error)}`);
 }
 
 async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullName: string): Promise<void> {
