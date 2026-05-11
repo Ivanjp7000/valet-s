@@ -109,14 +109,21 @@ Preferred communication style: Simple, everyday language.
 - **Billing**: Required on Google Cloud project; first 1,000 scans/month free then ~$1.50/1,000
 
 ## Thermal Label Printing
-- **Printer**: Phomemo thermal printer (50mm x 70mm labels)
+- **Printer Model**: Phomemo M110s (Bluetooth thermal label printer)
 - **Technology**: Client-side PDF generation using pdf-lib
-- **Implementation**: Generates PDF with exact page dimensions (50mm x 70mm) and opens in new tab for printing
+- **Label size**: 50mm × 70mm
+- **Implementation**: Generates PDF with exact page dimensions (50mm × 70mm) and opens in new tab for printing
+- **Printing workflow per device**:
+  - **iPhone/iPad**: PDF opens in Safari → tap Share → "Open in Phomemo" app → Print (Bluetooth to M110s)
+  - **Android**: PDF opens → share to Phomemo app → Print (Bluetooth to M110s)
+  - **Desktop/Mac**: PDF opens in new tab → Ctrl/Cmd+P → select Phomemo M110s → set paper to 50×70mm
+- **Name label** (valet-ticket-wizard): Prints guest name + QR code + "Visit Valet-s.com" on 50×70mm label
 - **Key considerations**: 
-  - Uses MediaBox, CropBox, BleedBox for printer compatibility
+  - Uses MediaBox for printer compatibility
   - Cursor-based layout fills entire label from top to bottom
   - Footer positioned at fixed bottom margin
-  - Requires printer paper size to match label dimensions (50x70mm)
+  - Requires printer paper size to match label dimensions (50×70mm)
+  - M110s connects via Bluetooth 3.0 — pair via Phomemo app before printing
 
 ## Development Tools
 - **Vite**: Frontend build tool with HMR and development server
