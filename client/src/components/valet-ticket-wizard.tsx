@@ -1030,7 +1030,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 className="w-full border-dashed border-purple-400 text-purple-600 hover:bg-purple-50 hover:border-purple-500 text-sm font-medium"
                 onClick={() => setFormData({ ...formData, ticketNumber: PSEUDO_TICKET })}
               >
-                + Add Pseudo Ticket
+                + Generate Ticket
               </Button>
               {formData.ticketNumber === PSEUDO_TICKET && (
                 <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
