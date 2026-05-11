@@ -8,7 +8,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User, insertOULicenseSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 // In-memory OTP store: userId → { code, expiresAt }
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
@@ -99,20 +99,23 @@ function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Resend client — uses RESEND_API_KEY secret directly
-function getResendClient(): { client: Resend; fromEmail: string } {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error('RESEND_API_KEY is not set');
-  return {
-    client: new Resend(apiKey),
-    fromEmail: 'onboarding@resend.dev',
-  };
+// Gmail SMTP transporter
+function getMailTransporter() {
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!user || !pass) throw new Error('GMAIL_USER or GMAIL_APP_PASSWORD is not set');
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
 }
 
 async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
-  const { client, fromEmail } = getResendClient();
-  const result = await client.emails.send({
-    from: fromEmail,
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
+  console.log(`[OTP email] Sending to=${toEmail} from=${fromEmail}`);
+  const info = await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
     to: toEmail,
     subject: "Your Valet System Login Code",
     html: `
@@ -132,14 +135,14 @@ async function sendOtpEmail(toEmail: string, code: string): Promise<void> {
       </div>
     `,
   });
-  console.log(`[OTP email] to=${toEmail} from=${fromEmail} result=${JSON.stringify(result)}`);
-  if (result.error) throw new Error(`Resend error: ${JSON.stringify(result.error)}`);
+  console.log(`[OTP email] Sent OK messageId=${info.messageId}`);
 }
 
 async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullName: string): Promise<void> {
-  const { client, fromEmail } = getResendClient();
-  await client.emails.send({
-    from: fromEmail,
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
+  await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
     to: toEmail,
     subject: "Verify your email — St. Regis Osaka Valet System",
     html: `
@@ -166,10 +169,11 @@ async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullNam
 }
 
 async function sendWelcomeEmail(toEmail: string, fullName: string): Promise<void> {
-  const { client, fromEmail } = getResendClient();
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
   const loginUrl = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000';
-  await client.emails.send({
-    from: fromEmail,
+  await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
     to: toEmail,
     subject: "Your account is ready — St. Regis Osaka Valet System",
     html: `
@@ -200,9 +204,10 @@ async function sendWelcomeEmail(toEmail: string, fullName: string): Promise<void
 }
 
 async function sendApprovalEmail(toEmail: string, fullName: string): Promise<void> {
-  const { client, fromEmail } = getResendClient();
-  await client.emails.send({
-    from: fromEmail,
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
+  await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
     to: toEmail,
     subject: "Your account has been approved — St. Regis Osaka Valet System",
     html: `
