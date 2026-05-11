@@ -29,8 +29,23 @@ function getStageFromStatus(status: string): number {
 
 export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTrackerProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATIONS.retrieving);
+  const [cancelling, setCancelling] = useState(false);
   const { lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
+
+  // Calls the server to cancel the retrieval request, then navigates back
+  const handleCancelRequest = async () => {
+    setCancelling(true);
+    try {
+      await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}/cancel-retrieval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestName }),
+      });
+    } catch {}
+    setCancelling(false);
+    onBack();
+  };
 
   const { data: ticket } = useQuery<ValetTicket>({
     queryKey: ["/api/tickets", ticketNumber, guestName],
@@ -171,11 +186,12 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
 
         <Button
           variant="ghost"
-          onClick={onBack}
+          onClick={handleCancelRequest}
+          disabled={cancelling}
           className="mx-auto mb-8 text-gray-400 hover:text-gray-600"
         >
           <X className="mr-2" size={16} />
-          Cancel Request
+          {cancelling ? "Cancelling…" : "Cancel Request"}
         </Button>
       </div>
     );
@@ -384,11 +400,12 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
 
           <Button
             variant="ghost"
-            onClick={onBack}
+            onClick={handleCancelRequest}
+            disabled={cancelling}
             className="w-full mt-4 text-gray-400 hover:text-gray-600"
           >
             <X className="mr-2" size={16} />
-            Cancel Request
+            {cancelling ? "Cancelling…" : "Cancel Request"}
           </Button>
         </div>
       </div>

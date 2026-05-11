@@ -1258,11 +1258,60 @@ export default function StaffDashboard() {
           const ticket = data.data;
           setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== ticket?.ticketNumber));
         }
+        if (data.type === 'retrieval_cancelled') {
+          const cancelled = data.data;
+          setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== cancelled?.ticketNumber));
+          queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+        }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
   }, [lastMessage, queryClient, user]);
+
+  // Reconcile popup with polled data — shows popup for any retrieval_requested ticket
+  // even if the WS event was missed (e.g. page was loading when request arrived)
+  useEffect(() => {
+    if (!activeTickets) return;
+    const pendingSet = new Set(
+      activeTickets.filter(t => t.status === 'retrieval_requested').map(t => t.ticketNumber)
+    );
+
+    // Add any pending tickets not yet in the popup queue
+    const missing = activeTickets.filter(
+      t => t.status === 'retrieval_requested'
+    );
+    if (missing.length > 0) {
+      setRetrievalRequests(prev => {
+        const next = [...prev];
+        missing.forEach(t => {
+          if (!next.some(r => r.ticketNumber === t.ticketNumber)) {
+            const isSameOU = user?.role === 'superadmin' || !t.ouId || t.ouId === user?.ouId;
+            if (isSameOU) {
+              next.push({
+                ticketNumber: t.ticketNumber,
+                guestName: t.guestName,
+                carMake: t.carMake,
+                carModel: t.carModel,
+                carColor: t.carColor,
+                licensePlate: t.licensePlate,
+                visitorType: t.visitorType,
+                visitorSubType: t.visitorSubType,
+                ouId: t.ouId,
+                locationId: t.locationId,
+                parkingLocation: t.parkingLocation,
+                parkingSector: t.parkingSector,
+              });
+            }
+          }
+        });
+        return next;
+      });
+    }
+
+    // Remove from queue any tickets no longer retrieval_requested (cancelled/accepted by another staff)
+    setRetrievalRequests(prev => prev.filter(r => pendingSet.has(r.ticketNumber)));
+  }, [activeTickets, user]);
 
   const acceptRetrievalMutation = useMutation({
     mutationFn: async (ticketNumber: string) => {

@@ -24,26 +24,58 @@ interface RetrievalNotificationPopupProps {
   onDismiss: (ticketNumber: string) => void;
 }
 
-function playAlertSound() {
+// Single persistent AudioContext — created once and kept alive
+let _audioCtx: AudioContext | null = null;
+
+function getAudioCtx(): AudioContext | null {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const notes = [523, 659, 784, 659, 784]; // C5 E5 G5 E5 G5
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const start = ctx.currentTime + i * 0.15;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.35, start + 0.05);
-      gain.gain.linearRampToValueAtTime(0, start + 0.13);
-      osc.start(start);
-      osc.stop(start + 0.15);
-    });
+    if (!_audioCtx) {
+      _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return _audioCtx;
   } catch {
-    // Audio not available — silent fallback
+    return null;
+  }
+}
+
+// Register a one-time listener to unlock audio on first user gesture
+function registerAudioUnlock() {
+  const resume = () => {
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+  };
+  document.addEventListener("pointerdown", resume, { once: true });
+  document.addEventListener("keydown", resume, { once: true });
+}
+
+function playAlertSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+
+  const doPlay = () => {
+    try {
+      const notes = [523, 659, 784, 659, 784]; // C5 E5 G5 E5 G5
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const start = ctx.currentTime + i * 0.15;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.35, start + 0.05);
+        gain.gain.linearRampToValueAtTime(0, start + 0.13);
+        osc.start(start);
+        osc.stop(start + 0.15);
+      });
+    } catch {}
+  };
+
+  if (ctx.state === "suspended") {
+    ctx.resume().then(doPlay).catch(() => {});
+  } else {
+    doPlay();
   }
 }
 
@@ -53,6 +85,11 @@ export function RetrievalNotificationPopup({
   onDismiss,
 }: RetrievalNotificationPopupProps) {
   const intervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
+
+  // Unlock audio on first user gesture as early as possible
+  useEffect(() => {
+    registerAudioUnlock();
+  }, []);
 
   // Repeat alert every 4 seconds per pending request until accepted/dismissed
   useEffect(() => {

@@ -414,6 +414,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public: customer cancels their own retrieval request — moves ticket back to 'active'
+  app.post('/api/tickets/:ticketNumber/cancel-retrieval', async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { guestName } = req.body;
+      if (!guestName || typeof guestName !== 'string' || !guestName.trim()) {
+        return res.status(400).json({ message: 'Name required' });
+      }
+      const ticket = await storage.getValetTicket(ticketNumber);
+      if (!ticket || !namesMatch(guestName, ticket.guestName)) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+      if (ticket.status !== 'retrieval_requested') {
+        return res.status(400).json({ message: 'No pending retrieval request to cancel' });
+      }
+      const updated = await storage.updateValetTicketStatus(ticketNumber, 'active');
+      broadcastToOU(updated!.ouId, {
+        type: 'retrieval_cancelled',
+        data: { ticketNumber },
+      });
+      res.json({ message: 'Retrieval request cancelled' });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Schedule a future retrieval
   app.post('/api/tickets/:ticketNumber/schedule-retrieval', async (req: any, res) => {
     try {
