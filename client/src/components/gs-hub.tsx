@@ -573,9 +573,14 @@ function MessageCard({ msg, currentUserId, isGSMember, canModerate }: { msg: GsM
 // ── Calendar view ─────────────────────────────────────────────────────────────
 function CalendarView({ isGSMember }: { isGSMember: boolean }) {
   const today = new Date();
+  // Use local date (not UTC) to avoid timezone off-by-one issues
+  const localTodayStr = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,"0")}-${today.getDate().toString().padStart(2,"0")}`;
+
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth()); // 0-indexed
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(localTodayStr);
   const [addOpen, setAddOpen] = useState(false);
+  const [eventsViewOpen, setEventsViewOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<CalendarEvent | undefined>();
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -607,8 +612,6 @@ function CalendarView({ isGSMember }: { isGSMember: boolean }) {
   const monthStr = `${year}-${(month + 1).toString().padStart(2, "0")}`;
   const monthEvents = events.filter(e => e.eventDate.startsWith(monthStr));
 
-  const todayStr = today.toISOString().slice(0, 10);
-
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -618,21 +621,46 @@ function CalendarView({ isGSMember }: { isGSMember: boolean }) {
     return parseInt(d) === day;
   });
 
+  // Events shown in the list below: selected day if it has events, otherwise all month
+  const selectedDayEvents = events.filter(e => e.eventDate === selectedDateStr);
+  const listEvents = selectedDayEvents.length > 0 ? selectedDayEvents : monthEvents;
+  const listLabel = selectedDayEvents.length > 0
+    ? `Events on ${selectedDateStr.split("-").reverse().join("/")} `
+    : "This Month's Events";
+
+  // All events sorted for Events View table
+  const allEventsSorted = [...events].sort((a, b) => {
+    const d = a.eventDate.localeCompare(b.eventDate);
+    if (d !== 0) return d;
+    return (a.startTime ?? "").localeCompare(b.startTime ?? "");
+  });
+
+  function fmtEvDate(dateStr: string) {
+    const [y, m, d] = dateStr.split("-");
+    return `${d}/${m}/${y}`;
+  }
+
   return (
     <div className="space-y-3">
-      {/* Month navigation */}
+      {/* Month navigation + buttons */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button onClick={prevMonth} className="p-1 rounded hover:bg-gray-100"><ChevronLeft size={16} /></button>
           <span className="text-sm font-semibold text-gray-700 w-36 text-center">{MONTH_NAMES[month]} {year}</span>
           <button onClick={nextMonth} className="p-1 rounded hover:bg-gray-100"><ChevronRight size={16} /></button>
         </div>
-        {isGSMember && (
-          <Button size="sm" onClick={() => setAddOpen(true)}
-            className="h-7 text-xs bg-regis-navy hover:bg-regis-navy/90 text-white gap-1">
-            <Plus size={12} /> Add Event
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => setEventsViewOpen(true)}
+            className="h-7 text-xs border-gray-300 text-gray-600 hover:bg-gray-50 gap-1">
+            <Calendar size={12} /> Events View
           </Button>
-        )}
+          {isGSMember && (
+            <Button size="sm" onClick={() => setAddOpen(true)}
+              className="h-7 text-xs bg-regis-navy hover:bg-regis-navy/90 text-white gap-1">
+              <Plus size={12} /> Add Event
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Calendar grid */}
@@ -645,16 +673,27 @@ function CalendarView({ isGSMember }: { isGSMember: boolean }) {
             if (!day) return <div key={`e${i}`} className="min-h-[56px] border-r border-b border-gray-100 bg-gray-50/40" />;
             const dayStr = `${year}-${(month + 1).toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
             const dayEvents = eventsForDay(day);
-            const isToday = dayStr === todayStr;
+            const isToday = dayStr === localTodayStr;
+            const isSelected = dayStr === selectedDateStr;
             return (
-              <div key={day} className={`min-h-[56px] border-r border-b border-gray-100 p-1 ${isToday ? "bg-regis-gold/10" : ""}`}>
-                <div className={`text-xs font-semibold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${isToday ? "bg-regis-navy text-white" : "text-gray-600"}`}>
+              <div
+                key={day}
+                onClick={() => setSelectedDateStr(dayStr)}
+                className={`min-h-[56px] border-r border-b border-gray-100 p-1 cursor-pointer transition-colors
+                  ${isToday ? "bg-regis-gold/10" : ""}
+                  ${isSelected && !isToday ? "bg-blue-50" : ""}
+                  hover:bg-gray-50`}
+              >
+                <div className={`text-xs font-semibold mb-1 w-5 h-5 flex items-center justify-center rounded-full
+                  ${isToday ? "bg-regis-navy text-white" : ""}
+                  ${isSelected && !isToday ? "bg-blue-500 text-white" : ""}
+                  ${!isToday && !isSelected ? "text-gray-600" : ""}`}>
                   {day}
                 </div>
                 <div className="space-y-0.5">
                   {dayEvents.slice(0, 2).map(ev => (
                     <div key={ev.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate font-medium border cursor-pointer hover:opacity-80 ${CATEGORY_COLORS[ev.category] || CATEGORY_COLORS.general}`}
-                      onClick={() => isGSMember && setEditEvent(ev)}
+                      onClick={e => { e.stopPropagation(); isGSMember && setEditEvent(ev); }}
                       title={`${ev.title}${ev.startTime ? " · " + ev.startTime : ""}`}>
                       {ev.startTime ? ev.startTime + " " : ""}{ev.title}
                     </div>
@@ -667,14 +706,14 @@ function CalendarView({ isGSMember }: { isGSMember: boolean }) {
         </div>
       </div>
 
-      {/* Upcoming events list */}
+      {/* Events list — shows selected day or full month */}
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">This Month's Events</p>
-        {monthEvents.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-4">No events this month</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{listLabel}</p>
+        {listEvents.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">No events</p>
         ) : (
           <div className="space-y-1.5">
-            {monthEvents.map(ev => (
+            {listEvents.map(ev => (
               <div key={ev.id} className={`flex items-start gap-2 rounded-lg border p-2.5 ${CATEGORY_COLORS[ev.category] || CATEGORY_COLORS.general}`}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -696,6 +735,45 @@ function CalendarView({ isGSMember }: { isGSMember: boolean }) {
           </div>
         )}
       </div>
+
+      {/* Events View dialog — table of all events */}
+      <Dialog open={eventsViewOpen} onOpenChange={setEventsViewOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar size={16} className="text-regis-gold" />
+              All Calendar Events
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 -mx-1 px-1">
+            {allEventsSorted.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No events yet</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left font-semibold text-gray-500 py-2 pr-3 w-24">Date</th>
+                    <th className="text-left font-semibold text-gray-500 py-2 pr-3 w-16">Time</th>
+                    <th className="text-left font-semibold text-gray-500 py-2">Event</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allEventsSorted.map(ev => (
+                    <tr key={ev.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 pr-3 font-medium text-gray-700 whitespace-nowrap">{fmtEvDate(ev.eventDate)}</td>
+                      <td className="py-2 pr-3 text-gray-500 whitespace-nowrap">{ev.startTime || "—"}</td>
+                      <td className="py-2">
+                        <div className="font-medium text-gray-800">{ev.title}</div>
+                        {ev.details && <div className="text-[10px] text-gray-400 truncate max-w-[180px]">{ev.details}</div>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {addOpen && <CalendarEventDialog open={addOpen} onClose={() => setAddOpen(false)} />}
       {editEvent && <CalendarEventDialog event={editEvent} open={!!editEvent} onClose={() => setEditEvent(undefined)} />}
