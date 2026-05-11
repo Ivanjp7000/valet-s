@@ -18,7 +18,7 @@ const STAGE_DURATIONS_MS = [
 ];
 
 const stages = [
-  { id: 1, name: "Retrieving",           icon: Car,         status: "retrieving" },
+  { id: 1, name: "Locating Car",          icon: Car,         status: "retrieving" },
   { id: 2, name: "In Transit",           icon: Car,         status: "transit"    },
   { id: 3, name: "Final Preparations",   icon: Sparkles,    status: "preparing"  },
   { id: 4, name: "Ready",                icon: CheckCircle, status: "ready"      },
@@ -271,7 +271,7 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
   const totalActive     = activeRetrievalTickets.length;
 
   const getStatusLabel = (status: string) => {
-    if (status === "retrieving") return "Retrieving";
+    if (status === "retrieving") return "Locating Car";
     if (status === "transit")    return "In Transit";
     if (status === "preparing")  return "Final Prep";
     if (status === "ready")      return "Ready";
@@ -307,7 +307,7 @@ export function UnifiedRetrievalBox({ tickets, onStageComplete, onStatusChange, 
         <div className="grid grid-cols-4 gap-2 mb-4">
           <div className="text-center p-2 bg-blue-50 rounded-lg">
             <p className="text-xl font-bold text-blue-600">{retrievingCount}</p>
-            <p className="text-[10px] text-blue-600 font-medium">Retrieving</p>
+            <p className="text-[10px] text-blue-600 font-medium">Locating Car</p>
           </div>
           <div className="text-center p-2 bg-yellow-50 rounded-lg">
             <p className="text-xl font-bold text-yellow-600">{transitCount}</p>
