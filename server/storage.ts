@@ -121,6 +121,8 @@ export interface IStorage {
   bulkImportGuestNames(names: { name: string; visitorType: string }[], ouId: string): Promise<void>;
   getGuestNameSuggestions(prefix: string, visitorType: string, ouId: string): Promise<string[]>;
   clearGuestNameImports(visitorType: string, ouId: string): Promise<void>;
+  listGuestNameImports(ouId: string): Promise<GuestNameImport[]>;
+  deleteGuestNameImport(id: string, ouId: string): Promise<void>;
 
   // Session Audit operations
   upsertSessionAudit(data: { sessionId: string; userId: string; username: string; displayName?: string; role: string; ouId?: string; ipAddress?: string; country?: string; city?: string; deviceType?: string; os?: string; browser?: string }): Promise<void>;
@@ -750,6 +752,17 @@ export class DatabaseStorage implements IStorage {
 
   async clearGuestNameImports(visitorType: string, ouId: string): Promise<void> {
     await db.delete(guestNameImports).where(and(eq(guestNameImports.ouId, ouId), eq(guestNameImports.visitorType, visitorType)));
+  }
+
+  async listGuestNameImports(ouId: string): Promise<GuestNameImport[]> {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return db.select().from(guestNameImports)
+      .where(and(eq(guestNameImports.ouId, ouId), gt(guestNameImports.createdAt, cutoff)))
+      .orderBy(asc(guestNameImports.visitorType), asc(guestNameImports.name));
+  }
+
+  async deleteGuestNameImport(id: string, ouId: string): Promise<void> {
+    await db.delete(guestNameImports).where(and(eq(guestNameImports.id, id), eq(guestNameImports.ouId, ouId)));
   }
 
   async upsertSessionAudit(data: { sessionId: string; userId: string; username: string; displayName?: string; role: string; ouId?: string; ipAddress?: string; country?: string; city?: string; deviceType?: string; os?: string; browser?: string }): Promise<void> {

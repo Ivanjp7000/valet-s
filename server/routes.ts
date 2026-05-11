@@ -2283,6 +2283,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/name-imports/list  (privilege_admin — view all active imported names)
+  app.get('/api/name-imports/list', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.json([]);
+      const names = await storage.listGuestNameImports(user.ouId);
+      res.json(names);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // DELETE /api/name-imports/:id  (privilege_admin — delete a single imported name)
+  app.delete('/api/name-imports/:id', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      await storage.deleteGuestNameImport(req.params.id, user.ouId);
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // DELETE /api/name-imports/type/:visitorType  (privilege_admin — clear all names for a visitor type)
+  app.delete('/api/name-imports/type/:visitorType', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const user = req.currentUser as User;
+      if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
+      await storage.clearGuestNameImports(req.params.visitorType, user.ouId);
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // GET /api/name-imports  (any authenticated staff — for autocomplete suggestions)
   app.get('/api/name-imports', isAuthenticated, async (req: any, res) => {
     try {

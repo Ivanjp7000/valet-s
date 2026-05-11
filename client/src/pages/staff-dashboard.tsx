@@ -740,6 +740,7 @@ export default function StaffDashboard() {
 
   // V-info Import dialog state (privilege_admin only)
   const [showVInfoImport, setShowVInfoImport] = useState(false);
+  const [vInfoTab, setVInfoTab] = useState<'import'|'manage'>('import');
   const [vInfoStep, setVInfoStep] = useState<1|2>(1);
   const [vInfoVisitorType, setVInfoVisitorType] = useState('');
   const [vInfoMethod, setVInfoMethod] = useState<'csv'|'paste'|null>(null);
@@ -936,13 +937,39 @@ export default function StaffDashboard() {
     enabled: !!user && user.role === 'privilege_admin',
   });
 
+  const { data: vInfoNameList, isLoading: vInfoListLoading } = useQuery<{ id: string; name: string; visitorType: string; createdAt: string }[]>({
+    queryKey: ["/api/name-imports/list"],
+    enabled: !!user && user.role === 'privilege_admin' && showVInfoImport && vInfoTab === 'manage',
+  });
+
   const vInfoImportMutation = useMutation({
-    mutationFn: async ({ names, visitorType }: { names: string[]; visitorType: string }) =>
-      apiRequest("POST", "/api/name-imports", { names, visitorType }),
+    mutationFn: async ({ names, visitorType }: { names: string[]; visitorType: string }) => {
+      const res = await apiRequest("POST", "/api/name-imports", { names, visitorType });
+      return res.json();
+    },
     onSuccess: (data: any) => {
       setVInfoImportedCount(data.imported ?? 0);
+      queryClient.invalidateQueries({ queryKey: ['/api/name-imports/list'] });
     },
     onError: (e: any) => toast({ title: "Import failed", description: e.message ?? "Could not import names", variant: "destructive" }),
+  });
+
+  const vInfoDeleteOneMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/name-imports/${id}`);
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/name-imports/list'] }),
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message ?? "Could not delete name", variant: "destructive" }),
+  });
+
+  const vInfoDeleteTypeMutation = useMutation({
+    mutationFn: async (visitorType: string) => {
+      const res = await apiRequest("DELETE", `/api/name-imports/type/${encodeURIComponent(visitorType)}`);
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/name-imports/list'] }),
+    onError: (e: any) => toast({ title: "Delete failed", description: e.message ?? "Could not clear names", variant: "destructive" }),
   });
 
   const issueLicenseMutation = useMutation({
@@ -4574,111 +4601,191 @@ export default function StaffDashboard() {
               </DialogTitle>
             </DialogHeader>
 
+            {/* Tabs — hidden when showing success screen */}
+            {vInfoImportedCount === null && (
+              <div className="flex border-b mb-2">
+                <button
+                  onClick={() => setVInfoTab('import')}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${vInfoTab === 'import' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                  Import Names
+                </button>
+                <button
+                  onClick={() => { setVInfoTab('manage'); queryClient.invalidateQueries({ queryKey: ['/api/name-imports/list'] }); }}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${vInfoTab === 'manage' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                  Manage Names
+                </button>
+              </div>
+            )}
+
             {vInfoImportedCount !== null ? (
               /* Success screen */
               <div className="flex flex-col items-center py-8 gap-3 text-center">
                 <CheckCircle2 size={48} className="text-green-500" />
                 <p className="text-lg font-semibold text-gray-800">{vInfoImportedCount} name{vInfoImportedCount !== 1 ? 's' : ''} imported</p>
                 <p className="text-sm text-gray-500">Names will be available for autocomplete for 24 hours.</p>
-                <Button className="mt-2 bg-regis-navy text-white" onClick={() => setShowVInfoImport(false)}>Done</Button>
-              </div>
-            ) : vInfoStep === 1 ? (
-              /* Step 1 — pick visitor type */
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">Select the guest category for this name list:</p>
-                <div className="grid grid-cols-1 gap-3">
-                  {([
-                    { key: 'hotel_guest', label: 'Hotel Staying Guest', icon: <Home size={20} /> },
-                    { key: 'restaurant',  label: 'Restaurant Valet',    icon: <FileText size={20} /> },
-                    { key: 'event',       label: 'Event',               icon: <CalendarDays size={20} /> },
-                    { key: 'others',      label: 'Others',              icon: <Users size={20} /> },
-                  ] as { key: string; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
-                    <button
-                      key={key}
-                      onClick={() => { setVInfoVisitorType(key); setVInfoStep(2); }}
-                      className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
-                    >
-                      <span className="text-blue-600">{icon}</span>
-                      <span className="font-medium text-gray-800">{label}</span>
-                      <ChevronRight size={16} className="ml-auto text-gray-400" />
-                    </button>
-                  ))}
+                <div className="flex gap-2 mt-2">
+                  <Button variant="outline" onClick={() => { setVInfoImportedCount(null); setVInfoTab('manage'); queryClient.invalidateQueries({ queryKey: ['/api/name-imports/list'] }); }}>
+                    View Names
+                  </Button>
+                  <Button className="bg-regis-navy text-white" onClick={() => setShowVInfoImport(false)}>Done</Button>
                 </div>
               </div>
-            ) : (
-              /* Step 2 — pick method + input */
-              <div className="space-y-4">
-                <button onClick={() => setVInfoStep(1)} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
-                  <ChevronLeft size={14} /> Back
-                </button>
 
-                {!vInfoMethod ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setVInfoMethod('csv')}
-                      className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
-                    >
-                      <Download size={24} className="text-blue-600" />
-                      <span className="text-sm font-medium">Import from CSV</span>
-                    </button>
-                    <button
-                      onClick={() => setVInfoMethod('paste')}
-                      className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
-                    >
-                      <FileText size={24} className="text-blue-600" />
-                      <span className="text-sm font-medium">Paste Names</span>
-                    </button>
-                  </div>
-                ) : vInfoMethod === 'paste' ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600">Paste guest names — one name per line:</p>
-                    <textarea
-                      className="w-full h-48 border border-gray-300 rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      placeholder={"Tanaka Hiroshi\nYamamoto Kenji\nSato Yuki"}
-                      value={vInfoPasteText}
-                      onChange={(e) => setVInfoPasteText(e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1" onClick={() => setVInfoMethod(null)}>Back</Button>
-                      <Button
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                        disabled={!vInfoPasteText.trim() || vInfoImportMutation.isPending}
-                        onClick={() => {
-                          const names = vInfoPasteText.split('\n').map(n => n.trim()).filter(Boolean);
-                          vInfoImportMutation.mutate({ names, visitorType: vInfoVisitorType });
-                        }}
+            ) : vInfoTab === 'import' ? (
+              /* ── Import tab ── */
+              vInfoStep === 1 ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">Select the guest category for this name list:</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {([
+                      { key: 'hotel_guest', label: 'Hotel Staying Guest', icon: <Home size={20} /> },
+                      { key: 'restaurant',  label: 'Restaurant Valet',    icon: <FileText size={20} /> },
+                      { key: 'event',       label: 'Event',               icon: <CalendarDays size={20} /> },
+                      { key: 'others',      label: 'Others',              icon: <Users size={20} /> },
+                    ] as { key: string; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+                      <button
+                        key={key}
+                        onClick={() => { setVInfoVisitorType(key); setVInfoStep(2); }}
+                        className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-left"
                       >
-                        {vInfoImportMutation.isPending ? 'Importing…' : `Import ${vInfoPasteText.split('\n').filter(l => l.trim()).length} Names`}
-                      </Button>
-                    </div>
+                        <span className="text-blue-600">{icon}</span>
+                        <span className="font-medium text-gray-800">{label}</span>
+                        <ChevronRight size={16} className="ml-auto text-gray-400" />
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600">Select a CSV file (one name per row in the first column):</p>
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                      onChange={(e) => setVInfoCsvFile(e.target.files?.[0] ?? null)}
-                    />
-                    {vInfoCsvFile && <p className="text-xs text-gray-500">{vInfoCsvFile.name} selected</p>}
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1" onClick={() => setVInfoMethod(null)}>Back</Button>
-                      <Button
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                        disabled={!vInfoCsvFile || vInfoImportMutation.isPending}
-                        onClick={async () => {
-                          if (!vInfoCsvFile) return;
-                          const text = await vInfoCsvFile.text();
-                          const names = text.split('\n').map(row => row.split(',')[0].replace(/^"|"$/g, '').trim()).filter(Boolean);
-                          vInfoImportMutation.mutate({ names, visitorType: vInfoVisitorType });
-                        }}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <button onClick={() => setVInfoStep(1)} className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                    <ChevronLeft size={14} /> Back
+                  </button>
+
+                  {!vInfoMethod ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setVInfoMethod('csv')}
+                        className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
                       >
-                        {vInfoImportMutation.isPending ? 'Importing…' : 'Import CSV'}
-                      </Button>
+                        <Download size={24} className="text-blue-600" />
+                        <span className="text-sm font-medium">Import from CSV</span>
+                      </button>
+                      <button
+                        onClick={() => setVInfoMethod('paste')}
+                        className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                      >
+                        <FileText size={24} className="text-blue-600" />
+                        <span className="text-sm font-medium">Paste Names</span>
+                      </button>
                     </div>
-                  </div>
-                )}
+                  ) : vInfoMethod === 'paste' ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600">Paste guest names — one name per line:</p>
+                      <textarea
+                        className="w-full h-48 border border-gray-300 rounded-lg p-3 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        placeholder={"Tanaka Hiroshi\nYamamoto Kenji\nSato Yuki"}
+                        value={vInfoPasteText}
+                        onChange={(e) => setVInfoPasteText(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="outline" className="flex-1" onClick={() => setVInfoMethod(null)}>Back</Button>
+                        <Button
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                          disabled={!vInfoPasteText.trim() || vInfoImportMutation.isPending}
+                          onClick={() => {
+                            const names = vInfoPasteText.split('\n').map(n => n.trim()).filter(Boolean);
+                            vInfoImportMutation.mutate({ names, visitorType: vInfoVisitorType });
+                          }}
+                        >
+                          {vInfoImportMutation.isPending ? 'Importing…' : `Import ${vInfoPasteText.split('\n').filter(l => l.trim()).length} Names`}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600">Select a CSV file (one name per row in the first column):</p>
+                      <input
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        onChange={(e) => setVInfoCsvFile(e.target.files?.[0] ?? null)}
+                      />
+                      {vInfoCsvFile && <p className="text-xs text-gray-500">{vInfoCsvFile.name} selected</p>}
+                      <div className="flex gap-2">
+                        <Button variant="outline" className="flex-1" onClick={() => setVInfoMethod(null)}>Back</Button>
+                        <Button
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                          disabled={!vInfoCsvFile || vInfoImportMutation.isPending}
+                          onClick={async () => {
+                            if (!vInfoCsvFile) return;
+                            const text = await vInfoCsvFile.text();
+                            const names = text.split('\n').map(row => row.split(',')[0].replace(/^"|"$/g, '').trim()).filter(Boolean);
+                            vInfoImportMutation.mutate({ names, visitorType: vInfoVisitorType });
+                          }}
+                        >
+                          {vInfoImportMutation.isPending ? 'Importing…' : 'Import CSV'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+
+            ) : (
+              /* ── Manage tab ── */
+              <div className="space-y-3">
+                {vInfoListLoading ? (
+                  <p className="text-sm text-gray-500 py-4 text-center">Loading…</p>
+                ) : !vInfoNameList || vInfoNameList.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-gray-400">No active imported names.</div>
+                ) : (() => {
+                  const LABELS: Record<string, string> = {
+                    hotel_guest: 'Hotel Staying Guest',
+                    restaurant: 'Restaurant Valet',
+                    event: 'Event',
+                    others: 'Others',
+                  };
+                  const grouped = vInfoNameList.reduce<Record<string, typeof vInfoNameList>>((acc, n) => {
+                    if (!acc[n.visitorType]) acc[n.visitorType] = [];
+                    acc[n.visitorType].push(n);
+                    return acc;
+                  }, {});
+                  return (
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+                      {Object.entries(grouped).map(([type, entries]) => (
+                        <div key={type}>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              {LABELS[type] ?? type} <span className="text-gray-400 font-normal">({entries.length})</span>
+                            </p>
+                            <button
+                              className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                              onClick={() => { if (confirm(`Delete all ${entries.length} names from "${LABELS[type] ?? type}"?`)) vInfoDeleteTypeMutation.mutate(type); }}
+                            >
+                              Clear all
+                            </button>
+                          </div>
+                          <div className="border rounded-lg divide-y overflow-hidden">
+                            {entries.map(entry => (
+                              <div key={entry.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+                                <span className="text-sm text-gray-800">{entry.name}</span>
+                                <button
+                                  onClick={() => vInfoDeleteOneMutation.mutate(entry.id)}
+                                  className="text-gray-300 hover:text-red-500 transition-colors ml-2 flex-shrink-0"
+                                  title="Remove name"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </DialogContent>
