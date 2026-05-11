@@ -32,94 +32,84 @@ const fmtGuest = (name: string | null | undefined) =>
 async function printNameLabel(guestName: string): Promise<void> {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
 
-  // 35mm × 49mm in points (50×70mm reduced 30% — 1 pt = 1/72 inch, 1 mm ≈ 2.8346 pt)
+  // 30mm wide × 38mm tall — portrait orientation, matches 30mm roll on M110s
+  // (1 pt = 1/72 inch; 1 mm ≈ 2.8346 pt)
   const mmToPt = (mm: number) => mm * 2.8346;
-  const W = mmToPt(35);  // 99.21
-  const H = mmToPt(49);  // 138.89
+  const W = mmToPt(30);  // 85.0 pt
+  const H = mmToPt(38);  // 107.7 pt
 
   const doc = await PDFDocument.create();
   const page = doc.addPage([W, H]);
   page.setMediaBox(0, 0, W, H);
 
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const font    = await doc.embedFont(StandardFonts.Helvetica);
+  const font     = await doc.embedFont(StandardFonts.Helvetica);
 
   // Embed QR code image
   let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
   try {
-    const resp = await fetch(qrCodeUrl);
+    const resp  = await fetch(qrCodeUrl);
     const bytes = new Uint8Array(await resp.arrayBuffer());
     try { qrImage = await doc.embedJpg(bytes); } catch {
       qrImage = await doc.embedPng(bytes);
     }
-  } catch { /* skip QR if fetch fails */ }
+  } catch { /* skip QR gracefully */ }
 
-  const padding = mmToPt(3);
-  const innerW = W - padding * 2;
+  const pad    = mmToPt(2);      // 2 mm padding all sides
+  const innerW = W - pad * 2;    // 73.7 pt usable width
+
+  let cursor = H - pad;          // start drawing from top
 
   // ── Guest name ────────────────────────────────────────────────
   const displayName = guestName.trim();
-  const maxNameSize = 13;
-  let nameSize = maxNameSize;
-  while (nameSize > 7 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) {
+  let nameSize = 9;
+  while (nameSize > 5 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) {
     nameSize -= 0.5;
   }
-  const nameY = H - padding - nameSize;
+  cursor -= nameSize;
   page.drawText(displayName, {
-    x: padding + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
-    y: nameY,
+    x: pad + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
+    y: cursor,
     font: fontBold,
     size: nameSize,
     color: rgb(0.1, 0.12, 0.27),
   });
+  cursor -= mmToPt(1.5);
 
-  // ── Divider ───────────────────────────────────────────────────
-  const divY = nameY - mmToPt(2);
-  page.drawRectangle({ x: padding, y: divY, width: innerW, height: 0.5, color: rgb(0.79, 0.66, 0.3) });
+  // ── Gold divider ──────────────────────────────────────────────
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: rgb(0.79, 0.66, 0.3) });
+  cursor -= mmToPt(1.5);
 
-  // ── QR code ───────────────────────────────────────────────────
-  const qrSize = mmToPt(26);
-  const qrY = divY - mmToPt(1.5) - qrSize;
+  // ── QR code (18 mm square, centred) ──────────────────────────
+  const qrSize = mmToPt(18);  // 51 pt — fits comfortably
   if (qrImage) {
     page.drawImage(qrImage, {
       x: (W - qrSize) / 2,
-      y: qrY,
+      y: cursor - qrSize,
       width: qrSize,
       height: qrSize,
     });
   }
+  cursor -= qrSize + mmToPt(1.5);
 
-  // ── "Visit" label ─────────────────────────────────────────────
-  const visitText = 'Visit';
-  const visitSize = 7;
-  const visitY = qrY - mmToPt(2);
-  page.drawText(visitText, {
-    x: padding + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
-    y: visitY,
+  // ── "Visit  Valet-s.com" on one line ─────────────────────────
+  const visitLabel = 'Visit  Valet-s.com';
+  const visitSize  = 5.5;
+  page.drawText(visitLabel, {
+    x: pad + (innerW - font.widthOfTextAtSize(visitLabel, visitSize)) / 2,
+    y: cursor - visitSize,
     font,
     size: visitSize,
-    color: rgb(0.45, 0.45, 0.45),
-  });
-
-  // ── Valet-s.com URL ───────────────────────────────────────────
-  const urlText = 'Valet-s.com';
-  const urlSize = 9;
-  const urlY = visitY - urlSize - mmToPt(0.5);
-  page.drawText(urlText, {
-    x: padding + (innerW - fontBold.widthOfTextAtSize(urlText, urlSize)) / 2,
-    y: urlY,
-    font: fontBold,
-    size: urlSize,
-    color: rgb(0.1, 0.12, 0.27),
+    color: rgb(0.35, 0.35, 0.35),
   });
 
   // ── Open PDF ──────────────────────────────────────────────────
   const pdfBytes = await doc.save();
   const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
+  const blobUrl = URL.createObjectURL(blob);
+  const win = window.open(blobUrl, '_blank');
   if (win) win.focus();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 }
 
 /**
