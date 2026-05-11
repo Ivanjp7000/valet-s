@@ -531,18 +531,18 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-regis-navy text-white">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6">
+      <div className="border-b bg-white">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center min-w-0">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-3 sm:mr-4 flex-shrink-0">
                 {isSuperAdmin ? <Shield className="text-regis-navy" size={20} /> : <Crown className="text-regis-navy" size={20} />}
               </div>
               <div className="min-w-0">
-                <h1 className="text-base sm:text-xl font-semibold truncate">
+                <h1 className="text-base sm:text-xl font-semibold text-regis-navy truncate">
                   {isSuperAdmin ? "Super Admin" : "Admin Panel"}
                 </h1>
-                <p className="text-blue-200 text-xs sm:text-sm truncate">
+                <p className="text-gray-500 text-xs sm:text-sm truncate">
                   {isSuperAdmin ? "Multi-Tenant System" : userOUName || "Management"}
                 </p>
               </div>
@@ -564,16 +564,16 @@ export default function AdminPanel() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-regis-gold bg-regis-gold/10 text-regis-navy hover:bg-regis-gold hover:text-regis-navy px-2 sm:px-3"
+                  className="border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white px-2 sm:px-3"
                   data-testid="button-back-home"
                 >
-                  <Home size={16} className="text-regis-gold" />
-                  <span className="hidden sm:inline ml-2 text-white">Home</span>
+                  <Home size={16} />
+                  <span className="hidden sm:inline ml-2">Home</span>
                 </Button>
               </Link>
               <a 
                 href="/api/logout"
-                className="flex items-center text-blue-200 hover:text-white p-2" 
+                className="flex items-center text-gray-500 hover:text-regis-navy p-2" 
                 data-testid="link-logout"
               >
                 <LogOut size={16} />

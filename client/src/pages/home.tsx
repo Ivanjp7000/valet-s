@@ -49,16 +49,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-soft-gray">
-      <div className="bg-regis-navy text-white">
+      <div className="border-b bg-white">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
           <div className="flex items-center">
             <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-4">
               <Crown className="text-regis-navy" size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Valet Management System</h1>
+              <h1 className="text-xl font-semibold text-regis-navy">Valet Management System</h1>
               <div className="flex items-center gap-2 mt-1">
-                <p className="text-blue-200 text-sm">Welcome, {user?.firstName || user?.username}</p>
+                <p className="text-gray-500 text-sm">Welcome, {user?.firstName || user?.username}</p>
                 <Badge className={`${getRoleColor(user?.role || '')} text-white text-xs`}>
                   {getRoleLabel(user?.role || '')}
                 </Badge>
@@ -67,7 +67,7 @@ export default function Home() {
           </div>
           <a
             href="/api/logout"
-            className="flex items-center text-blue-200 hover:text-white"
+            className="flex items-center text-gray-500 hover:text-regis-navy"
             data-testid="link-logout"
           >
             <LogOut className="mr-2" size={18} />
