@@ -32,10 +32,10 @@ const fmtGuest = (name: string | null | undefined) =>
 async function printNameLabel(guestName: string): Promise<void> {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
 
-  // 50mm × 70mm in points (1 pt = 1/72 inch, 1 mm ≈ 2.8346 pt)
+  // 35mm × 49mm in points (50×70mm reduced 30% — 1 pt = 1/72 inch, 1 mm ≈ 2.8346 pt)
   const mmToPt = (mm: number) => mm * 2.8346;
-  const W = mmToPt(50);  // 141.73
-  const H = mmToPt(70);  // 198.43
+  const W = mmToPt(35);  // 99.21
+  const H = mmToPt(49);  // 138.89
 
   const doc = await PDFDocument.create();
   const page = doc.addPage([W, H]);
