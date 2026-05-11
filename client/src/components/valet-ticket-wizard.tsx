@@ -30,24 +30,32 @@ const fmtGuest = (name: string | null | undefined) =>
  * printer on iPhone, Android, or desktop (Phomemo app or browser print dialog).
  */
 async function printNameLabel(guestName: string): Promise<void> {
+  // Open the window SYNCHRONOUSLY (before any await) so the browser
+  // doesn't treat it as a popup from an async context and block it.
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('Pop-ups are blocked. Please allow pop-ups for this site and try again.');
+    return;
+  }
+  win.document.write('<html><body style="margin:0;background:#e5e5e5;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#555">Generating label…</body></html>');
+  win.document.close();
+
   // 30mm × 38mm at 300 DPI → 354 × 449 px canvas
   const DPI    = 300;
   const mmToPx = (mm: number) => Math.round((mm / 25.4) * DPI);
-
-  const W = mmToPx(30);  // 354 px
-  const H = mmToPx(38);  // 449 px
+  const W = mmToPx(30);   // 354 px
+  const H = mmToPx(38);   // 449 px
 
   const canvas  = document.createElement('canvas');
   canvas.width  = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // White background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  const pad    = mmToPx(2);      // ~24 px
-  const innerW = W - pad * 2;    // ~306 px
+  const pad    = mmToPx(2);
+  const innerW = W - pad * 2;
 
   // Load QR code image
   const loadImg = (src: string): Promise<HTMLImageElement> =>
@@ -61,18 +69,18 @@ async function printNameLabel(guestName: string): Promise<void> {
   let qrImg: HTMLImageElement | null = null;
   try { qrImg = await loadImg(qrCodeUrl); } catch { /* skip */ }
 
-  let cursor = pad;  // y increases downward
+  let cursor = pad;
 
-  // ── QR code (18 mm square, centred) ──────────────────────────
-  const qrSize = mmToPx(18);  // ~213 px
+  // ── QR code (18 mm, centred) ──────────────────────────────────
+  const qrSize = mmToPx(18);
   if (qrImg) ctx.drawImage(qrImg, (W - qrSize) / 2, cursor, qrSize, qrSize);
   cursor += qrSize + mmToPx(1.5);
 
   // ── "Visit Valet-s.com" ───────────────────────────────────────
-  const visitPx = mmToPx(1.8);  // ~21 px
-  ctx.font      = `${visitPx}px Arial, sans-serif`;
-  ctx.fillStyle = '#666666';
-  ctx.textAlign = 'center';
+  const visitPx = mmToPx(1.8);
+  ctx.font         = `${visitPx}px Arial, sans-serif`;
+  ctx.fillStyle    = '#666666';
+  ctx.textAlign    = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText('Visit  Valet-s.com', W / 2, cursor);
   cursor += visitPx + mmToPx(1.5);
@@ -80,11 +88,10 @@ async function printNameLabel(guestName: string): Promise<void> {
   // ── Gold divider ──────────────────────────────────────────────
   ctx.fillStyle = '#c9a84c';
   ctx.fillRect(pad, cursor, innerW, 2);
-  cursor += 2 + mmToPx(1.5);
 
   // ── Guest name — pinned to bottom ─────────────────────────────
   const displayName = guestName.trim();
-  let namePx = mmToPx(3.5);  // ~41 px ≈ bold 9 pt
+  let namePx = mmToPx(3.5);
   ctx.textBaseline = 'alphabetic';
   ctx.font = `bold ${namePx}px Arial, sans-serif`;
   while (namePx > mmToPx(2) && ctx.measureText(displayName).width > innerW) {
@@ -95,11 +102,10 @@ async function printNameLabel(guestName: string): Promise<void> {
   ctx.textAlign = 'center';
   ctx.fillText(displayName, W / 2, H - pad);
 
-  // ── Open image in new tab with iPhone instructions ─────────────
+  // ── Write final image into the already-open tab ───────────────
   const dataUrl = canvas.toDataURL('image/png');
-  const win = window.open('', '_blank');
-  if (win) {
-    win.document.write(`<!DOCTYPE html>
+  win.document.open();
+  win.document.write(`<!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -109,9 +115,9 @@ async function printNameLabel(guestName: string): Promise<void> {
          align-items:center;justify-content:center;min-height:100vh;
          font-family:sans-serif;padding:20px;box-sizing:border-box}
     img{border:1px solid #ccc;box-shadow:0 2px 12px rgba(0,0,0,.2);
-        width:177px;height:224px}
+        width:177px;height:224px;display:block}
     .tip{margin-top:18px;background:#fff;border-radius:10px;padding:14px 18px;
-         max-width:320px;font-size:14px;color:#333;line-height:1.6;text-align:center}
+         max-width:320px;font-size:14px;color:#333;line-height:1.7;text-align:center}
     .tip b{color:#111}
   </style>
 </head>
@@ -119,15 +125,13 @@ async function printNameLabel(guestName: string): Promise<void> {
   <img src="${dataUrl}" alt="Valet Label">
   <div class="tip">
     <b>iPhone → Phomemo:</b><br>
-    Long-press the image above<br>
-    → <b>Save to Photos</b><br>
+    Long-press the image → <b>Save to Photos</b><br>
     Then open <b>Phomemo app</b><br>
-    → Print from Album → select image → Print
+    → Print from Album → select → Print
   </div>
 </body>
 </html>`);
-    win.document.close();
-  }
+  win.document.close();
 }
 
 /**
