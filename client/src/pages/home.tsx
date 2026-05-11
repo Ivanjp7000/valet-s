@@ -281,7 +281,8 @@ export default function Home() {
             <img
               src={valetBanner}
               alt="Valet Service"
-              className="rounded-2xl shadow-lg w-full max-w-5xl object-cover"
+              className="rounded-2xl shadow-lg w-full max-w-5xl object-cover object-center"
+              style={{ maxHeight: '85%', height: 280 }}
             />
           </div>
         </div>
