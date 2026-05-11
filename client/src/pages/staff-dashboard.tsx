@@ -673,6 +673,9 @@ export default function StaffDashboard() {
   });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showAddUser, setShowAddUser] = useState(false);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<UserType | null>(null);
+  const [workingOUId, setWorkingOUId] = useState<string | null>(null);
+  const [showOUPicker, setShowOUPicker] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
   const [showVehicleRoster, setShowVehicleRoster] = useState(false);
   const [showGSHub, setShowGSHub] = useState(false);
@@ -1142,12 +1145,34 @@ export default function StaffDashboard() {
   });
 
 
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/users/${id}`);
+    },
+    onSuccess: () => {
+      setDeleteUserTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Account deleted", description: "The user account has been removed." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to delete account.", variant: "destructive" });
+    },
+  });
+
   // Check if user must change password on mount
   useEffect(() => {
     if (user?.mustChangePassword) {
       setShowPasswordChangeModal(true);
     }
   }, [user?.mustChangePassword]);
+
+  // Show OU picker on first load for superadmin
+  useEffect(() => {
+    if (user?.role === 'superadmin' && workingOUId === null && allOUs && allOUs.length > 0) {
+      setShowOUPicker(true);
+    }
+  }, [user?.role, allOUs]);
 
   // Guest trip history for the currently viewed ticket
   const { data: viewTicketTrips } = useQuery<{ id: string; ticketId: string; departedAt: string; returnedAt: string | null; durationSeconds: number | null; createdAt: string }[]>({
@@ -3063,7 +3088,19 @@ export default function StaffDashboard() {
           {/* User Management Tab */}
           {user?.role === 'superadmin' && (
             <TabsContent value="users" className="space-y-6">
-              <h2 className="text-xl font-semibold text-regis-navy">User Management</h2>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="text-xl font-semibold text-regis-navy">User Management</h2>
+                <div className="flex items-center gap-2">
+                  {workingOUId && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-regis-navy/10 text-regis-navy font-medium">
+                      {allOUs?.find(o => o.id === workingOUId)?.name ?? 'Selected OU'}
+                    </span>
+                  )}
+                  <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => setShowOUPicker(true)}>
+                    <Building2 size={13} /> Switch OU
+                  </Button>
+                </div>
+              </div>
 
               <Card>
                 <CardContent className="p-6">
@@ -3071,28 +3108,38 @@ export default function StaffDashboard() {
                     <div className="text-center py-8">Loading users...</div>
                   ) : (
                     <div className="space-y-4">
-                      {allUsers?.map((staffUser) => (
-                        <div key={staffUser.id} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center">
-                          <div>
+                      {(allUsers ?? [])
+                        .filter(u => !workingOUId || (u as any).ouId === workingOUId || u.role === 'superadmin')
+                        .map((staffUser) => (
+                        <div key={staffUser.id} className="border border-gray-200 rounded-lg p-4 flex justify-between items-center gap-2">
+                          <div className="min-w-0">
                             <p className="font-medium">{staffUser.firstName} {staffUser.lastName}</p>
-                            <p className="text-sm text-gray-600">{staffUser.email}</p>
-                            <p className="text-xs text-gray-500 capitalize">{staffUser.role?.replace('_', ' ')}</p>
+                            <p className="text-sm text-gray-600 truncate">{staffUser.email}</p>
+                            <p className="text-xs text-gray-500 capitalize">{staffUser.role?.replace(/_/g, ' ')}</p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                setEditUserData(staffUser);
-                                setShowPassword(false);
-                              }}
+                              onClick={() => { setEditUserData(staffUser); setShowPassword(false); }}
                               data-testid={`button-edit-user-${staffUser.id}`}
                             >
-                              <Edit size={14} className="mr-1" />
-                              Edit
+                              <Edit size={14} className="mr-1" /> Edit
                             </Button>
+                            {staffUser.role !== 'superadmin' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={() => setDeleteUserTarget(staffUser)}
+                                disabled={deleteUserMutation.isPending}
+                                data-testid={`button-delete-user-${staffUser.id}`}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            )}
                             <Badge variant={staffUser.role === 'superadmin' ? 'default' : 'secondary'}>
-                              {staffUser.role?.replace('_', ' ')}
+                              {staffUser.role?.replace(/_/g, ' ')}
                             </Badge>
                           </div>
                         </div>
@@ -4593,6 +4640,67 @@ export default function StaffDashboard() {
                     setResetPasswordData({ newPassword: '', confirmPassword: '', forceChange: true });
                   }}>
                     Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* OU Picker Modal — shown to superadmin on first entry */}
+        <Dialog open={showOUPicker} onOpenChange={() => {}}>
+          <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle className="text-regis-navy">Select Organization</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 pt-2">
+              <p className="text-sm text-gray-500">Which organization are you working in right now?</p>
+              <div className="space-y-2">
+                {(allOUs || []).map((ou: any) => (
+                  <button
+                    key={ou.id}
+                    className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors hover:bg-regis-navy hover:text-white hover:border-regis-navy ${workingOUId === ou.id ? 'border-regis-navy bg-regis-navy text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                    onClick={() => setWorkingOUId(ou.id)}
+                  >
+                    <p className="font-medium text-sm">{ou.name}</p>
+                  </button>
+                ))}
+              </div>
+              <Button
+                className="w-full bg-regis-gold hover:bg-amber-600 text-white mt-2"
+                disabled={!workingOUId}
+                onClick={() => setShowOUPicker(false)}
+              >
+                Enter Dashboard
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete User Confirmation */}
+        <Dialog open={!!deleteUserTarget} onOpenChange={(open) => { if (!open) setDeleteUserTarget(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="text-red-700">Delete Account</DialogTitle>
+            </DialogHeader>
+            {deleteUserTarget && (
+              <div className="space-y-4 pt-1">
+                <p className="text-sm text-gray-700">
+                  Permanently remove <span className="font-semibold">{[deleteUserTarget.firstName, deleteUserTarget.lastName].filter(Boolean).join(' ')}</span>?
+                  This cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    className="flex-1 gap-1"
+                    onClick={() => deleteUserMutation.mutate(deleteUserTarget.id)}
+                    disabled={deleteUserMutation.isPending}
+                  >
+                    {deleteUserMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Yes, delete
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={() => setDeleteUserTarget(null)}>
+                    Cancel
                   </Button>
                 </div>
               </div>
