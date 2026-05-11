@@ -62,7 +62,7 @@ function PendingRegistrationsTab() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="animate-spin text-gray-400" size={24} />
             </div>
-          ) : !pending || pending.length === 0 ? (
+          ) : !Array.isArray(pending) || pending.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 text-center">
               <UserCheck size={40} className="text-gray-200 mb-3" />
               <p className="text-gray-500 font-medium">No pending registrations</p>
