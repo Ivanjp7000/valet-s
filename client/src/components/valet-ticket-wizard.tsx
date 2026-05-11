@@ -25,80 +25,73 @@ const fmtGuest = (name: string | null | undefined) =>
   name ? stripHonorifics(name) + ' 様' : '';
 
 /**
- * Print a 50×70mm name label on a Phomemo thermal printer.
- * Opens as a PDF in a new tab — works with any AirPrint / Phomemo-compatible
- * printer on iPhone, Android, or desktop (Phomemo app or browser print dialog).
+ * Generate a 30×38mm name label PDF and trigger a local file download.
+ * iPhone: Safari downloads → tap download icon → open file → share to Phomemo → Print
+ * Desktop: Ctrl/Cmd+P → select Phomemo M110s → paper 30×38mm
  */
-async function printNameLabel(
-  guestName: string,
-  setDataUrl: (url: string) => void,
-): Promise<void> {
+async function printNameLabel(guestName: string): Promise<void> {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
 
-  // 30mm × 38mm at 300 DPI → 354 × 449 px canvas
-  const DPI    = 300;
-  const mmToPx = (mm: number) => Math.round((mm / 25.4) * DPI);
-  const W = mmToPx(30);   // 354 px
-  const H = mmToPx(38);   // 449 px
+  const mmToPt = (mm: number) => mm * 2.8346;
+  const W = mmToPt(30);
+  const H = mmToPt(38);
 
-  const canvas  = document.createElement('canvas');
-  canvas.width  = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
+  const doc  = await PDFDocument.create();
+  const page = doc.addPage([W, H]);
+  page.setMediaBox(0, 0, W, H);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, H);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const font     = await doc.embedFont(StandardFonts.Helvetica);
 
-  const pad    = mmToPx(2);
+  let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
+  try {
+    const resp  = await fetch(qrCodeUrl);
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    try { qrImage = await doc.embedJpg(bytes); } catch { qrImage = await doc.embedPng(bytes); }
+  } catch { /* skip */ }
+
+  const pad    = mmToPt(2);
   const innerW = W - pad * 2;
+  let cursor   = H - pad;
 
-  // Load QR code image
-  const loadImg = (src: string): Promise<HTMLImageElement> =>
-    new Promise((res, rej) => {
-      const img = new Image();
-      img.onload  = () => res(img);
-      img.onerror = rej;
-      img.src = src;
-    });
+  // QR code
+  const qrSize = mmToPt(18);
+  if (qrImage) page.drawImage(qrImage, { x: (W - qrSize) / 2, y: cursor - qrSize, width: qrSize, height: qrSize });
+  cursor -= qrSize + mmToPt(1.5);
 
-  let qrImg: HTMLImageElement | null = null;
-  try { qrImg = await loadImg(qrCodeUrl); } catch { /* skip */ }
+  // "Visit Valet-s.com"
+  const visitSize = 6;
+  const visitText = 'Visit  Valet-s.com';
+  page.drawText(visitText, {
+    x: pad + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
+    y: cursor - visitSize, font, size: visitSize, color: rgb(0.4, 0.4, 0.4),
+  });
+  cursor -= visitSize + mmToPt(1.5);
 
-  let cursor = pad;
+  // Gold divider
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.6, color: rgb(0.79, 0.66, 0.3) });
 
-  // ── QR code (18 mm, centred) ──────────────────────────────────
-  const qrSize = mmToPx(18);
-  if (qrImg) ctx.drawImage(qrImg, (W - qrSize) / 2, cursor, qrSize, qrSize);
-  cursor += qrSize + mmToPx(1.5);
-
-  // ── "Visit Valet-s.com" ───────────────────────────────────────
-  const visitPx = mmToPx(1.8);
-  ctx.font         = `${visitPx}px Arial, sans-serif`;
-  ctx.fillStyle    = '#666666';
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText('Visit  Valet-s.com', W / 2, cursor);
-  cursor += visitPx + mmToPx(1.5);
-
-  // ── Gold divider ──────────────────────────────────────────────
-  ctx.fillStyle = '#c9a84c';
-  ctx.fillRect(pad, cursor, innerW, 2);
-
-  // ── Guest name — pinned to bottom ─────────────────────────────
+  // Guest name at bottom
   const displayName = guestName.trim();
-  let namePx = mmToPx(3.5);
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = `bold ${namePx}px Arial, sans-serif`;
-  while (namePx > mmToPx(2) && ctx.measureText(displayName).width > innerW) {
-    namePx -= 1;
-    ctx.font = `bold ${namePx}px Arial, sans-serif`;
-  }
-  ctx.fillStyle = '#1a1f45';
-  ctx.textAlign = 'center';
-  ctx.fillText(displayName, W / 2, H - pad);
+  let nameSize = 10;
+  while (nameSize > 6 && fontBold.widthOfTextAtSize(displayName, nameSize) > innerW) nameSize -= 0.5;
+  page.drawText(displayName, {
+    x: pad + (innerW - fontBold.widthOfTextAtSize(displayName, nameSize)) / 2,
+    y: pad, font: fontBold, size: nameSize, color: rgb(0.1, 0.12, 0.27),
+  });
 
-  // ── Share / display the label ────────────────────────────────
-  // Pass the finished image back to the React component to show in a dialog
-  setDataUrl(canvas.toDataURL('image/png'));
+  // Download the PDF file
+  const pdfBytes = await doc.save();
+  const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href         = url;
+  a.download     = `valet-label-${guestName.trim().replace(/\s+/g, '-')}.pdf`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**
@@ -307,7 +300,6 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
-  const [labelDataUrl, setLabelDataUrl] = useState<string | null>(null);
   const [carMakeSearch, setCarMakeSearch] = useState("");
   const [showCarMakeDropdown, setShowCarMakeDropdown] = useState(false);
   const [showBrandGrid, setShowBrandGrid] = useState(true);
@@ -588,7 +580,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <button
             type="button"
             disabled={!formData.guestName.trim()}
-            onClick={() => printNameLabel(formData.guestName, setLabelDataUrl)}
+            onClick={() => printNameLabel(formData.guestName)}
             className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-500 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Printer size={12} />
@@ -1339,36 +1331,6 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       />
     )}
 
-    {/* Label preview dialog */}
-    {labelDataUrl && (
-      <Dialog open={!!labelDataUrl} onOpenChange={() => setLabelDataUrl(null)}>
-        <DialogContent className="max-w-xs text-center">
-          <DialogHeader>
-            <DialogTitle>Name Label</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center gap-4 py-2">
-            <img
-              src={labelDataUrl}
-              alt="Valet label"
-              style={{ width: 177, height: 224, border: '1px solid #ddd', borderRadius: 4 }}
-            />
-            <div className="text-sm text-gray-600 bg-amber-50 border border-amber-200 rounded-lg p-3 text-left leading-relaxed">
-              <p className="font-semibold text-amber-800 mb-1">iPhone → Phomemo</p>
-              <p>1. <b>Long-press</b> the image above</p>
-              <p>2. Tap <b>"Save to Photos"</b></p>
-              <p>3. Open <b>Phomemo app</b></p>
-              <p>4. Find the image in your photos &amp; print</p>
-            </div>
-            <button
-              onClick={() => setLabelDataUrl(null)}
-              className="text-sm text-gray-500 hover:text-gray-700 underline"
-            >
-              Close
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )}
     </>
   );
 }
