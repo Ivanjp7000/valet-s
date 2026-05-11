@@ -326,13 +326,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Name is required" });
       }
 
-      // Rate limit per-ticket (not per-IP) so rotating source addresses cannot bypass it
+      // Rate limit per-ticket — generous limit to allow continuous status polling
+      // (3-second polling = 20/min = 300/15min; 600 gives 30min of headroom)
       const socketIp = req.socket?.remoteAddress || 'unknown';
-      if (!checkRateLimit(`ticket-lookup:${ticketNumber}`, 15, 15 * 60 * 1000)) {
+      if (!checkRateLimit(`ticket-lookup:${ticketNumber}`, 600, 15 * 60 * 1000)) {
         return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
       }
-      // Secondary IP-based limit using the direct socket address (not x-forwarded-for)
-      if (!checkRateLimit(`ticket-lookup-ip:${socketIp}`, 60, 60 * 1000)) {
+      // Secondary IP-based limit (hotel WiFi may have many guests polling simultaneously)
+      if (!checkRateLimit(`ticket-lookup-ip:${socketIp}`, 300, 60 * 1000)) {
         return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
       }
 
@@ -596,8 +597,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateValetTicketStatus(ticketNumber, 'retrieving');
 
+      // Notify staff (retrieval_accepted removes popup)
       broadcastToOU(updated!.ouId, {
         type: 'retrieval_accepted',
+        data: updated,
+      });
+      // Also send ticket_status_updated so the customer's phone WS gets an instant push
+      broadcastToOU(updated!.ouId, {
+        type: 'ticket_status_updated',
         data: updated,
       });
 

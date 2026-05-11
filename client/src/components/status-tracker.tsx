@@ -52,12 +52,16 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
     queryFn: async () => {
       const url = `/api/tickets/${encodeURIComponent(ticketNumber)}?name=${encodeURIComponent(guestName)}`;
       const res = await fetch(url, { credentials: "include" });
+      // On 429 (rate-limited) keep previous data — do not throw
+      if (res.status === 429) return undefined as any;
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
     refetchInterval: 3000,
-    refetchIntervalInBackground: true, // keep polling even when phone screen is off / tab is backgrounded
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
+    retry: false,
+    placeholderData: (prev) => prev, // always show last known status while refetching
   });
 
   // Force an immediate refetch whenever the phone comes back to the foreground
