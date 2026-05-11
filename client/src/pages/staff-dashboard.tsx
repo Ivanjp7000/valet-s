@@ -4756,7 +4756,7 @@ export default function StaffDashboard() {
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
                       {Object.entries(grouped).map(([type, entries]) => (
                         <div key={type}>
-                          <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center justify-between mb-0.5">
                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                               {LABELS[type] ?? type} <span className="text-gray-400 font-normal">({entries.length})</span>
                             </p>
@@ -4767,6 +4767,14 @@ export default function StaffDashboard() {
                               Clear all
                             </button>
                           </div>
+                          {(() => {
+                            const oldest = entries.reduce((min, e) => new Date(e.createdAt) < new Date(min.createdAt) ? e : min, entries[0]);
+                            const expiresAt = new Date(new Date(oldest.createdAt).getTime() + 24 * 60 * 60 * 1000);
+                            const fmt = expiresAt.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+                            return (
+                              <p className="text-[10px] text-amber-600 mb-1.5">Auto Deletion: {fmt}</p>
+                            );
+                          })()}
                           <div className="border rounded-lg divide-y overflow-hidden">
                             {entries.map(entry => (
                               <div key={entry.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
