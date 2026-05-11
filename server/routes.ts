@@ -2381,7 +2381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── GS Hub routes ────────────────────────────────────────────────────────────
 
   // GET /api/gs/members/me — check if current user is a GS member
-  app.get('/api/gs/members/me', isAuthenticated, async (req: any, res) => {
+  app.get('/api/gs/members/me', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.json({ isMember: false });
@@ -2426,7 +2426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/gs/messages — all GS messages for the OU
-  app.get('/api/gs/messages', isAuthenticated, async (req: any, res) => {
+  app.get('/api/gs/messages', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId && user.role !== 'superadmin') return res.json([]);
@@ -2437,7 +2437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/gs/messages — any authenticated staff can send
-  app.post('/api/gs/messages', isAuthenticated, async (req: any, res) => {
+  app.post('/api/gs/messages', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
@@ -2453,7 +2453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/gs/messages/:id/reply — GS member replies
-  app.post('/api/gs/messages/:id/reply', isAuthenticated, async (req: any, res) => {
+  app.post('/api/gs/messages/:id/reply', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
@@ -2473,7 +2473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/gs/messages/:id/convert-to-event — GS member converts message to calendar event
-  app.post('/api/gs/messages/:id/convert-to-event', isAuthenticated, async (req: any, res) => {
+  app.post('/api/gs/messages/:id/convert-to-event', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
@@ -2495,7 +2495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/gs/messages/:id/acknowledge — original sender confirms they saw the calendar entry
-  app.post('/api/gs/messages/:id/acknowledge', isAuthenticated, async (req: any, res) => {
+  app.post('/api/gs/messages/:id/acknowledge', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       const msg = await storage.acknowledgeGSMessage(req.params.id);
@@ -2507,7 +2507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Calendar routes ───────────────────────────────────────────────────────────
 
   // GET /api/calendar/events — all calendar events for the OU
-  app.get('/api/calendar/events', isAuthenticated, async (req: any, res) => {
+  app.get('/api/calendar/events', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId && user.role !== 'superadmin') return res.json([]);
@@ -2517,7 +2517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/calendar/events — GS member creates event directly
-  app.post('/api/calendar/events', isAuthenticated, async (req: any, res) => {
+  app.post('/api/calendar/events', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
@@ -2538,7 +2538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/calendar/events/:id — GS member updates event
-  app.patch('/api/calendar/events/:id', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/calendar/events/:id', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
@@ -2554,7 +2554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/calendar/events/:id — GS member deletes event
-  app.delete('/api/calendar/events/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/calendar/events/:id', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
       const user = req.currentUser as User;
       if (!user.ouId) return res.status(400).json({ message: 'No OU assigned' });
