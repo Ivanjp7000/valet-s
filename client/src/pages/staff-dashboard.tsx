@@ -1722,6 +1722,15 @@ export default function StaffDashboard() {
 
             {/* Header with New Ticket Button + Vehicle Roster Toggle */}
             <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-regis-navy text-regis-navy hover:bg-regis-navy/10"
+                onClick={() => { setShowVehicleRoster(false); setShowGSHub(false); }}
+              >
+                <Home size={16} className="mr-1 sm:mr-2" />
+                Home
+              </Button>
               {canEdit && (
                 <Button 
                   onClick={() => setShowTicketWizard(true)}
@@ -1744,15 +1753,6 @@ export default function StaffDashboard() {
                   Vehicle Roster
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-                onClick={() => { setShowVehicleRoster(false); setShowGSHub(false); }}
-              >
-                <Home size={16} className="mr-1 sm:mr-2" />
-                Home
-              </Button>
               <Button
                 size="sm"
                 variant={showGSHub ? "default" : "outline"}
