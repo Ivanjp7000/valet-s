@@ -4267,8 +4267,10 @@ export default function StaffDashboard() {
                                 {lic.isActive ? 'Active' : 'Revoked'}
                               </span>
                             </div>
-                            <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{lic.issuedAt ? new Date(lic.issuedAt).toLocaleDateString() : '—'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Valid To</p><p className="font-medium">{lic.validTo ? new Date(lic.validTo).toLocaleDateString() : '—'}</p></div>
+                            <div className="flex gap-6">
+                              <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{lic.issuedAt ? new Date(lic.issuedAt).toLocaleDateString() : '—'}</p></div>
+                              <div><p className="text-gray-500 text-xs">Valid To</p><p className="font-medium">{lic.validTo ? new Date(lic.validTo).toLocaleDateString() : '—'}</p></div>
+                            </div>
                           </div>
                           <div>
                             <p className="text-gray-500 text-xs mb-1">License Key</p>
@@ -4376,8 +4378,10 @@ export default function StaffDashboard() {
                             {myLicense.isActive ? 'Active' : 'Revoked'}
                           </span>
                         </div>
-                        <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{myLicense.issuedAt ? new Date(myLicense.issuedAt).toLocaleDateString() : '—'}</p></div>
-                        <div><p className="text-gray-500 text-xs">Valid To</p><p className="font-medium">{myLicense.validTo ? new Date(myLicense.validTo).toLocaleDateString() : '—'}</p></div>
+                        <div className="flex gap-6">
+                          <div><p className="text-gray-500 text-xs">Issued</p><p className="font-medium">{myLicense.issuedAt ? new Date(myLicense.issuedAt).toLocaleDateString() : '—'}</p></div>
+                          <div><p className="text-gray-500 text-xs">Valid To</p><p className="font-medium">{myLicense.validTo ? new Date(myLicense.validTo).toLocaleDateString() : '—'}</p></div>
+                        </div>
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs mb-1">License Key</p>
