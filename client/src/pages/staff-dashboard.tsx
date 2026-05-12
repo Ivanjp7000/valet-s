@@ -1746,6 +1746,15 @@ export default function StaffDashboard() {
               )}
               <Button
                 size="sm"
+                variant="outline"
+                className="border-regis-navy text-regis-navy hover:bg-regis-navy/10"
+                onClick={() => { setShowVehicleRoster(false); setShowGSHub(false); }}
+              >
+                <Home size={16} className="mr-1 sm:mr-2" />
+                Home
+              </Button>
+              <Button
+                size="sm"
                 variant={showGSHub ? "default" : "outline"}
                 className={`relative ${showGSHub ? "bg-regis-gold text-regis-navy hover:bg-regis-gold/90 font-semibold" : "border-regis-gold text-regis-navy hover:bg-regis-gold/10"}`}
                 onClick={() => { setShowGSHub(v => !v); setShowVehicleRoster(false); }}
@@ -1757,15 +1766,6 @@ export default function StaffDashboard() {
                     {gsOpenCount > 99 ? "99+" : gsOpenCount}
                   </span>
                 )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-regis-navy text-regis-navy hover:bg-regis-navy/10"
-                onClick={() => { setShowVehicleRoster(false); setShowGSHub(false); }}
-              >
-                <Home size={16} className="mr-1 sm:mr-2" />
-                Home
               </Button>
               {user?.role === 'privilege_admin' && (
                 <Button
