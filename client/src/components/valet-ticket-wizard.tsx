@@ -516,18 +516,18 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const getVisitorTypeIcon = (type: VisitorType) => {
     switch (type) {
-      case "hotel_guest": return <Hotel className="w-6 h-6" />;
-      case "restaurant": return <UtensilsCrossed className="w-6 h-6" />;
-      case "event": return <CalendarDays className="w-6 h-6" />;
-      case "others": return <Users className="w-6 h-6" />;
+      case "hotel_guest": return <Hotel className="w-4 h-4 shrink-0" />;
+      case "restaurant": return <UtensilsCrossed className="w-4 h-4 shrink-0" />;
+      case "event": return <CalendarDays className="w-4 h-4 shrink-0" />;
+      case "others": return <Users className="w-4 h-4 shrink-0" />;
     }
   };
 
   const renderStep1 = () => (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Guest Information — top of step 1 */}
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-3">Guest Information</h3>
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Guest Information</h3>
         <div className="relative">
           <label className="text-sm font-medium text-gray-700">Full Name *</label>
           <Input
@@ -590,8 +590,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-3">Visitor Type</h3>
-        <div className="grid grid-cols-1 gap-3">
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Visitor Type</h3>
+        <div className="grid grid-cols-2 gap-2">
           {(Object.entries(VISITOR_TYPES) as [VisitorType, string][]).map(([key, label]) => (
             <div key={key}>
               <button
@@ -599,7 +599,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   const autoRoom = key === 'hotel_guest' ? '' : key === 'event' ? 'Event' : key === 'others' ? 'Others' : '';
                   setFormData({ ...formData, visitorType: key, visitorSubType: "", roomNumber: autoRoom });
                 }}
-                className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                className={`w-full flex items-center gap-2 p-2 px-3 rounded-lg border-2 transition-all ${
                   formData.visitorType === key
                     ? "border-regis-gold bg-regis-gold/10"
                     : "border-gray-200 hover:border-gray-300"
@@ -607,8 +607,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 data-testid={`visitor-type-${key}`}
               >
                 {getVisitorTypeIcon(key)}
-                <span className="font-medium">{label}</span>
-                {formData.visitorType === key && <Check className="ml-auto text-regis-gold" size={20} />}
+                <span className="font-medium text-sm">{label}</span>
+                {formData.visitorType === key && <Check className="ml-auto text-regis-gold" size={16} />}
               </button>
 
               {/* Restaurant sub-options appear inline, immediately below */}
@@ -636,8 +636,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-3">Vehicle Details</h3>
-        <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Vehicle Details</h3>
+        <div className="space-y-2">
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium text-gray-700">Car Make</label>
@@ -868,10 +868,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   );
 
   const renderStep2 = () => (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-3">Registration Plate Photo</h3>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Registration Plate Photo</h3>
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
           {formData.platePhotoUrl ? (
             <div className="space-y-3">
               <img 
@@ -892,7 +892,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             </div>
           ) : (
             <div className="space-y-3">
-              <Camera className="w-12 h-12 mx-auto text-gray-400" />
+              <Camera className="w-8 h-8 mx-auto text-gray-400" />
               <p className="text-sm text-gray-500">Take a photo of the license plate</p>
               <div className="flex gap-2 justify-center">
                 <Button
@@ -976,9 +976,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
       {/* General Car Photo */}
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-1">General Car Photo</h3>
-        <p className="text-xs text-gray-400 mb-3">Optional — take a photo of the whole car for reference</p>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center">
+        <h3 className="text-sm font-semibold text-regis-navy mb-0.5">General Car Photo <span className="text-xs font-normal text-gray-400">— Optional</span></h3>
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center">
           {formData.carPhotoUrl ? (
             <div className="space-y-2">
               <img
@@ -1005,7 +1004,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 <p className="text-sm text-regis-navy animate-pulse">Compressing photo…</p>
               ) : (
                 <>
-                  <Camera className="w-10 h-10 mx-auto text-gray-400" />
+                  <Camera className="w-7 h-7 mx-auto text-gray-400" />
                   <p className="text-sm text-gray-500">Take a general photo of the car</p>
                   <Button
                     variant="outline"
@@ -1050,7 +1049,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-regis-navy mb-3">Room Number</h3>
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Room Number</h3>
         {formData.visitorType === 'hotel_guest' ? (
           <Input
             value={formData.roomNumber}
@@ -1075,10 +1074,10 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       : user?.username || "Unknown Staff";
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div>
-          <h3 className="text-lg font-semibold text-regis-navy mb-3">Valet Ticket Number</h3>
-          <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Valet Ticket Number</h3>
+          <div className="space-y-2">
             <div>
               <label className="text-sm font-medium text-gray-700">Ticket Number *</label>
               <div className="flex gap-2 mt-1">
@@ -1135,9 +1134,9 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-regis-navy mb-3">Auto-filled Information</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="bg-gray-50 rounded-lg p-3">
+          <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Auto-filled Information</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <span className="text-gray-500">Date:</span>
               <p className="font-medium">{now.toLocaleDateString()}</p>
@@ -1259,8 +1258,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   return (
     <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[96vh] overflow-y-auto">
+        <DialogHeader className="pb-1">
           <DialogTitle className="flex items-center gap-2">
             <Ticket className="w-5 h-5 text-regis-gold" />
             {showPreview ? "Confirm Ticket Details" : "New Valet Ticket"}
@@ -1268,7 +1267,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         </DialogHeader>
 
         {!showPreview && (
-          <div className="flex justify-between mb-6">
+          <div className="flex justify-between mb-3">
             {STEPS.map((step, index) => (
               <div key={step.id} className="flex items-center">
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
