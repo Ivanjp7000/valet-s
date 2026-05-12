@@ -104,26 +104,6 @@ export class ObjectStorageService {
     return `/${photoPath}`;
   }
 
-  // Gets the upload URL for a car photo
-  async getCarPhotoUploadURL(): Promise<string> {
-    const privateObjectDir = this.getPrivateObjectDir();
-    if (!privateObjectDir) {
-      throw new Error("PRIVATE_OBJECT_DIR not set");
-    }
-
-    const photoId = randomUUID();
-    const fullPath = `${privateObjectDir}/car-photos/${photoId}`;
-
-    const { bucketName, objectName } = parseObjectPath(fullPath);
-
-    return signObjectURL({
-      bucketName,
-      objectName,
-      method: "PUT",
-      ttlSec: 900,
-    });
-  }
-
   // Download car photo to response
   async downloadCarPhoto(file: File, res: Response) {
     try {
