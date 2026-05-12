@@ -1220,16 +1220,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== PENDING REGISTRATIONS (Super Admin Only) =====
-  // New auto-approved @stregis.com accounts (last 30 days)
+  // New auto-approved @stregis.com accounts (last 30 days), excluding acknowledged ones
   app.get('/api/admin/new-stregis-accounts', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const allUsers = await storage.getAllUsers();
+      const ackedSetting = await storage.getSystemSetting('acknowledged_stregis_ids');
+      const ackedIds: string[] = ackedSetting ? JSON.parse(ackedSetting.value) : [];
       const newAccounts = allUsers.filter((u: any) =>
         u.email?.toLowerCase().endsWith('@stregis.com') &&
         u.accountStatus === 'active' &&
         u.createdAt && new Date(u.createdAt) >= since &&
-        !u.password
+        !u.password &&
+        !ackedIds.includes(u.id)
       ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       res.json(newAccounts.map((u: any) => ({
         id: u.id, firstName: u.firstName, lastName: u.lastName,
@@ -1237,6 +1240,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })));
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch new accounts" });
+    }
+  });
+
+  // Acknowledge a new @stregis.com account (removes it from the notification list)
+  app.post('/api/admin/new-stregis-accounts/:id/acknowledge', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const ackedSetting = await storage.getSystemSetting('acknowledged_stregis_ids');
+      const ackedIds: string[] = ackedSetting ? JSON.parse(ackedSetting.value) : [];
+      if (!ackedIds.includes(id)) ackedIds.push(id);
+      await storage.upsertSystemSetting({ key: 'acknowledged_stregis_ids', value: JSON.stringify(ackedIds) });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to acknowledge account" });
     }
   });
 

@@ -50,6 +50,15 @@ function PendingRegistrationsTab() {
     refetchInterval: 15000,
   });
 
+  const acknowledgeMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/new-stregis-accounts/${id}/acknowledge`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/new-stregis-accounts'] });
+      toast({ title: "Acknowledged", description: "Account removed from notifications." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to acknowledge.", variant: "destructive" }),
+  });
+
   const { data: ous } = useQuery<any[]>({ queryKey: ['/api/ous'] });
 
   const approveMutation = useMutation({
@@ -124,6 +133,15 @@ function PendingRegistrationsTab() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                         ✓ Active
                       </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[10px] border-gray-300 text-gray-500 hover:border-regis-navy hover:text-regis-navy"
+                        disabled={acknowledgeMutation.isPending}
+                        onClick={() => acknowledgeMutation.mutate(acc.id)}
+                      >
+                        Acknowledge
+                      </Button>
                     </div>
                   </div>
                 ))}
