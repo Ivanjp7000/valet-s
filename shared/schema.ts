@@ -82,6 +82,7 @@ export const users = pgTable("users", {
   mustChangePassword: boolean("must_change_password").default(false), // Force password change on first login
   twoFactorEnabled: boolean("two_factor_enabled").default(false), // Super Admin can enable email OTP 2FA
   isActive: boolean("is_active").default(true),
+  isHidden: boolean("is_hidden").default(false), // Super Admin can hide accounts from non-super-admin views
   // Self-registration flow
   accountStatus: varchar("account_status").default("active"), // 'active', 'pending_email_verification', 'pending_approval'
   emailVerificationToken: varchar("email_verification_token"),

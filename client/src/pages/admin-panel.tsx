@@ -736,6 +736,16 @@ export default function AdminPanel() {
     onError: (error) => handleError(error, "Failed to update 2FA"),
   });
 
+  const toggleHiddenMutation = useMutation({
+    mutationFn: async (id: string) => await apiRequest("PATCH", `/api/users/${id}/toggle-hidden`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Success", description: "Account visibility updated" });
+    },
+    onError: (error) => handleError(error, "Failed to update visibility"),
+  });
+
   const createFaqMutation = useMutation({
     mutationFn: async (faq: { question: string; answer: string }) => await apiRequest("POST", "/api/admin/faqs", faq),
     onSuccess: () => {
@@ -1186,6 +1196,7 @@ export default function AdminPanel() {
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden sm:table-cell">Username</th>
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Role</th>
                           {isSuperAdmin && <th className="text-center p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">2FA</th>}
+                          {isSuperAdmin && <th className="text-center p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Hide</th>}
                           {isSuperAdmin && <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Org</th>}
                           <th className="text-left p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm hidden md:table-cell">Location</th>
                           <th className="text-right p-2 sm:p-4 font-medium text-gray-600 text-xs sm:text-sm">Actions</th>
@@ -1193,10 +1204,13 @@ export default function AdminPanel() {
                       </thead>
                       <tbody>
                         {filteredUsers?.map((u) => (
-                          <tr key={u.id} className="border-t" data-testid={`row-user-${u.id}`}>
+                          <tr key={u.id} className={`border-t ${(u as any).isHidden ? 'opacity-40' : ''}`} data-testid={`row-user-${u.id}`}>
                             <td className="p-2 sm:p-4">
                               <div>
-                                <p className="font-medium text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">{u.firstName} {u.lastName}</p>
+                                <p className="font-medium text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none flex items-center gap-1">
+                                  {u.firstName} {u.lastName}
+                                  {(u as any).isHidden && <EyeOff size={11} className="text-gray-400 shrink-0" title="Hidden account" />}
+                                </p>
                                 <p className="text-xs text-gray-500 truncate max-w-[100px] sm:max-w-none">{u.email}</p>
                               </div>
                             </td>
@@ -1216,6 +1230,21 @@ export default function AdminPanel() {
                                   className="inline-flex items-center justify-center rounded-full w-8 h-8 transition-colors hover:bg-gray-100 disabled:opacity-50"
                                 >
                                   <ShieldCheck size={18} className={u.twoFactorEnabled ? "text-green-600" : "text-gray-300"} />
+                                </button>
+                              </td>
+                            )}
+                            {isSuperAdmin && (
+                              <td className="p-2 sm:p-4 text-center">
+                                <button
+                                  onClick={() => toggleHiddenMutation.mutate(u.id)}
+                                  title={(u as any).isHidden ? "Hidden — click to make visible" : "Visible — click to hide from others"}
+                                  disabled={toggleHiddenMutation.isPending}
+                                  className="inline-flex items-center justify-center rounded-full w-8 h-8 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                                >
+                                  {(u as any).isHidden
+                                    ? <EyeOff size={18} className="text-orange-500" />
+                                    : <Eye size={18} className="text-gray-300" />
+                                  }
                                 </button>
                               </td>
                             )}

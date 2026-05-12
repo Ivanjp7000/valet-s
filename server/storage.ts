@@ -529,7 +529,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(users)
-      .where(and(eq(users.ouId, ouId), eq(users.isActive, true), eq(users.accountStatus, 'active')))
+      .where(and(eq(users.ouId, ouId), eq(users.isActive, true), eq(users.accountStatus, 'active'), eq(users.isHidden, false)))
       .orderBy(asc(users.firstName));
   }
 

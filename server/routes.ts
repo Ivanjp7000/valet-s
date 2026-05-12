@@ -1670,6 +1670,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle hidden status for a user (Super Admin only)
+  app.patch('/api/users/:id/toggle-hidden', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      const updated = await storage.updateUser(id, { isHidden: !(targetUser as any).isHidden });
+      res.json({ success: true, isHidden: (updated as any)?.isHidden });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle hidden status" });
+    }
+  });
+
   // Toggle 2FA for a user (Super Admin only)
   app.patch('/api/users/:id/toggle-2fa', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
