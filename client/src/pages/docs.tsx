@@ -274,11 +274,6 @@ export default function Docs() {
               desc="Log in to see all active valet tickets and their current status in real time — Pending, In Transit, Ready, and Completed."
             />
             <Item
-              icon={<Car size={14} />}
-              title="Vehicle Roster"
-              desc="Access the Vehicle Roster to see all active vehicles, their assigned parking sector and location, and current ticket status."
-            />
-            <Item
               icon={<MapPin size={14} />}
               title="Licence Plate Information"
               desc="View licence plate details attached to each ticket, including OCR-scanned Japanese plates where available."

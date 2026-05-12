@@ -1744,15 +1744,17 @@ export default function StaffDashboard() {
                   New Valet Ticket
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant={showVehicleRoster ? "default" : "outline"}
-                className={showVehicleRoster ? "bg-regis-navy text-white hover:bg-regis-navy/90" : "border-regis-navy text-regis-navy hover:bg-regis-navy/10"}
-                onClick={() => { setShowVehicleRoster(v => !v); setShowGSHub(false); }}
-              >
-                <List size={16} className="mr-1 sm:mr-2" />
-                Vehicle Roster
-              </Button>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant={showVehicleRoster ? "default" : "outline"}
+                  className={showVehicleRoster ? "bg-regis-navy text-white hover:bg-regis-navy/90" : "border-regis-navy text-regis-navy hover:bg-regis-navy/10"}
+                  onClick={() => { setShowVehicleRoster(v => !v); setShowGSHub(false); }}
+                >
+                  <List size={16} className="mr-1 sm:mr-2" />
+                  Vehicle Roster
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant={showGSHub ? "default" : "outline"}
@@ -1781,7 +1783,7 @@ export default function StaffDashboard() {
             </div>
 
             {/* Vehicle Roster Panel */}
-            {showVehicleRoster && (() => {
+            {showVehicleRoster && canEdit && (() => {
               const allTickets = activeTickets || [];
               const selDateStr = rosterDate.toDateString(); // e.g. "Thu May 08 2026"
               const fmtDateDisplay = (d: Date) =>
