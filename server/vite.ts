@@ -76,10 +76,14 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve JS/CSS assets with long cache (they have content hashes in filenames)
+  app.use(express.static(distPath, { index: false }));
 
-  // fall through to index.html if the file doesn't exist
+  // Always serve index.html with no-cache so browsers pick up new deploys immediately
   app.use("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
