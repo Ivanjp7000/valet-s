@@ -169,7 +169,7 @@ export default function Landing() {
   };
 
   if (showStatus) {
-    return <StatusTracker ticketNumber={submittedTicket} guestName={guestNameInput.trim()} onBack={() => setShowStatus(false)} />;
+    return <StatusTracker ticketNumber={submittedTicket} guestName={guestNameInput.trim()} guestPin={guestPinInput.trim().toUpperCase() || undefined} onBack={() => setShowStatus(false)} />;
   }
 
   if (showCamera) {

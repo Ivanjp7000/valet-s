@@ -9,6 +9,7 @@ import type { ValetTicket } from "@shared/schema";
 interface StatusTrackerProps {
   ticketNumber: string;
   guestName: string;
+  guestPin?: string;
   onBack: () => void;
 }
 
@@ -27,11 +28,19 @@ function getStageFromStatus(status: string): number {
   return -1;
 }
 
-export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTrackerProps) {
+export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: StatusTrackerProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATIONS.retrieving);
   const [cancelling, setCancelling] = useState(false);
   const { lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
+
+  // Build the polling URL — prefer PIN when provided; fall back to name
+  const buildLookupUrl = () => {
+    const params = new URLSearchParams();
+    if (guestPin) params.set("pin", guestPin);
+    else if (guestName) params.set("name", guestName);
+    return `/api/tickets/${encodeURIComponent(ticketNumber)}?${params.toString()}`;
+  };
 
   // Calls the server to cancel the retrieval request, then navigates back
   const handleCancelRequest = async () => {
@@ -40,18 +49,19 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
       await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}/cancel-retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName }),
+        body: JSON.stringify({ guestName, guestPin: guestPin || undefined }),
       });
     } catch {}
     setCancelling(false);
     onBack();
   };
 
+  const queryKey = ["/api/tickets", ticketNumber, guestName, guestPin ?? ""];
+
   const { data: ticket } = useQuery<ValetTicket>({
-    queryKey: ["/api/tickets", ticketNumber, guestName],
+    queryKey,
     queryFn: async () => {
-      const url = `/api/tickets/${encodeURIComponent(ticketNumber)}?name=${encodeURIComponent(guestName)}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(buildLookupUrl(), { credentials: "include" });
       // On 429 (rate-limited) keep previous data — do not throw
       if (res.status === 429) return undefined as any;
       if (!res.ok) throw new Error(`${res.status}`);
@@ -68,12 +78,12 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
   useEffect(() => {
     const handleVisibility = () => {
       if (!document.hidden) {
-        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName] });
+        queryClient.invalidateQueries({ queryKey });
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [ticketNumber, guestName, queryClient]);
+  }, [ticketNumber, guestName, guestPin, queryClient]);
 
   const currentStage = ticket ? getStageFromStatus(ticket.status) : -1;
   const isReady = ticket?.status === "ready";
@@ -88,7 +98,7 @@ export function StatusTracker({ ticketNumber, guestName, onBack }: StatusTracker
         message.type === "ticket_status_updated" &&
         message.data?.ticketNumber === ticketNumber
       ) {
-        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName] });
+        queryClient.invalidateQueries({ queryKey });
       }
     } catch {}
   }, [lastMessage, ticketNumber, queryClient]);

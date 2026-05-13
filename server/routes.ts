@@ -716,12 +716,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/tickets/:ticketNumber/cancel-retrieval', async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
-      const { guestName } = req.body;
-      if (!guestName || typeof guestName !== 'string' || !guestName.trim()) {
-        return res.status(400).json({ message: 'Name required' });
+      const { guestName, guestPin: bodyPin } = req.body;
+      const pinParam = typeof bodyPin === 'string' ? bodyPin.trim().toUpperCase() : '';
+      if (!guestName?.trim() && !pinParam) {
+        return res.status(400).json({ message: 'Name or PIN required' });
       }
       const ticket = await storage.getValetTicket(ticketNumber);
-      if (!ticket || !namesMatch(guestName, ticket.guestName)) {
+      let cancelVerified = false;
+      if (!ticket) {
+        cancelVerified = false;
+      } else if (pinParam && ticket.guestPin) {
+        cancelVerified = pinParam === ticket.guestPin.toUpperCase();
+      } else {
+        cancelVerified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+      }
+      if (!ticket || !cancelVerified) {
         return res.status(404).json({ message: 'Ticket not found' });
       }
       if (ticket.status !== 'retrieval_requested') {
