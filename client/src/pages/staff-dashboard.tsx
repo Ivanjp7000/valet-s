@@ -2106,8 +2106,9 @@ export default function StaffDashboard() {
                   </span>
                 );
               };
-              // 備考 split cell — top: NOTES popup, bottom: NC Done toggle
+              // 備考 split cell — top: NOTES popup, bottom: NC Done toggle (hidden for R&E and Others tabs)
               const todayDateStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+              const showNC = rosterTab !== 'events' && rosterTab !== 'others';
               const BikouCell = ({ ticket }: { ticket: ValetTicket }) => {
                 const hasNotes = !!(ticket.staffNotes && ticket.staffNotes.trim());
                 const ncDone = (ticket as any).nightCheckDone === todayDateStr;
@@ -2116,7 +2117,7 @@ export default function StaffDashboard() {
                     {/* Top half — NOTES */}
                     <button
                       onClick={() => setRosterNotesPopup({ ticketNumber: ticket.ticketNumber, notes: ticket.staffNotes || '' })}
-                      className={`flex-1 w-full flex items-center justify-center border-b border-black text-[10px] font-bold transition-colors ${
+                      className={`flex-1 w-full flex items-center justify-center text-[10px] font-bold transition-colors ${showNC ? 'border-b border-black' : ''} ${
                         hasNotes
                           ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
                           : 'bg-white text-gray-400 hover:bg-gray-50'
@@ -2125,17 +2126,19 @@ export default function StaffDashboard() {
                     >
                       NOTES
                     </button>
-                    {/* Bottom half — NC Done */}
-                    <button
-                      onClick={() => rosterNotesMutation.mutate({ ticketNumber: ticket.ticketNumber, nightCheckDone: !ncDone })}
-                      className={`flex-1 w-full flex items-center justify-center text-[10px] font-bold transition-colors ${
-                        ncDone
-                          ? 'bg-green-500 text-white hover:bg-green-600'
-                          : 'bg-red-500 text-white hover:bg-red-600'
-                      }`}
-                    >
-                      {ncDone ? 'NC Done' : 'NC Pending'}
-                    </button>
+                    {/* Bottom half — NC Done (hotel guests only) */}
+                    {showNC && (
+                      <button
+                        onClick={() => rosterNotesMutation.mutate({ ticketNumber: ticket.ticketNumber, nightCheckDone: !ncDone })}
+                        className={`flex-1 w-full flex items-center justify-center text-[10px] font-bold transition-colors ${
+                          ncDone
+                            ? 'bg-green-500 text-white hover:bg-green-600'
+                            : 'bg-red-500 text-white hover:bg-red-600'
+                        }`}
+                      >
+                        {ncDone ? 'NC Done' : 'NC Pending'}
+                      </button>
+                    )}
                   </div>
                 );
               };
@@ -2426,7 +2429,7 @@ export default function StaffDashboard() {
                             return (<>
                               <button
                                 onClick={() => setRosterNotesPopup({ ticketNumber: ticket.ticketNumber, notes: ticket.staffNotes || '' })}
-                                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold border-r border-gray-300 transition-colors ${
+                                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold transition-colors ${showNC ? 'border-r border-gray-300' : ''} ${
                                   hasNotes ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-white text-gray-400 hover:bg-gray-50'
                                 }`}
                                 title={hasNotes ? ticket.staffNotes! : 'Add notes'}
@@ -2434,15 +2437,17 @@ export default function StaffDashboard() {
                                 <FileText size={12} />
                                 NOTES{hasNotes ? ' ✓' : ''}
                               </button>
-                              <button
-                                onClick={() => rosterNotesMutation.mutate({ ticketNumber: ticket.ticketNumber, nightCheckDone: !ncDone })}
-                                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold transition-colors ${
-                                  ncDone ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-red-500 text-white hover:bg-red-600'
-                                }`}
-                              >
-                                <CheckSquare size={12} />
-                                {ncDone ? 'NC Done ✓' : 'NC Pending'}
-                              </button>
+                              {showNC && (
+                                <button
+                                  onClick={() => rosterNotesMutation.mutate({ ticketNumber: ticket.ticketNumber, nightCheckDone: !ncDone })}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold transition-colors ${
+                                    ncDone ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-red-500 text-white hover:bg-red-600'
+                                  }`}
+                                >
+                                  <CheckSquare size={12} />
+                                  {ncDone ? 'NC Done ✓' : 'NC Pending'}
+                                </button>
+                              )}
                             </>);
                           })()}
                         </div>
