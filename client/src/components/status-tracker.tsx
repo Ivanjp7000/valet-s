@@ -341,6 +341,32 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     );
   }
 
+  // Schedule expired — active ticket whose scheduled time has passed. Staff will start retrieval soon.
+  if (ticket?.status === 'active' && ticket?.scheduledRetrievalAt && _scheduledMs <= 0) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="bg-regis-navy text-white px-6 py-8 text-center">
+          <div className="w-16 h-16 bg-regis-gold rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Car className="text-white" size={24} />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Starting Retrieval</h2>
+          <p className="text-blue-200 text-sm">Ticket #{ticketNumber}</p>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto w-full">
+          <div className="w-20 h-20 border-4 border-regis-gold border-t-transparent rounded-full animate-spin mb-6" />
+          <h3 className="text-xl font-bold text-regis-navy mb-3">Your scheduled pickup time has arrived</h3>
+          <p className="text-gray-500 text-sm leading-relaxed">
+            A valet attendant is starting retrieval of your vehicle. This page will update automatically.
+          </p>
+        </div>
+        <Button variant="ghost" onClick={onBack} className="mx-auto mb-8 text-gray-400 hover:text-gray-600">
+          <X className="mr-2" size={16} />
+          Back to Home
+        </Button>
+      </div>
+    );
+  }
+
   // In progress (retrieving, transit, or preparing)
   if (!isActive) {
     return (

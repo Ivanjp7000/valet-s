@@ -1218,6 +1218,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
+      // Clear scheduled retrieval time when retrieval actually begins — schedule is fulfilled
+      if (['retrieving', 'transit', 'preparing', 'ready', 'completed'].includes(status) && existing.scheduledRetrievalAt) {
+        ticket = await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: null }) ?? ticket;
+      }
+
       // Auto-update rosterCategory when ticket is completed (departed, no coming back)
       if (status === 'completed') {
         const depCategory = (existing.visitorType === 'restaurant' || existing.visitorType === 'event' || existing.visitorType === 'others') ? 'events' : 'departing';
