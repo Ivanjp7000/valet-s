@@ -63,7 +63,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-soft-gray">
       <div className="border-b bg-white">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-0">
+        <div className="max-w-6xl mx-auto px-6 py-4" style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
           <div className="flex items-center gap-4 flex-shrink-0">
             <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center flex-shrink-0">
               <Crown className="text-regis-navy" size={24} />
@@ -79,8 +79,8 @@ export default function Home() {
             </div>
           </div>
           {/* Banner fills the empty centre space on desktop */}
-          <div className="hidden sm:flex flex-1 justify-center px-2">
-            <img src={valetHeaderBanner} alt="" className="h-[70px] rounded object-cover" style={{ maxWidth: '550px', width: '100%' }} />
+          <div className="hidden sm:flex flex-1" style={{ justifyContent: 'center', padding: '0 4px' }}>
+            <img src={valetHeaderBanner} alt="" style={{ height: 70, maxWidth: 550, width: '100%', borderRadius: 6, objectFit: 'cover' }} />
           </div>
           <a
             href="/api/logout"
