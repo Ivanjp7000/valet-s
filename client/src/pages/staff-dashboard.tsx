@@ -977,8 +977,9 @@ export default function StaffDashboard() {
   const togglePanel = (id: string) => {
     const isOpen = expandedPanels.has(id);
     if (!isOpen) {
-      // Scroll to panel header BEFORE expanding — panel is still collapsed so position is exact
-      const el = document.getElementById(`panel-${id}`);
+      // Both mobile + desktop panels share the same id — find the VISIBLE one
+      const allEls = Array.from(document.querySelectorAll<HTMLElement>(`[id="panel-${id}"]`));
+      const el = allEls.find(e => e.offsetParent !== null) ?? allEls[0];
       if (el) {
         const absoluteTop = el.getBoundingClientRect().top + window.scrollY;
         window.scrollTo({ top: Math.max(0, absoluteTop - 8), behavior: 'smooth' });
