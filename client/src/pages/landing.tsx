@@ -460,7 +460,7 @@ export default function Landing() {
                 src={luxuryCarImg}
                 alt="Luxury valet car"
                 className="w-full object-cover"
-                style={{ height: '180px', objectPosition: 'center 60%' }}
+                style={{ height: '162px', objectPosition: 'center 60%' }}
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-white/60" />
             </div>
