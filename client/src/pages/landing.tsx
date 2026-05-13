@@ -459,8 +459,8 @@ export default function Landing() {
               <img
                 src={luxuryCarImg}
                 alt="Luxury valet car"
-                className="w-full object-cover"
-                style={{ height: '162px', objectPosition: 'center 60%' }}
+                className="block mx-auto"
+                style={{ width: '90%', height: 'auto' }}
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-white/60" />
             </div>
