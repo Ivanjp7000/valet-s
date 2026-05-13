@@ -51,120 +51,136 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
+// pdf-lib standard fonts only support WinAnsi (Latin) characters.
+// Replace anything outside that range so the PDF never crashes.
+function sanitizePdf(text: string): string {
+  return text.split('').map(c => {
+    const code = c.charCodeAt(0);
+    if (code < 32 || (code > 126 && code < 160) || code > 255) return '?';
+    return c;
+  }).join('');
+}
+
 async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
-  const mmToPt = (mm: number) => mm * 2.8346;
-  const W = mmToPt(50);
-  const H = mmToPt(80);
-  const pad = mmToPt(3);
-  const innerW = W - pad * 2;
+  try {
+    const mmToPt = (mm: number) => mm * 2.8346;
+    const W = mmToPt(50);
+    const H = mmToPt(80);
+    const pad = mmToPt(3);
+    const innerW = W - pad * 2;
 
-  const doc = await PDFDocument.create();
-  const page = doc.addPage([W, H]);
-  page.setMediaBox(0, 0, W, H);
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([W, H]);
+    page.setMediaBox(0, 0, W, H);
 
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const font     = await doc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const font     = await doc.embedFont(StandardFonts.Helvetica);
 
-  const gold  = rgb(0.79, 0.66, 0.3);
-  const navy  = rgb(0.1,  0.12, 0.27);
-  const gray  = rgb(0.45, 0.45, 0.45);
-  const white = rgb(1, 1, 1);
+    const gold  = rgb(0.79, 0.66, 0.3);
+    const navy  = rgb(0.1,  0.12, 0.27);
+    const gray  = rgb(0.45, 0.45, 0.45);
+    const white = rgb(1, 1, 1);
 
-  let cursor = H - pad;
+    let cursor = H - pad;
 
-  // ── Header bar ──────────────────────────────────────────────────────────
-  const headerH = mmToPt(9);
-  page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: navy });
-  const headerLabel = 'VALET TICKET';
-  const headerSize  = 9;
-  page.drawText(headerLabel, {
-    x: (W - fontBold.widthOfTextAtSize(headerLabel, headerSize)) / 2,
-    y: H - headerH + (headerH - headerSize) / 2,
-    font: fontBold, size: headerSize, color: white,
-  });
-  cursor = H - headerH - mmToPt(3);
+    // ── Header bar ──────────────────────────────────────────────────────────
+    const headerH = mmToPt(9);
+    page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: navy });
+    const headerLabel = 'VALET TICKET';
+    const headerSize  = 9;
+    page.drawText(headerLabel, {
+      x: (W - fontBold.widthOfTextAtSize(headerLabel, headerSize)) / 2,
+      y: H - headerH + (headerH - headerSize) / 2,
+      font: fontBold, size: headerSize, color: white,
+    });
+    cursor = H - headerH - mmToPt(3);
 
-  // ── Ticket number ────────────────────────────────────────────────────────
-  const numStr  = `#${ticket.ticketNumber}`;
-  const numSize = 22;
-  page.drawText(numStr, {
-    x: (W - fontBold.widthOfTextAtSize(numStr, numSize)) / 2,
-    y: cursor - numSize,
-    font: fontBold, size: numSize, color: navy,
-  });
-  cursor -= numSize + mmToPt(1);
+    // ── Ticket number ────────────────────────────────────────────────────────
+    const numStr  = `#${ticket.ticketNumber}`;
+    const numSize = 22;
+    page.drawText(numStr, {
+      x: (W - fontBold.widthOfTextAtSize(numStr, numSize)) / 2,
+      y: cursor - numSize,
+      font: fontBold, size: numSize, color: navy,
+    });
+    cursor -= numSize + mmToPt(1);
 
-  // Gold rule
-  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.8, color: gold });
-  cursor -= mmToPt(2.5);
+    // Gold rule
+    page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.8, color: gold });
+    cursor -= mmToPt(2.5);
 
-  // ── Helper to draw a label/value row ────────────────────────────────────
-  const drawRow = (label: string, value: string | null | undefined, sz = 6.5) => {
-    if (!value) return;
-    const labelTxt = label.toUpperCase();
-    const labelSz  = 5;
-    page.drawText(labelTxt, { x: pad, y: cursor, font, size: labelSz, color: gray });
-    cursor -= labelSz + 1;
-    let vSz = sz;
-    while (vSz > 5 && fontBold.widthOfTextAtSize(value, vSz) > innerW) vSz -= 0.5;
-    page.drawText(value, { x: pad, y: cursor, font: fontBold, size: vSz, color: navy });
-    cursor -= vSz + mmToPt(1.8);
-  };
+    // ── Helper to draw a label/value row ──────────────────────────────────
+    const drawRow = (label: string, value: string | null | undefined, sz = 6.5) => {
+      if (!value) return;
+      const safe     = sanitizePdf(value);
+      const labelTxt = label.toUpperCase();
+      const labelSz  = 5;
+      page.drawText(labelTxt, { x: pad, y: cursor, font, size: labelSz, color: gray });
+      cursor -= labelSz + 1;
+      let vSz = sz;
+      while (vSz > 5 && fontBold.widthOfTextAtSize(safe, vSz) > innerW) vSz -= 0.5;
+      page.drawText(safe, { x: pad, y: cursor, font: fontBold, size: vSz, color: navy });
+      cursor -= vSz + mmToPt(1.8);
+    };
 
-  // Guest name
-  drawRow('Guest Name', ticket.guestName || '—', 8);
+    // Guest name
+    drawRow('Guest Name', ticket.guestName || '-', 8);
 
-  // Visitor type
-  const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
-    : ticket.visitorType === 'restaurant'
-      ? `Restaurant${ticket.visitorSubType ? ` — ${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
-      : ticket.visitorType === 'event' ? 'Event'
-      : ticket.visitorType === 'others' ? 'Others'
-      : ticket.visitorType || '—';
-  drawRow('Visitor Type', visitorLabel);
+    // Visitor type
+    const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
+      : ticket.visitorType === 'restaurant'
+        ? `Restaurant${ticket.visitorSubType ? ` - ${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
+        : ticket.visitorType === 'event' ? 'Event'
+        : ticket.visitorType === 'others' ? 'Others'
+        : ticket.visitorType || '-';
+    drawRow('Visitor Type', visitorLabel);
 
-  // Room number (hotel only)
-  if (ticket.roomNumber) drawRow('Room No.', ticket.roomNumber);
+    // Room number (hotel only)
+    if (ticket.roomNumber) drawRow('Room No.', ticket.roomNumber);
 
-  // Gold rule
-  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
-  cursor -= mmToPt(2);
+    // Gold rule
+    page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
+    cursor -= mmToPt(2);
 
-  // Vehicle
-  const carLine = [ticket.carMake, ticket.carModel, ticket.carColor].filter(Boolean).join('  ');
-  drawRow('Vehicle', carLine || '—');
-  drawRow('License Plate', ticket.licensePlate || '—');
-  drawRow('Parking Spot', ticket.parkingLocation || '—');
+    // Vehicle
+    const carLine = [ticket.carMake, ticket.carModel, ticket.carColor].filter(Boolean).join('  ');
+    drawRow('Vehicle', carLine || '-');
+    drawRow('License Plate', ticket.licensePlate || '-');
+    drawRow('Parking Spot', ticket.parkingLocation || '-');
 
-  // Gold rule
-  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
-  cursor -= mmToPt(2);
+    // Gold rule
+    page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
+    cursor -= mmToPt(2);
 
-  // Check-in time
-  if (ticket.createdAt) {
-    const d   = new Date(ticket.createdAt);
-    const pad2 = (n: number) => n.toString().padStart(2, '0');
-    const timeStr = `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}  ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-    drawRow('Check-in', timeStr);
+    // Check-in time
+    if (ticket.createdAt) {
+      const d    = new Date(ticket.createdAt);
+      const pad2 = (n: number) => n.toString().padStart(2, '0');
+      const timeStr = `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}  ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      drawRow('Check-in', timeStr);
+    }
+
+    // PIN (if exists)
+    if (ticket.guestPin) drawRow('PIN', ticket.guestPin, 9);
+
+    // ── Footer ─────────────────────────────────────────────────────────────
+    const footerSz  = 5;
+    const footerTxt = 'Valet-s.com';
+    page.drawText(footerTxt, {
+      x: (W - font.widthOfTextAtSize(footerTxt, footerSz)) / 2,
+      y: pad,
+      font, size: footerSz, color: gray,
+    });
+
+    const pdfBytes = await doc.save();
+    const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url      = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (err) {
+    console.error('Print ticket error:', err);
+    alert('Could not generate PDF. Check the browser console for details.');
   }
-
-  // PIN (if exists)
-  if (ticket.guestPin) drawRow('PIN', ticket.guestPin, 9);
-
-  // ── Footer ───────────────────────────────────────────────────────────────
-  const footerSz = 5;
-  const footerTxt = 'Valet-s.com';
-  page.drawText(footerTxt, {
-    x: (W - font.widthOfTextAtSize(footerTxt, footerSz)) / 2,
-    y: pad,
-    font, size: footerSz, color: gray,
-  });
-
-  const pdfBytes = await doc.save();
-  const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
-  const url      = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function TripLogSection({
