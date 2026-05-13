@@ -441,24 +441,23 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-soft-gray">
-      {/* Header */}
-      <div className="bg-regis-navy">
-        <div className="max-w-md mx-auto px-6 py-6 text-center">
-          <p className="text-[10px] font-semibold tracking-[0.25em] text-regis-gold uppercase mb-1">Exclusive</p>
-          <h1 className="text-2xl font-bold tracking-widest text-white uppercase mb-1">Valet Service</h1>
-          <div className="flex items-center justify-center gap-3 mt-2">
-            <div className="h-px w-10 bg-regis-gold/60" />
-            <p className="text-[11px] tracking-[0.18em] text-white/60 uppercase">Retrieve your vehicle</p>
-            <div className="h-px w-10 bg-regis-gold/60" />
-          </div>
-        </div>
-      </div>
-
       {/* Main Customer Interface */}
       <div className="max-w-md mx-auto px-6 py-8">
         {/* Ticket Input Card */}
-        <Card className="mb-6 shadow-lg">
-          <CardContent className="p-8">
+        <Card className="mb-6 shadow-lg overflow-hidden">
+          <CardContent className="p-0">
+            {/* Header inside card */}
+            <div className="bg-regis-navy text-center px-6 py-5">
+              <p className="text-[10px] font-semibold tracking-[0.25em] text-regis-gold uppercase mb-1">Exclusive</p>
+              <h1 className="text-2xl font-bold tracking-widest text-white uppercase mb-1">Valet Service</h1>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <div className="h-px w-10 bg-regis-gold/60" />
+                <p className="text-[11px] tracking-[0.18em] text-white/60 uppercase">Retrieve your vehicle</p>
+                <div className="h-px w-10 bg-regis-gold/60" />
+              </div>
+            </div>
+
+            <div className="p-8">
             {/* Luxury car hero image */}
             <div className="flex justify-center mb-6">
               <div
@@ -539,6 +538,7 @@ export default function Landing() {
             >
               {isLoading ? "Looking up…" : "Submit"}
             </Button>
+            </div>
           </CardContent>
         </Card>
 
