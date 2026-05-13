@@ -82,35 +82,25 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
   body {
     width: 50mm; height: 80mm; overflow: hidden;
     font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
-    font-size: 8pt; color: #1a1f45;
+    color: #1a1f45;
   }
   .header {
     background: #1a1f45; color: #fff;
-    text-align: center; padding: 2.5mm 0 1.5mm;
-    font-size: 7pt; letter-spacing: 2px; font-weight: bold;
+    text-align: center; padding: 1.2mm 0;
+    font-size: 6.5pt; letter-spacing: 2px; font-weight: bold;
   }
   .ticket-num {
-    text-align: center; font-size: 22pt; font-weight: bold;
-    color: #1a1f45; padding: 1mm 0;
-    line-height: 1;
+    text-align: center; font-size: 18pt; font-weight: bold;
+    color: #1a1f45; line-height: 1; padding: 0.8mm 0 0.5mm;
   }
-  .gold-line { height: 0.5mm; background: #c9a84c; margin: 0 3mm; }
-  .body { padding: 2mm 3mm 0; }
-  .row { margin-bottom: 2mm; }
-  .label {
-    display: block; font-size: 6pt; color: #888;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    margin-bottom: 0.5mm;
-  }
-  .value {
-    display: block; font-size: 9pt; font-weight: bold; color: #1a1f45;
-    word-break: break-all;
-  }
-  .value.large { font-size: 10pt; }
-  .footer {
-    position: absolute; bottom: 2mm; left: 0; right: 0;
-    text-align: center; font-size: 5pt; color: #999;
-  }
+  .gold-line { height: 0.4mm; background: #c9a84c; margin: 0 2.5mm 1.5mm; }
+  .body { padding: 0 2.5mm; }
+  .row { display: flex; align-items: baseline; margin-bottom: 1mm; gap: 1.5mm; }
+  .label { font-size: 5.5pt; color: #888; white-space: nowrap; flex-shrink: 0; min-width: 14mm; }
+  .value { font-size: 7.5pt; font-weight: bold; word-break: break-all; }
+  .pin-row { margin-top: 1mm; }
+  .pin-val { font-size: 10pt; font-weight: bold; }
+  .footer { text-align: center; font-size: 5pt; color: #aaa; margin-top: 1mm; }
 </style>
 </head>
 <body>
@@ -118,16 +108,14 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
   <div class="ticket-num">#${ticket.ticketNumber}</div>
   <div class="gold-line"></div>
   <div class="body">
-    ${row('Guest Name', ticket.guestName || '–')}
-    ${row('Visitor Type', visitorLabel)}
-    ${ticket.roomNumber ? row('Room No.', ticket.roomNumber) : ''}
-    <div class="gold-line" style="margin:2mm -3mm;"></div>
-    ${carLine ? row('Vehicle', carLine) : ''}
-    ${row('License Plate', ticket.licensePlate || '–')}
-    ${row('Parking Spot', ticket.parkingLocation || '–')}
-    <div class="gold-line" style="margin:2mm -3mm;"></div>
+    ${row('Guest', ticket.guestName || '–')}
+    ${row('Type', visitorLabel)}
+    ${ticket.roomNumber ? row('Room', ticket.roomNumber) : ''}
+    ${row('Plate', ticket.licensePlate || '–')}
+    ${ticket.parkingLocation ? row('Parking', ticket.parkingLocation) : ''}
+    ${carLine ? row('Car', carLine) : ''}
     ${checkinStr ? row('Check-in', checkinStr) : ''}
-    ${ticket.guestPin ? `<div class="row"><span class="label">PIN</span><span class="value large">${ticket.guestPin}</span></div>` : ''}
+    ${ticket.guestPin ? `<div class="row pin-row"><span class="label">PIN</span><span class="value pin-val">${ticket.guestPin}</span></div>` : ''}
   </div>
   <div class="footer">Valet-s.com</div>
   <script>window.onload = function(){ window.print(); }<\/script>
