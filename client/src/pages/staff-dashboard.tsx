@@ -835,6 +835,9 @@ export default function StaffDashboard() {
 
   // Auto Close dialog state
   const [autoCloseTicket, setAutoCloseTicket] = useState<ValetTicket | null>(null);
+  const [desktopSchedulingId, setDesktopSchedulingId] = useState<string | null>(null);
+  const [desktopScheduleInput, setDesktopScheduleInput] = useState('');
+  const [desktopScheduleSaving, setDesktopScheduleSaving] = useState(false);
   const [inHouseCollapsed, setInHouseCollapsed] = useState(false);
   const [inHouseSortBy, setInHouseSortBy] = useState<'newest'|'oldest'|'name_az'|'name_za'|'ticket_asc'|'ticket_desc'>('newest');
   const [autoCloseDate, setAutoCloseDate] = useState('');
@@ -2943,12 +2946,36 @@ export default function StaffDashboard() {
                                     )}
                                     {!inHouseCollapsed && canEdit && (
                                       <div className="space-y-1.5">
-                                        <Button size="sm" className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
-                                          onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
-                                          data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
-                                        >
-                                          <Play size={14} className="mr-1" /> Retrieve
-                                        </Button>
+                                        {/* Row 1: Retrieve | Schedule */}
+                                        <div className="flex gap-1.5">
+                                          <Button size="sm" className="flex-1 bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
+                                            onClick={() => updateStatusMutation.mutate({ ticketNumber: ticket.ticketNumber, status: 'retrieving' })}
+                                            data-testid={`button-start-retrieval-desktop-${ticket.ticketNumber}`}
+                                          >
+                                            <Play size={14} className="mr-1" /> Retrieve
+                                          </Button>
+                                          <Button size="sm"
+                                            className={`flex-1 font-semibold text-xs sm:text-sm ${ticket.scheduledRetrievalAt ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                                            onClick={() => {
+                                              if (desktopSchedulingId === ticket.id) {
+                                                setDesktopSchedulingId(null);
+                                                setDesktopScheduleInput('');
+                                              } else {
+                                                if (ticket.scheduledRetrievalAt) {
+                                                  const d = new Date(ticket.scheduledRetrievalAt as unknown as string);
+                                                  const pad = (n: number) => n.toString().padStart(2, '0');
+                                                  setDesktopScheduleInput(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                                } else {
+                                                  setDesktopScheduleInput('');
+                                                }
+                                                setDesktopSchedulingId(ticket.id);
+                                              }
+                                            }}
+                                          >
+                                            <CalendarDays size={13} className="mr-1" /> Schedule
+                                          </Button>
+                                        </div>
+                                        {/* Row 2: Departed | Auto Close */}
                                         <div className="flex gap-1.5">
                                           <Button size="sm"
                                             className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold text-xs"
@@ -2970,6 +2997,61 @@ export default function StaffDashboard() {
                                             <Timer size={13} className="mr-1" /> Auto Close
                                           </Button>
                                         </div>
+                                        {/* Inline schedule picker */}
+                                        {desktopSchedulingId === ticket.id && (
+                                          <div className="bg-blue-50 border border-blue-200 rounded p-2 space-y-1.5">
+                                            <input
+                                              type="datetime-local"
+                                              className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                              value={desktopScheduleInput}
+                                              min={new Date().toISOString().slice(0, 16)}
+                                              onChange={e => setDesktopScheduleInput(e.target.value)}
+                                            />
+                                            <div className="flex gap-1.5">
+                                              <Button size="sm"
+                                                disabled={!desktopScheduleInput || desktopScheduleSaving}
+                                                className="flex-1 h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                                                onClick={async () => {
+                                                  if (!desktopScheduleInput) return;
+                                                  setDesktopScheduleSaving(true);
+                                                  try {
+                                                    const resp = await fetch(`/api/staff/tickets/${ticket.ticketNumber}/schedule-retrieval`, {
+                                                      method: 'POST',
+                                                      headers: { 'Content-Type': 'application/json' },
+                                                      body: JSON.stringify({ scheduledAt: new Date(desktopScheduleInput).toISOString() }),
+                                                    });
+                                                    if (!resp.ok) {
+                                                      const err = await resp.json().catch(() => ({}));
+                                                      alert((err as { message?: string }).message ?? 'Failed to schedule');
+                                                      return;
+                                                    }
+                                                    queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                                                    setDesktopSchedulingId(null);
+                                                    setDesktopScheduleInput('');
+                                                  } catch { alert('Failed to schedule'); }
+                                                  finally { setDesktopScheduleSaving(false); }
+                                                }}
+                                              >
+                                                {desktopScheduleSaving ? <Loader2 size={12} className="animate-spin" /> : 'Set'}
+                                              </Button>
+                                              {ticket.scheduledRetrievalAt && (
+                                                <Button size="sm"
+                                                  className="flex-1 h-7 text-xs bg-red-500 hover:bg-red-600 text-white"
+                                                  onClick={async () => {
+                                                    try {
+                                                      await fetch(`/api/staff/tickets/${ticket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                                                      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                                                      setDesktopSchedulingId(null);
+                                                    } catch { alert('Failed to clear'); }
+                                                  }}
+                                                >Clear</Button>
+                                              )}
+                                              <Button size="sm" variant="outline" className="h-7 text-xs px-2"
+                                                onClick={() => { setDesktopSchedulingId(null); setDesktopScheduleInput(''); }}
+                                              >✕</Button>
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>
