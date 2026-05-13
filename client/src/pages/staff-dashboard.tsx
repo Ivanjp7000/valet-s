@@ -414,7 +414,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="font-bold text-regis-navy truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
             {ticket.guestPin && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0">
+              <span className="inline-flex items-center gap-0.5 font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
                 PIN&nbsp;{ticket.guestPin}
               </span>
             )}
@@ -2667,7 +2667,7 @@ export default function StaffDashboard() {
                                         <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
                                           <p className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
                                           {ticket.guestPin && (
-                                            <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0">
+                                            <span className="inline-flex items-center gap-0.5 font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
                                               PIN&nbsp;{ticket.guestPin}
                                             </span>
                                           )}
@@ -5527,6 +5527,17 @@ export default function StaffDashboard() {
                     />
                   </div>
                 </div>
+
+                {/* PIN — read-only, immutable */}
+                {editTicketData.guestPin && (
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">PIN</label>
+                    <div className="h-8 mt-0.5 flex items-center gap-2 px-3 rounded-md border border-dashed border-regis-gold/50 bg-regis-gold/10 w-fit min-w-[100px]">
+                      <span className="font-mono font-bold text-regis-navy text-sm tracking-widest">{editTicketData.guestPin}</span>
+                      <span className="text-[9px] text-gray-400 italic">locked</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Row: Make + Model + Color */}
                 <div className="grid grid-cols-3 gap-2">
