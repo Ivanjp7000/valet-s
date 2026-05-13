@@ -2108,7 +2108,7 @@ export default function StaffDashboard() {
               };
               // 備考 split cell — top: NOTES popup, bottom: NC Done toggle (hidden for R&E and Others tabs)
               const todayDateStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-              const showNC = rosterTab !== 'events' && rosterTab !== 'others';
+              const showNC = rosterTab !== 'events' && rosterTab !== 'others' && rosterTab !== 'departing';
               const BikouCell = ({ ticket }: { ticket: ValetTicket }) => {
                 const hasNotes = !!(ticket.staffNotes && ticket.staffNotes.trim());
                 const ncDone = (ticket as any).nightCheckDone === todayDateStr;
