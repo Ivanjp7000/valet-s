@@ -19,6 +19,10 @@ interface TicketPreview {
   visitorSubType?: string | null;
   createdAt: string;
   stageStartedAt?: string | null;
+  guestName?: string | null;
+  carMake?: string | null;
+  carModel?: string | null;
+  carColor?: string | null;
 }
 
 export default function Landing() {
@@ -336,41 +340,48 @@ export default function Landing() {
               {/* Divider */}
               <div className="border-t border-gray-100 my-5" />
 
-              {/* Ticket Info */}
-              <div className="space-y-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Ticket className="text-regis-navy" size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Ticket Number</p>
-                    <p className="font-bold text-regis-navy text-lg">#{ticketPreview.ticketNumber}</p>
-                  </div>
+              {/* Ticket Info — compact grid */}
+              <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 mb-6 text-sm">
+
+                {/* Ticket # */}
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Ticket size={11} />Ticket</span>
+                  <span className="font-bold text-regis-navy">#{ticketPreview.ticketNumber}</span>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Building2 className="text-purple-500" size={16} />
+                {/* Guest Name */}
+                {ticketPreview.guestName && (
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><User size={11} />Guest</span>
+                    <span className="font-semibold text-gray-800 text-right">{ticketPreview.guestName}</span>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Venue / Visit Type</p>
-                    <p className="font-semibold text-gray-800">{visitorLabel}</p>
-                    {ticketPreview.visitorSubType && (
-                      <p className="text-xs text-gray-500 capitalize">{ticketPreview.visitorSubType.replace(/_/g, ' ')}</p>
-                    )}
+                )}
+
+                {/* Car */}
+                {(ticketPreview.carMake || ticketPreview.carModel || ticketPreview.carColor) && (
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Car size={11} />Vehicle</span>
+                    <span className="font-semibold text-gray-800 text-right">
+                      {[ticketPreview.carColor, ticketPreview.carMake, ticketPreview.carModel].filter(Boolean).join(' ')}
+                    </span>
                   </div>
+                )}
+
+                {/* Visit type */}
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Building2 size={11} />Visit</span>
+                  <span className="font-semibold text-gray-800 text-right">
+                    {visitorLabel}
+                    {ticketPreview.visitorSubType && <span className="text-gray-400 font-normal"> · {ticketPreview.visitorSubType.replace(/_/g, ' ')}</span>}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Calendar className="text-green-600" size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Car Arrived</p>
-                    <p className="font-semibold text-gray-800">{format(arrivedAt, "dd MMM yyyy")}</p>
-                    <p className="text-xs text-gray-500">{format(arrivedAt, "hh:mm a")}</p>
-                  </div>
+                {/* Arrived */}
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Calendar size={11} />Arrived</span>
+                  <span className="font-semibold text-gray-800">{format(arrivedAt, "dd MMM yyyy")} <span className="text-gray-400 font-normal text-xs">{format(arrivedAt, "hh:mm a")}</span></span>
                 </div>
+
               </div>
 
               {/* Divider */}

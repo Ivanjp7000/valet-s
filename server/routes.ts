@@ -637,6 +637,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         visitorSubType: ticket.visitorSubType,
         createdAt: ticket.createdAt,
         stageStartedAt: ticket.stageStartedAt,
+        guestName: ticket.guestName,
+        carMake: ticket.carMake,
+        carModel: ticket.carModel,
+        carColor: ticket.carColor,
       });
     } catch (error) {
       console.error("Error fetching ticket:", error);
