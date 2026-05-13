@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Crown, LogOut, Minimize2, Maximize2, Gauge, ShieldCheck, SlidersHorizontal, BookOpen, LayoutDashboard, Building, MapPin, Users } from "lucide-react";
 import { Link } from "wouter";
 import valetBanner from "@assets/ValetS-Banner1_1778463992078.png";
+import valetHeaderBanner from "@assets/ValetS-Banner-Header0_1778708941891.png";
 import { useQuery } from "@tanstack/react-query";
 import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
 
@@ -63,12 +64,15 @@ export default function Home() {
     <div className="min-h-screen bg-soft-gray">
       <div className="border-b bg-white">
         <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center mr-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-regis-gold rounded-lg flex items-center justify-center flex-shrink-0">
               <Crown className="text-regis-navy" size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-regis-navy">Valet Management System</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-semibold text-regis-navy">Valet Management System</h1>
+                <img src={valetHeaderBanner} alt="" className="h-8 rounded object-cover hidden sm:block" style={{ maxWidth: '160px' }} />
+              </div>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-gray-500 text-sm">Welcome, {user?.firstName || user?.username}</p>
                 <Badge className={`${getRoleColor(user?.role || '')} text-white text-xs`}>
