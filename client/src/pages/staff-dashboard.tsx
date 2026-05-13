@@ -51,43 +51,40 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
-// pdf-lib standard fonts only support WinAnsi (Latin) characters.
-// Replace anything outside that range so the PDF never crashes.
-function sanitizePdf(text: string): string {
-  return text.split('').map(c => {
-    const code = c.charCodeAt(0);
-    if (code < 32 || (code > 126 && code < 160) || code > 255) return '?';
-    return c;
-  }).join('');
-}
-
 async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
   try {
     const mmToPt = (mm: number) => mm * 2.8346;
     const W = mmToPt(50);
     const H = mmToPt(80);
-    const pad = mmToPt(3);
-    const innerW = W - pad * 2;
+    const PAD = mmToPt(3);
+    const innerW = W - PAD * 2;
 
     const doc = await PDFDocument.create();
+
+    // Embed Noto Sans JP — supports Japanese + Latin characters
+    const fontBytes = await fetch('/fonts/NotoSansJP-Regular.ttf').then(r => r.arrayBuffer());
+    const jpFont     = await doc.embedFont(fontBytes);
+    const jpFontBold = await doc.embedFont(fontBytes); // same face used for "bold" rows (heavier weight not bundled)
+
+    // Fallback Latin fonts for header / footer where we know text is ASCII
+    const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const fontReg  = await doc.embedFont(StandardFonts.Helvetica);
+
     const page = doc.addPage([W, H]);
     page.setMediaBox(0, 0, W, H);
 
-    const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-    const font     = await doc.embedFont(StandardFonts.Helvetica);
-
     const gold  = rgb(0.79, 0.66, 0.3);
     const navy  = rgb(0.1,  0.12, 0.27);
-    const gray  = rgb(0.45, 0.45, 0.45);
+    const gray  = rgb(0.50, 0.50, 0.50);
     const white = rgb(1, 1, 1);
 
-    let cursor = H - pad;
+    let cursor = H - PAD;
 
-    // ── Header bar ──────────────────────────────────────────────────────────
-    const headerH = mmToPt(9);
-    page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: navy });
+    // ── Header bar ────────────────────────────────────────────────────────
+    const headerH    = mmToPt(9);
     const headerLabel = 'VALET TICKET';
     const headerSize  = 9;
+    page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: navy });
     page.drawText(headerLabel, {
       x: (W - fontBold.widthOfTextAtSize(headerLabel, headerSize)) / 2,
       y: H - headerH + (headerH - headerSize) / 2,
@@ -95,7 +92,7 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     });
     cursor = H - headerH - mmToPt(3);
 
-    // ── Ticket number ────────────────────────────────────────────────────────
+    // ── Ticket number ──────────────────────────────────────────────────────
     const numStr  = `#${ticket.ticketNumber}`;
     const numSize = 22;
     page.drawText(numStr, {
@@ -103,28 +100,39 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
       y: cursor - numSize,
       font: fontBold, size: numSize, color: navy,
     });
-    cursor -= numSize + mmToPt(1);
+    cursor -= numSize + mmToPt(1.5);
 
     // Gold rule
-    page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.8, color: gold });
-    cursor -= mmToPt(2.5);
+    page.drawRectangle({ x: PAD, y: cursor, width: innerW, height: 0.8, color: gold });
+    cursor -= mmToPt(3);
 
-    // ── Helper to draw a label/value row ──────────────────────────────────
-    const drawRow = (label: string, value: string | null | undefined, sz = 6.5) => {
+    // ── Label / value row helper ───────────────────────────────────────────
+    // labelSz: small grey caps above the value
+    // valueSz: larger bold value below — default 9pt, shrinks to fit width
+    const drawRow = (label: string, value: string | null | undefined, valueSz = 9) => {
       if (!value) return;
-      const safe     = sanitizePdf(value);
       const labelTxt = label.toUpperCase();
-      const labelSz  = 5;
-      page.drawText(labelTxt, { x: pad, y: cursor, font, size: labelSz, color: gray });
-      cursor -= labelSz + 1;
-      let vSz = sz;
-      while (vSz > 5 && fontBold.widthOfTextAtSize(safe, vSz) > innerW) vSz -= 0.5;
-      page.drawText(safe, { x: pad, y: cursor, font: fontBold, size: vSz, color: navy });
-      cursor -= vSz + mmToPt(1.8);
+      const labelSz  = 6;
+
+      // Label line (grey, Latin-safe)
+      page.drawText(labelTxt, {
+        x: PAD, y: cursor,
+        font: fontReg, size: labelSz, color: gray,
+      });
+      cursor -= mmToPt(2); // gap between label and value
+
+      // Value line (Japanese-capable, navy)
+      let vSz = valueSz;
+      while (vSz > 6 && jpFont.widthOfTextAtSize(value, vSz) > innerW) vSz -= 0.5;
+      page.drawText(value, {
+        x: PAD, y: cursor,
+        font: jpFontBold, size: vSz, color: navy,
+      });
+      cursor -= vSz + mmToPt(3); // generous gap after each row
     };
 
     // Guest name
-    drawRow('Guest Name', ticket.guestName || '-', 8);
+    drawRow('Guest Name', ticket.guestName || '-', 10);
 
     // Visitor type
     const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
@@ -133,43 +141,42 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
         : ticket.visitorType === 'event' ? 'Event'
         : ticket.visitorType === 'others' ? 'Others'
         : ticket.visitorType || '-';
-    drawRow('Visitor Type', visitorLabel);
+    drawRow('Visitor Type', visitorLabel, 9);
 
-    // Room number (hotel only)
-    if (ticket.roomNumber) drawRow('Room No.', ticket.roomNumber);
+    // Room number (hotel guests only)
+    if (ticket.roomNumber) drawRow('Room No.', ticket.roomNumber, 9);
 
     // Gold rule
-    page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
-    cursor -= mmToPt(2);
+    page.drawRectangle({ x: PAD, y: cursor, width: innerW, height: 0.5, color: gold });
+    cursor -= mmToPt(2.5);
 
-    // Vehicle
+    // Vehicle details
     const carLine = [ticket.carMake, ticket.carModel, ticket.carColor].filter(Boolean).join('  ');
-    drawRow('Vehicle', carLine || '-');
-    drawRow('License Plate', ticket.licensePlate || '-');
-    drawRow('Parking Spot', ticket.parkingLocation || '-');
+    drawRow('Vehicle', carLine || '-', 9);
+    drawRow('License Plate', ticket.licensePlate || '-', 9);
+    drawRow('Parking Spot', ticket.parkingLocation || '-', 9);
 
     // Gold rule
-    page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
-    cursor -= mmToPt(2);
+    page.drawRectangle({ x: PAD, y: cursor, width: innerW, height: 0.5, color: gold });
+    cursor -= mmToPt(2.5);
 
     // Check-in time
     if (ticket.createdAt) {
       const d    = new Date(ticket.createdAt);
-      const pad2 = (n: number) => n.toString().padStart(2, '0');
-      const timeStr = `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}  ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-      drawRow('Check-in', timeStr);
+      const p2   = (n: number) => n.toString().padStart(2, '0');
+      drawRow('Check-in', `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}  ${p2(d.getHours())}:${p2(d.getMinutes())}`, 8);
     }
 
-    // PIN (if exists)
-    if (ticket.guestPin) drawRow('PIN', ticket.guestPin, 9);
+    // PIN
+    if (ticket.guestPin) drawRow('PIN', ticket.guestPin, 11);
 
     // ── Footer ─────────────────────────────────────────────────────────────
     const footerSz  = 5;
     const footerTxt = 'Valet-s.com';
     page.drawText(footerTxt, {
-      x: (W - font.widthOfTextAtSize(footerTxt, footerSz)) / 2,
-      y: pad,
-      font, size: footerSz, color: gray,
+      x: (W - fontReg.widthOfTextAtSize(footerTxt, footerSz)) / 2,
+      y: PAD,
+      font: fontReg, size: footerSz, color: gray,
     });
 
     const pdfBytes = await doc.save();
