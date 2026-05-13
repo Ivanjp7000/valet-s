@@ -824,7 +824,7 @@ export default function StaffDashboard() {
     },
     refetchInterval: 15000,
   });
-  const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events'>('arriving');
+  const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events' | 'others'>('arriving');
   const [rosterDate, setRosterDate] = useState<Date>(new Date());
   const [copiedRowId, setCopiedRowId] = useState<string | null>(null);
   const [rosterNotesPopup, setRosterNotesPopup] = useState<{ ticketNumber: string; notes: string } | null>(null);
@@ -2068,13 +2068,17 @@ export default function StaffDashboard() {
                 .filter(t => t.visitorType === 'hotel_guest' && t.status === 'completed' && t.departedAt && new Date(t.departedAt).toDateString() === selDateStr)
                 .sort((a, b) => new Date(a.departedAt!).getTime() - new Date(b.departedAt!).getTime());
               const eventsTickets = allTickets
-                .filter(t => ['restaurant', 'event', 'others'].includes(t.visitorType || '') && new Date(t.createdAt!).toDateString() === selDateStr)
+                .filter(t => ['restaurant', 'event'].includes(t.visitorType || '') && new Date(t.createdAt!).toDateString() === selDateStr)
+                .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
+              const othersTickets = allTickets
+                .filter(t => t.visitorType === 'others' && new Date(t.createdAt!).toDateString() === selDateStr)
                 .sort((a, b) => new Date(a.createdAt!).getTime() - new Date(b.createdAt!).getTime());
 
-              const tabDefs: { key: 'arriving' | 'departing' | 'events'; label: string; sublabel: string; tickets: typeof arrivingTickets }[] = [
+              const tabDefs: { key: 'arriving' | 'departing' | 'events' | 'others'; label: string; sublabel: string; tickets: typeof arrivingTickets }[] = [
                 { key: 'arriving',  label: 'Cars Arriving Today & Staying Cars',  sublabel: 'ARRIVAL',   tickets: arrivingTickets },
                 { key: 'departing', label: 'Departed Cars Today', sublabel: 'DEPARTURE', tickets: departingTickets },
                 { key: 'events',    label: 'Restaurants & Events',     sublabel: 'R&E',       tickets: eventsTickets },
+                { key: 'others',    label: 'Others',                   sublabel: 'OTHERS',    tickets: othersTickets },
               ];
               const rosterTickets = tabDefs.find(t => t.key === rosterTab)?.tickets ?? [];
               const todayStr = fmtDateDisplay(rosterDate);
