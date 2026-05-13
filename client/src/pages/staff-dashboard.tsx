@@ -382,6 +382,10 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
 }) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
   const scheduled = (ticket as any).scheduledDepartureAt;
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [scheduleInput, setScheduleInput] = useState('');
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   const fmtScheduled = (dt: string) => {
     const d = new Date(dt);
@@ -520,6 +524,86 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               <Timer size={12} className="mr-1" />Auto Close
             </Button>
           </div>
+          {/* Schedule pickup button */}
+          {!showSchedulePicker ? (
+            <Button
+              size="sm"
+              className={`h-7 w-full text-xs font-semibold ${ticket.scheduledRetrievalAt ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+              onClick={() => {
+                if (ticket.scheduledRetrievalAt) {
+                  const d = new Date(ticket.scheduledRetrievalAt as unknown as string);
+                  const pad = (n: number) => n.toString().padStart(2, '0');
+                  setScheduleInput(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                }
+                setShowSchedulePicker(true);
+              }}
+            >
+              <CalendarDays size={12} className="mr-1" />
+              {ticket.scheduledRetrievalAt ? `Scheduled: ${fmtScheduled(ticket.scheduledRetrievalAt as unknown as string)}` : 'Schedule Pickup'}
+            </Button>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded p-1.5 space-y-1">
+              <input
+                type="datetime-local"
+                className="w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+                value={scheduleInput}
+                min={new Date().toISOString().slice(0, 16)}
+                onChange={e => setScheduleInput(e.target.value)}
+              />
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  disabled={!scheduleInput || scheduleSaving}
+                  className="h-6 flex-1 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={async () => {
+                    if (!scheduleInput) return;
+                    setScheduleSaving(true);
+                    try {
+                      const resp = await fetch(`/api/staff/tickets/${ticket.ticketNumber}/schedule-retrieval`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ scheduledAt: new Date(scheduleInput).toISOString() }),
+                      });
+                      if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({}));
+                        alert((err as { message?: string }).message ?? 'Failed to schedule');
+                        return;
+                      }
+                      queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                      setShowSchedulePicker(false);
+                      setScheduleInput('');
+                    } catch { alert('Failed to schedule'); }
+                    finally { setScheduleSaving(false); }
+                  }}
+                >
+                  {scheduleSaving ? <Loader2 size={10} className="animate-spin" /> : 'Set'}
+                </Button>
+                {ticket.scheduledRetrievalAt && (
+                  <Button
+                    size="sm"
+                    className="h-6 flex-1 text-xs bg-red-500 hover:bg-red-600 text-white"
+                    onClick={async () => {
+                      try {
+                        await fetch(`/api/staff/tickets/${ticket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                        queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                        setShowSchedulePicker(false);
+                      } catch { alert('Failed to clear'); }
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 flex-1 text-xs"
+                  onClick={() => { setShowSchedulePicker(false); setScheduleInput(''); }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
