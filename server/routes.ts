@@ -2818,28 +2818,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }, 60 * 1000);
 
   // ── 15-minute pre-alert for scheduled retrievals ─────────────────────────────
-  // Tracks which tickets have already fired their 15-min alert this session
-  const scheduleAlertedSet = new Set<string>();
+  // Maps ticketNumber → ISO scheduledAt string at time of last alert.
+  // Using a Map (not a Set) lets us re-alert when a ticket is rescheduled to a
+  // different time, and prune entries once they leave the upcoming window.
+  const scheduleAlertedMap = new Map<string, string>();
 
   setInterval(async () => {
     try {
       const upcoming = await storage.getUpcomingScheduledRetrievals(15);
+      const upcomingNumbers = new Set(upcoming.map(t => t.ticketNumber));
+
+      // Prune entries that are no longer in the upcoming window (ticket retrieved,
+      // schedule cleared, past due, or status changed to non-active).
+      for (const tn of scheduleAlertedMap.keys()) {
+        if (!upcomingNumbers.has(tn)) scheduleAlertedMap.delete(tn);
+      }
+
       for (const ticket of upcoming) {
-        if (scheduleAlertedSet.has(ticket.ticketNumber)) continue;
-        scheduleAlertedSet.add(ticket.ticketNumber);
+        const isoTime = ticket.scheduledRetrievalAt instanceof Date
+          ? ticket.scheduledRetrievalAt.toISOString()
+          : String(ticket.scheduledRetrievalAt);
+        // Skip if we already fired an alert for this exact scheduled time.
+        // If the time changed (rescheduled), the stored value won't match → re-alert.
+        if (scheduleAlertedMap.get(ticket.ticketNumber) === isoTime) continue;
+        scheduleAlertedMap.set(ticket.ticketNumber, isoTime);
         broadcastToOU(ticket.ouId, {
           type: 'schedule_alert',
           data: {
             ticketNumber: ticket.ticketNumber,
             guestName: ticket.guestName,
-            scheduledRetrievalAt: ticket.scheduledRetrievalAt,
+            scheduledRetrievalAt: isoTime,
             ouId: ticket.ouId,
           },
         });
         console.log(`[Schedule Alert] Fired 15-min pre-alert for ticket ${ticket.ticketNumber}`);
       }
-      // Clean up entries for tickets no longer in 'active' or past their scheduled time
-      // to allow re-alerting if a schedule is updated
     } catch (e) {
       console.error('[Schedule Alert] Error checking upcoming retrievals:', e);
     }

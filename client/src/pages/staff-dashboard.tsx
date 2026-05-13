@@ -1300,6 +1300,13 @@ export default function StaffDashboard() {
         if (data.type === 'ticket_created' || data.type === 'ticket_status_updated' || data.type === 'status_updated' || data.type === 'retrieval_accepted') {
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
           queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+          // Dismiss schedule alerts globally when the ticket is no longer active
+          if (data.type === 'ticket_status_updated' || data.type === 'status_updated') {
+            const updatedTicket = data.data;
+            if (updatedTicket?.ticketNumber && updatedTicket.status !== 'active') {
+              setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== updatedTicket.ticketNumber));
+            }
+          }
         }
         if (data.type === 'retrieval_requested') {
           const req: RetrievalRequest = data.data;
@@ -1684,11 +1691,16 @@ export default function StaffDashboard() {
                 className="w-full bg-regis-navy text-white hover:bg-regis-navy/90 text-xs"
                 onClick={async () => {
                   try {
-                    await fetch(`/api/staff/tickets/${alert.ticketNumber}/status`, {
+                    const startResp = await fetch(`/api/staff/tickets/${alert.ticketNumber}/status`, {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ status: 'retrieving' }),
                     });
+                    if (!startResp.ok) {
+                      const err = await startResp.json().catch(() => ({}));
+                      toast({ title: 'Failed to start retrieval', description: (err as { message?: string }).message ?? `Error ${startResp.status}`, variant: 'destructive' });
+                      return;
+                    }
                     setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber));
                     queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
                     toast({ title: 'Retrieval started', description: `Ticket #${alert.ticketNumber}` });
@@ -5303,7 +5315,12 @@ export default function StaffDashboard() {
                           className="text-xs text-red-500 hover:text-red-700 font-semibold ml-3"
                           onClick={async () => {
                             try {
-                              await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                              const clearResp = await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                              if (!clearResp.ok) {
+                                const err = await clearResp.json().catch(() => ({}));
+                                toast({ title: 'Failed to clear schedule', description: (err as { message?: string }).message ?? `Error ${clearResp.status}`, variant: 'destructive' });
+                                return;
+                              }
                               queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
                               setViewTicket(prev => prev ? { ...prev, scheduledRetrievalAt: null } : prev);
                               toast({ title: 'Schedule cleared' });
@@ -5329,13 +5346,18 @@ export default function StaffDashboard() {
                           if (!viewTicketScheduleInput) return;
                           setViewTicketScheduleSaving(true);
                           try {
-                            await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/schedule-retrieval`, {
+                            const schedResp = await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/schedule-retrieval`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ scheduledAt: new Date(viewTicketScheduleInput).toISOString() }),
                             });
+                            if (!schedResp.ok) {
+                              const err = await schedResp.json().catch(() => ({}));
+                              toast({ title: 'Failed to schedule', description: (err as { message?: string }).message ?? `Error ${schedResp.status}`, variant: 'destructive' });
+                              return;
+                            }
                             queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-                            setViewTicket(prev => prev ? { ...prev, scheduledRetrievalAt: new Date(viewTicketScheduleInput) as any } : prev);
+                            setViewTicket(prev => prev ? { ...prev, scheduledRetrievalAt: new Date(viewTicketScheduleInput) } : prev);
                             toast({ title: 'Pickup scheduled' });
                             setViewTicketScheduleInput('');
                           } catch {
