@@ -1345,7 +1345,7 @@ export default function StaffDashboard() {
           if (isSameOU && d?.ticketNumber) {
             setScheduleAlerts(prev => {
               if (prev.some(a => a.ticketNumber === d.ticketNumber)) return prev;
-              return [...prev, { ticketNumber: d.ticketNumber, guestName: d.guestName, scheduledRetrievalAt: d.scheduledRetrievalAt as string }];
+              return [...prev, { ticketNumber: d.ticketNumber, guestName: d.guestName, scheduledRetrievalAt: (d.scheduledAt ?? d.scheduledRetrievalAt) as string }];
             });
             // Play notification sound
             try {

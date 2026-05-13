@@ -837,7 +837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Ticket is not available for scheduling" });
       }
 
-      const updates: Record<string, any> = { scheduledRetrievalAt: scheduledDate };
+      const updates: { scheduledRetrievalAt: Date; reminderEmail?: string } = { scheduledRetrievalAt: scheduledDate };
       if (reminderEmail && typeof reminderEmail === 'string' && reminderEmail.includes('@')) {
         updates.reminderEmail = reminderEmail.trim().toLowerCase();
       }
@@ -950,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ticketNumber: ticket.ticketNumber,
           guestName: ticket.guestName,
           scheduledAt: scheduledDate.toISOString(),
-          scheduledBy: (req.currentUser as User)?.id ?? 'staff',
+          scheduledBy: 'staff',
           ouId: ticket.ouId,
         },
       });
@@ -981,7 +981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       broadcastToOU(ticket.ouId, {
         type: 'ticket_scheduled',
-        data: { ticketNumber: ticket.ticketNumber, scheduledAt: null, scheduledBy: (req.currentUser as User)?.id ?? 'staff', ouId: ticket.ouId },
+        data: { ticketNumber: ticket.ticketNumber, scheduledAt: null, scheduledBy: 'staff', ouId: ticket.ouId },
       });
       broadcastToOU(ticket.ouId, {
         type: 'ticket_status_updated',
@@ -2847,7 +2847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: {
             ticketNumber: ticket.ticketNumber,
             guestName: ticket.guestName,
-            scheduledRetrievalAt: isoTime,
+            scheduledAt: isoTime,
             ouId: ticket.ouId,
           },
         });

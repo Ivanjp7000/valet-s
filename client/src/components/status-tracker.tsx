@@ -287,10 +287,13 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     );
   }
 
-  // Active ticket with a scheduled retrieval time — show scheduled state
-  if (ticket?.status === 'active' && ticket?.scheduledRetrievalAt) {
+  // Active ticket with a scheduled retrieval time — show scheduled state only while countdown is in the future
+  const _scheduledMs = ticket?.status === 'active' && ticket?.scheduledRetrievalAt
+    ? new Date(ticket.scheduledRetrievalAt as unknown as string).getTime() - Date.now()
+    : -1;
+  if (ticket?.status === 'active' && ticket?.scheduledRetrievalAt && _scheduledMs > 0) {
     const scheduledTime = new Date(ticket.scheduledRetrievalAt as unknown as string);
-    const msLeft = scheduledTime.getTime() - Date.now();
+    const msLeft = _scheduledMs;
     const hoursLeft = Math.floor(msLeft / 3600000);
     const minutesLeft = Math.floor((msLeft % 3600000) / 60000);
 
