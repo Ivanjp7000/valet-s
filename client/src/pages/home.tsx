@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Crown, LogOut, Minimize2, Maximize2, Gauge, ShieldCheck, SlidersHorizontal, BookOpen, LayoutDashboard, Building, MapPin, Users } from "lucide-react";
 import { Link } from "wouter";
 import valetBanner from "@assets/ValetS-Banner1_1778463992078.png";
-import valetHeaderBanner from "@assets/ValetS-Banner-Header0_1778708941891.png";
+import valetHeaderBanner from "@assets/ValetS-Banner-Header0a_1778710775125.png";
 import { useQuery } from "@tanstack/react-query";
 import type { OrganizationalUnit, PhysicalLocation, User } from "@shared/schema";
 
