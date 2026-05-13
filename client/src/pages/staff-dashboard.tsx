@@ -5929,6 +5929,44 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
+                {/* Row: Visitor Type (+ sub-type if restaurant) */}
+                <div className={`grid gap-2 ${editTicketData.visitorType === 'restaurant' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Visitor Type</label>
+                    <Select
+                      value={editTicketData.visitorType}
+                      onValueChange={(value) => setEditTicketData({ ...editTicketData, visitorType: value, visitorSubType: value !== 'restaurant' ? null : editTicketData.visitorSubType })}
+                    >
+                      <SelectTrigger className="h-8 text-xs mt-0.5">
+                        <SelectValue placeholder="Visitor Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(VISITOR_TYPES).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editTicketData.visitorType === 'restaurant' && (
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Restaurant</label>
+                      <Select
+                        value={editTicketData.visitorSubType || ''}
+                        onValueChange={(value) => setEditTicketData({ ...editTicketData, visitorSubType: value })}
+                      >
+                        <SelectTrigger className="h-8 text-xs mt-0.5">
+                          <SelectValue placeholder="Select restaurant" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(RESTAURANT_SUB_TYPES).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
                 {/* Row: Guest Name + Room */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>

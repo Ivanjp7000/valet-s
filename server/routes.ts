@@ -2304,7 +2304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/staff/tickets/:ticketNumber/edit', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
-      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes, createdAt } = req.body;
+      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes, createdAt, visitorType, visitorSubType } = req.body;
 
       const existing = await storage.getValetTicket(ticketNumber);
       if (!existing) return res.status(404).json({ message: "Ticket not found" });
@@ -2331,6 +2331,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parkingLocation,
         parkingSector,
         staffNotes,
+        ...(visitorType ? { visitorType } : {}),
+        ...(visitorType ? { visitorSubType: visitorType === 'restaurant' ? (visitorSubType ?? null) : null } : {}),
         ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
       } as any);
 
