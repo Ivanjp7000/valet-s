@@ -975,22 +975,20 @@ export default function StaffDashboard() {
   };
 
   const togglePanel = (id: string) => {
-    let opening = false;
+    const isOpen = expandedPanels.has(id);
+    if (!isOpen) {
+      // Scroll to panel header BEFORE expanding — panel is still collapsed so position is exact
+      const el = document.getElementById(`panel-${id}`);
+      if (el) {
+        const absoluteTop = el.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: Math.max(0, absoluteTop - 8), behavior: 'smooth' });
+      }
+    }
     setExpandedPanels(prev => {
       const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else { next.add(id); opening = true; }
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
-    if (opening) {
-      setTimeout(() => {
-        const el = document.getElementById(`panel-${id}`);
-        if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const absoluteTop = rect.top + window.scrollY;
-        const centeredTop = absoluteTop - (window.innerHeight / 2) + 60;
-        window.scrollTo({ top: Math.max(0, centeredTop), behavior: 'smooth' });
-      }, 320);
-    }
   };
 
   const sensors = useSensors(
