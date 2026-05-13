@@ -974,11 +974,21 @@ export default function StaffDashboard() {
     }, 50);
   };
 
-  const togglePanel = (id: string) => setExpandedPanels(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const togglePanel = (id: string) => {
+    setExpandedPanels(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        setTimeout(() => {
+          const el = document.getElementById(`panel-${id}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+      }
+      return next;
+    });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
