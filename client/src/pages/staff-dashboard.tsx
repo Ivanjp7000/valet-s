@@ -651,6 +651,15 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
       </div>
       {!collapsed && canEdit && (
         <div className="space-y-1">
+          {/* Print Ticket */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white font-semibold"
+            onClick={() => printFullTicket(ticket)}
+          >
+            <Printer size={12} className="mr-1" />Print Ticket
+          </Button>
           {/* Row 1: Retrieve | Schedule */}
           <div className="flex gap-1">
             <Button
@@ -3125,6 +3134,13 @@ export default function StaffDashboard() {
                                     )}
                                     {!inHouseCollapsed && canEdit && (
                                       <div className="space-y-1.5">
+                                        {/* Print Ticket */}
+                                        <Button size="sm" variant="outline"
+                                          className="w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white font-semibold"
+                                          onClick={() => printFullTicket(ticket)}
+                                        >
+                                          <Printer size={13} className="mr-1" /> Print Ticket
+                                        </Button>
                                         {/* Row 1: Retrieve | Schedule */}
                                         <div className="flex gap-1.5">
                                           <Button size="sm" className="flex-1 bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
@@ -5851,141 +5867,9 @@ export default function StaffDashboard() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4 border-t">
-                  <Button 
-                    variant="outline" 
-                    onClick={async () => {
-                      const ticket = viewTicket;
-                      try {
-                        // Convert mm to points (72 points per inch, 25.4 mm per inch)
-                        const mm = (value: number) => (value * 72) / 25.4;
-                        
-                        // Label dimensions - 50mm x 70mm
-                        const labelWidthMm = 50;
-                        const labelHeightMm = 70;
-                        const widthPt = mm(labelWidthMm);
-                        const heightPt = mm(labelHeightMm);
-                        
-                        const pdfDoc = await PDFDocument.create();
-                        const page = pdfDoc.addPage([widthPt, heightPt]);
-                        
-                        // Set all page boxes to ensure correct dimensions
-                        page.setMediaBox(0, 0, widthPt, heightPt);
-                        page.setCropBox(0, 0, widthPt, heightPt);
-                        page.setBleedBox(0, 0, widthPt, heightPt);
-                        
-                        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-                        const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-                        
-                        // Cursor starts at top of page minus top margin
-                        let cursorY = heightPt - mm(3);
-                        
-                        // Helper function to draw text and move cursor
-                        const drawText = (options: { 
-                          text: string; 
-                          size: number; 
-                          face?: PDFFont; 
-                          align?: "left" | "center"; 
-                          gapMm?: number;
-                        }) => {
-                          const { text, size, face = font, align = "left", gapMm = 1.5 } = options;
-                          cursorY -= size; // Move cursor down by font size
-                          const textWidth = face.widthOfTextAtSize(text, size);
-                          const textX = align === "center" ? (widthPt - textWidth) / 2 : mm(4);
-                          page.drawText(text, { 
-                            x: textX, 
-                            y: cursorY, 
-                            size, 
-                            font: face, 
-                            color: rgb(0, 0, 0) 
-                          });
-                          cursorY -= mm(gapMm); // Add gap after text
-                        };
-                        
-                        // Header
-                        drawText({ text: "ST. REGIS OSAKA", size: 14, face: bold, align: "center" });
-                        drawText({ text: "VALET PARKING", size: 10, align: "center" });
-                        
-                        // Divider line
-                        page.drawLine({ 
-                          start: { x: mm(4), y: cursorY }, 
-                          end: { x: widthPt - mm(4), y: cursorY }, 
-                          thickness: 1, 
-                          color: rgb(0, 0, 0) 
-                        });
-                        cursorY -= mm(5);
-                        
-                        // Ticket number - large
-                        drawText({ text: `#${ticket.ticketNumber}`, size: 32, face: bold, align: "center", gapMm: 4 });
-                        
-                        // Guest info
-                        drawText({ text: fmtGuest(ticket.guestName) || "Guest", size: 14, face: bold });
-                        if (ticket.roomNumber) {
-                          drawText({ text: `Room: ${ticket.roomNumber}`, size: 11 });
-                        }
-                        
-                        // Vehicle section
-                        drawText({ text: "Vehicle", size: 11, face: bold, gapMm: 0.5 });
-                        const carInfo = [ticket.carMake, ticket.carModel].filter(Boolean).join(' ');
-                        if (carInfo) {
-                          drawText({ text: carInfo, size: 11 });
-                        }
-                        drawText({ text: `Color: ${ticket.carColor || 'N/A'}`, size: 11 });
-                        drawText({ text: `Plate: ${ticket.licensePlate || 'N/A'}`, size: 11 });
-                        
-                        // Location box
-                        if (ticket.parkingLocation) {
-                          const boxHeight = mm(10);
-                          cursorY -= boxHeight;
-                          page.drawRectangle({ 
-                            x: mm(4), 
-                            y: cursorY, 
-                            width: widthPt - mm(8), 
-                            height: boxHeight, 
-                            color: rgb(0.9, 0.9, 0.9) 
-                          });
-                          const locText = `LOC: ${ticket.parkingLocation}`;
-                          const locWidth = bold.widthOfTextAtSize(locText, 13);
-                          page.drawText(locText, { 
-                            x: (widthPt - locWidth) / 2, 
-                            y: cursorY + mm(3), 
-                            size: 13, 
-                            font: bold,
-                            color: rgb(0, 0, 0)
-                          });
-                          cursorY -= mm(2);
-                        }
-                        
-                        // Footer - always at bottom
-                        page.drawLine({ 
-                          start: { x: mm(4), y: mm(6) }, 
-                          end: { x: widthPt - mm(4), y: mm(6) }, 
-                          thickness: 0.5, 
-                          color: rgb(0, 0, 0) 
-                        });
-                        
-                        if (ticket.createdAt) {
-                          const dateText = new Date(ticket.createdAt).toLocaleString();
-                          const dateWidth = font.widthOfTextAtSize(dateText, 8);
-                          page.drawText(dateText, { 
-                            x: (widthPt - dateWidth) / 2, 
-                            y: mm(2), 
-                            size: 8, 
-                            font,
-                            color: rgb(0, 0, 0)
-                          });
-                        }
-                        
-                        // Generate PDF and open for printing
-                        const pdfBytes = await pdfDoc.save();
-                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                        const url = URL.createObjectURL(blob);
-                        
-                        // Open PDF in new tab for printing
-                        window.open(url, '_blank');
-                      } catch (error) {
-                        console.error('PDF generation error:', error);
-                      }
-                    }}
+                  <Button
+                    variant="outline"
+                    onClick={() => viewTicket && printFullTicket(viewTicket)}
                     className="flex items-center gap-2"
                     data-testid="button-print-ticket"
                   >
