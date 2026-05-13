@@ -654,7 +654,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             </div>
           )}
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => {
@@ -668,36 +668,27 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 1 0 5 5"/><path d="M12 2v4m0 0a5 5 0 0 1 5 5"/><circle cx="12" cy="17" r="5"/></svg>
             Generate Name
           </button>
-          <button
-            type="button"
-            onClick={() => printPinLabel(formData.guestPin)}
-            className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-500 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 transition-colors"
-          >
-            <Printer size={12} />
-            PIN
-          </button>
-        </div>
 
-        {/* PIN row */}
-        <div className="mt-2 flex items-center gap-2 bg-regis-navy/5 border border-regis-navy/20 rounded-lg px-3 py-2">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider shrink-0">PIN</span>
-          <span className="font-mono font-bold text-regis-navy text-base tracking-widest">{formData.guestPin}</span>
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, guestPin: generatePin() })}
-            title="Generate new PIN"
-            className="ml-0.5 p-1 rounded hover:bg-regis-navy/10 text-gray-400 hover:text-regis-navy transition-colors"
-          >
-            <RefreshCw size={13} />
-          </button>
-          <button
-            type="button"
-            onClick={() => printPinLabel(formData.guestPin)}
-            title="Print PIN label"
-            className="p-1 rounded hover:bg-amber-50 text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 hover:border-amber-400"
-          >
-            <Printer size={13} />
-          </button>
+          <div className="flex items-center gap-1.5 bg-regis-navy/5 border border-regis-navy/20 rounded-lg px-2.5 py-1">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider shrink-0">PIN</span>
+            <span className="font-mono font-bold text-regis-navy text-sm tracking-widest">{formData.guestPin}</span>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, guestPin: generatePin() })}
+              title="Generate new PIN"
+              className="p-0.5 rounded hover:bg-regis-navy/10 text-gray-400 hover:text-regis-navy transition-colors"
+            >
+              <RefreshCw size={11} />
+            </button>
+            <button
+              type="button"
+              onClick={() => printPinLabel(formData.guestPin)}
+              title="Print PIN label"
+              className="p-0.5 rounded hover:bg-amber-50 text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 hover:border-amber-400"
+            >
+              <Printer size={11} />
+            </button>
+          </div>
         </div>
       </div>
 
