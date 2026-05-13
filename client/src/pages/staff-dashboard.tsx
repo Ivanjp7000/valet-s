@@ -1325,10 +1325,10 @@ export default function StaffDashboard() {
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
           queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
           const d = data.data;
-          if (d?.scheduledRetrievalAt) {
+          if (d?.scheduledAt) {
             toast({
               title: 'Retrieval Scheduled',
-              description: `Ticket #${d.ticketNumber}${d.guestName ? ` (${d.guestName})` : ''} scheduled for ${new Date(d.scheduledRetrievalAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+              description: `Ticket #${d.ticketNumber}${d.guestName ? ` (${d.guestName})` : ''} scheduled for ${new Date(d.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
             });
           }
         }
@@ -1338,7 +1338,7 @@ export default function StaffDashboard() {
           if (isSameOU && d?.ticketNumber) {
             setScheduleAlerts(prev => {
               if (prev.some(a => a.ticketNumber === d.ticketNumber)) return prev;
-              return [...prev, { ticketNumber: d.ticketNumber, guestName: d.guestName, scheduledRetrievalAt: d.scheduledRetrievalAt }];
+              return [...prev, { ticketNumber: d.ticketNumber, guestName: d.guestName, scheduledRetrievalAt: d.scheduledRetrievalAt as string }];
             });
             // Play notification sound
             try {
@@ -1659,25 +1659,19 @@ export default function StaffDashboard() {
         }
       />
 
-      {/* 15-minute pre-alert popups — one card per scheduled pickup */}
+      {/* 15-minute pre-alert popups — one card per scheduled pickup, only closeable by starting retrieval */}
       {scheduleAlerts.length > 0 && (
         <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
           {scheduleAlerts.map(alert => (
             <div key={alert.ticketNumber} className="bg-white border-2 border-amber-400 rounded-xl shadow-xl p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
-                    <Clock className="text-amber-600" size={18} />
-                  </div>
-                  <div>
-                    <p className="font-bold text-sm text-regis-navy">Pickup in ~15 min</p>
-                    <p className="text-xs text-gray-500">Ticket #{alert.ticketNumber}</p>
-                  </div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Clock className="text-amber-600" size={18} />
                 </div>
-                <button
-                  className="text-gray-400 hover:text-gray-600 ml-2 text-sm font-bold"
-                  onClick={() => setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber))}
-                >✕</button>
+                <div>
+                  <p className="font-bold text-sm text-regis-navy">Pickup in ~15 min</p>
+                  <p className="text-xs text-gray-500">Ticket #{alert.ticketNumber}</p>
+                </div>
               </div>
               {alert.guestName && (
                 <p className="text-sm text-gray-700 mb-1 font-medium">{fmtGuest(alert.guestName)}</p>
@@ -1685,27 +1679,27 @@ export default function StaffDashboard() {
               <p className="text-xs text-amber-700 mb-3">
                 Scheduled: {new Date(alert.scheduledRetrievalAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="flex-1 bg-regis-navy text-white hover:bg-regis-navy/90 text-xs"
-                  onClick={() => {
-                    acceptRetrievalMutation.mutate(alert.ticketNumber);
+              <Button
+                size="sm"
+                className="w-full bg-regis-navy text-white hover:bg-regis-navy/90 text-xs"
+                onClick={async () => {
+                  try {
+                    await fetch(`/api/staff/tickets/${alert.ticketNumber}/status`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'retrieving' }),
+                    });
                     setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber));
-                  }}
-                >
-                  <Car size={12} className="mr-1" />
-                  Start Retrieval
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                  onClick={() => setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber))}
-                >
-                  Dismiss
-                </Button>
-              </div>
+                    queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                    toast({ title: 'Retrieval started', description: `Ticket #${alert.ticketNumber}` });
+                  } catch {
+                    toast({ title: 'Failed to start retrieval', variant: 'destructive' });
+                  }
+                }}
+              >
+                <Car size={12} className="mr-1" />
+                Start Retrieval
+              </Button>
             </div>
           ))}
         </div>

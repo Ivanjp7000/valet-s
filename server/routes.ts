@@ -774,7 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       broadcastToOU(updated!.ouId, {
         type: 'ticket_scheduled',
-        data: { ticketNumber, scheduledRetrievalAt: null },
+        data: { ticketNumber, scheduledAt: null, scheduledBy: 'guest' },
       });
       res.json({ message: 'Retrieval request cancelled' });
     } catch (err: any) {
@@ -849,7 +849,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           ticketNumber: ticket.ticketNumber,
           guestName: ticket.guestName,
-          scheduledRetrievalAt: scheduledDate.toISOString(),
+          scheduledAt: scheduledDate.toISOString(),
+          scheduledBy: 'guest',
           ouId: ticket.ouId,
         },
       });
@@ -948,7 +949,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         data: {
           ticketNumber: ticket.ticketNumber,
           guestName: ticket.guestName,
-          scheduledRetrievalAt: scheduledDate.toISOString(),
+          scheduledAt: scheduledDate.toISOString(),
+          scheduledBy: (req.currentUser as User)?.id ?? 'staff',
           ouId: ticket.ouId,
         },
       });
@@ -979,7 +981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       broadcastToOU(ticket.ouId, {
         type: 'ticket_scheduled',
-        data: { ticketNumber: ticket.ticketNumber, scheduledRetrievalAt: null, ouId: ticket.ouId },
+        data: { ticketNumber: ticket.ticketNumber, scheduledAt: null, scheduledBy: (req.currentUser as User)?.id ?? 'staff', ouId: ticket.ouId },
       });
       broadcastToOU(ticket.ouId, {
         type: 'ticket_status_updated',
