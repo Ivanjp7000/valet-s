@@ -52,6 +52,15 @@ function formatDuration(seconds: number): string {
 }
 
 async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
+  // Open the window NOW (synchronously, inside the user-gesture call stack)
+  // before any awaits — otherwise the popup blocker will kill it.
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups for this site to print tickets.');
+    return;
+  }
+  printWindow.document.write('<html><body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#555">Generating PDF…</body></html>');
+
   try {
     const mmToPt = (mm: number) => mm * 2.8346;
     const W = mmToPt(50);
@@ -182,10 +191,12 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     const pdfBytes = await doc.save();
     const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
     const url      = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    // Navigate the already-open window to the PDF (bypasses popup blocker)
+    printWindow.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   } catch (err) {
     console.error('Print ticket error:', err);
+    printWindow.close();
     alert('Could not generate PDF. Check the browser console for details.');
   }
 }

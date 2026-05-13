@@ -1,0 +1,197 @@
+/js/fbevents.js:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+o1151714.ingest.sentry.io/api/6318792/envelope/?sentry_key=8aa91189a4274b5a8c9b7b01d46ea360&sentry_version=7&sentry_client=sentry.javascript.browser%2F7.120.4:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+0swtje535su7e.js:72 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+   ///////////////////////////
+      /////////////////////
+      
+0swtje535su7e.js:72 Download the Apollo DevTools for a better development experience: https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm
+cdn.segment.com/next-integrations/actions/amplitude-plugins/f12a4347e1080fb88155.js:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+0swtje535su7e.js:72 Failed to create PluginFactory Object
+(anonymous) @ 0swtje535su7e.js:72
+0swtje535su7e.js:72 Failed to load Remote Plugin Error: Failed to load https://cdn.segment.com/next-integrations/actions/amplitude-plugins/f12a4347e1080fb88155.js
+    at HTMLScriptElement.<anonymous> (load-script.ts:53:24)
+(anonymous) @ 0swtje535su7e.js:72
+0swtje535su7e.js:72 [LaunchDarkly] LaunchDarkly client initialized
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=61da540a-fa5c-43c5-944f-b3a0b0b901c0:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=b80affee-d8ff-48d0-a870-1a57bcbcc9f5:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=6b805947-22eb-4000-8bee-b070b34489a3:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=1150aa56-3e3a-4ac5-96ea-b8ae85158837:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+ValetStream:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=343d1c35-dfeb-43ed-bf67-5d36978acd8b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=5eb5969c-ffa3-4427-a1fc-c65cb6135636:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=e95dd244-eb08-4ee9-b55b-a5aea614e4a3:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=4a9a928a-fb9c-48e1-b0f2-acbe3e6502e2:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=bd713ec7-0d40-4f18-ab73-c088c7d52d63:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=957198d2-c79f-487c-927f-a8b277e4d349:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+r.stripe.com/b:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=478f6dbb-58c6-4ce2-98a3-5eca399d9998:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=b597b823-8f87-4188-a225-757498f19725:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=623014d1-c550-4b45-b347-3ca58f2eaab1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=6dc04d6d-fb49-432e-bcc3-a8fced4e9b1d:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+0i8wy8tbht2ow.js:2 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'ambient-light-sensor'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'battery'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'execution-while-not-rendered'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'execution-while-out-of-viewport'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'layout-animations'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'legacy-image-formats'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'navigation-override'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'oversized-images'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'publickey-credentials'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'speaker-selection'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'unoptimized-images'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'unsized-media'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'pointer-lock'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Allow attribute will take precedence over 'allowfullscreen'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Allow attribute will take precedence over 'allowpaymentrequest'.
+C @ 0i8wy8tbht2ow.js:2
+056do-2sz0-iy.js:2 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://b01dc719-ee21-4e87-9322-57dca4415dff-00-3s1zx7xtta3x2.kirk.replit.dev') does not match the recipient window's origin ('https://replit.com').
+b @ 056do-2sz0-iy.js:2
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2F&id=default-start-application:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+client:802 WebSocket connection to 'wss://b01dc719-ee21-4e87-9322-57dca4415dff-00-3s1zx7xtta3x2.kirk.replit.dev/?token=2G4B125QbLKJ' failed: 
+(anonymous) @ client:802
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=5b893041-44b9-4c28-aa88-43a3b6f7c2fc:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=d2f263f8-8b0f-42a8-aab8-3a589a4eedcf:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=5959e3d4-4c8c-47ed-9281-075fca0a47a8:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=5ff9fe87-5006-4105-a1fa-119effc63655:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+client:815 WebSocket connection to 'wss://localhost:5173/?token=2G4B125QbLKJ' failed: 
+(anonymous) @ client:815
+injected.js:37 [vite] failed to connect to websocket.
+your current setup:
+  (browser) b01dc719-ee21-4e87-9322-57dca4415dff-00-3s1zx7xtta3x2.kirk.replit.dev/ <--[HTTP]--> localhost:5173/ (server)
+  (browser) b01dc719-ee21-4e87-9322-57dca4415dff-00-3s1zx7xtta3x2.kirk.replit.dev:/ <--[WebSocket (failing)]--> localhost:5173/ (server)
+Check out your Vite / network configuration and https://vite.dev/config/server-options.html#server-hmr .
+(anonymous) @ injected.js:37
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=a7406692-ecd2-4b42-a0a7-a8d99c9ed5ce:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=1b2dbf70-81f0-4de4-84b9-b04a570b8d8d:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+injected.js:37 Print ticket error: Error: Input to `PDFDocument.embedFont` was a custom font, but no `fontkit` instance was found. You must register a `fontkit` instance with `PDFDocument.registerFontkit(...)` before embedding custom fonts.
+    at new FontkitNotRegisteredError2 (pdf-lib.js?v=68fc2882:15633:22)
+    at PDFDocument2.assertFontkit (pdf-lib.js?v=68fc2882:18945:15)
+    at PDFDocument2.<anonymous> (pdf-lib.js?v=68fc2882:18638:30)
+    at step (pdf-lib.js?v=68fc2882:4351:17)
+    at Object.next (pdf-lib.js?v=68fc2882:4303:14)
+    at pdf-lib.js?v=68fc2882:4290:67
+    at new Promise (<anonymous>)
+    at __awaiter (pdf-lib.js?v=68fc2882:4272:10)
+    at PDFDocument2.embedFont (pdf-lib.js?v=68fc2882:18624:14)
+    at printFullTicket (staff-dashboard.tsx:66:34)
+(anonymous) @ injected.js:37
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=61e2c7d4-c04c-4778-aee1-3633d4d46bd6:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=4b315dce-ad69-4f3d-883d-238376ded0ff:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+0swtje535su7e.js:72  POST https://logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=97d32e47-1f0c-4f3d-bd3c-ad6b2c4bdb87 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0swtje535su7e.js:72
+s @ 11-ufo9nxhuye.js:2
+tb @ 11-ufo9nxhuye.js:2
+tm @ 11-ufo9nxhuye.js:2
+send @ 11-ufo9nxhuye.js:2
+e.flush @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+e.notify @ 11-ufo9nxhuye.js:2
+l @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+_ @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+r @ 0swtje535su7e.js:72
+0swtje535su7e.js:72  POST https://logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=f6e57ba3-3881-4d19-9620-8ff15db44f3f net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0swtje535su7e.js:72
+(anonymous) @ 0swtje535su7e.js:72
+tC @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+_ @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+Promise.then
+s @ 11-ufo9nxhuye.js:2
+tb @ 11-ufo9nxhuye.js:2
+tm @ 11-ufo9nxhuye.js:2
+send @ 11-ufo9nxhuye.js:2
+e.flush @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+e.notify @ 11-ufo9nxhuye.js:2
+l @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+_ @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+r @ 0swtje535su7e.js:72
+0swtje535su7e.js:72  POST https://logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=66f01b9c-bcee-4fc6-b3e6-e3d711a9e9c0 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0swtje535su7e.js:72
+s @ 11-ufo9nxhuye.js:2
+tb @ 11-ufo9nxhuye.js:2
+tm @ 11-ufo9nxhuye.js:2
+send @ 11-ufo9nxhuye.js:2
+e.flush @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+e.notify @ 11-ufo9nxhuye.js:2
+l @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+_ @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+r @ 0swtje535su7e.js:72
+0swtje535su7e.js:72  POST https://logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Axhr%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A76b1995c&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=3d9b5b8b-a102-49bf-a7d3-9770b413943a net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ 0swtje535su7e.js:72
+(anonymous) @ 0swtje535su7e.js:72
+tC @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+_ @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+Promise.then
+s @ 11-ufo9nxhuye.js:2
+tb @ 11-ufo9nxhuye.js:2
+tm @ 11-ufo9nxhuye.js:2
+send @ 11-ufo9nxhuye.js:2
+e.flush @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+e.notify @ 11-ufo9nxhuye.js:2
+l @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+_ @ 11-ufo9nxhuye.js:2
+(anonymous) @ 11-ufo9nxhuye.js:2
+r @ 0swtje535su7e.js:72
