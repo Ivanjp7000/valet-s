@@ -455,14 +455,23 @@ export default function Landing() {
         <Card className="mb-6 shadow-lg">
           <CardContent className="p-8">
             {/* Luxury car hero image */}
-            <div className="relative -mx-8 -mt-8 mb-6 overflow-hidden rounded-t-xl">
-              <img
-                src={luxuryCarImg}
-                alt="Luxury valet car"
-                className="block mx-auto"
-                style={{ width: '90%', height: 'auto' }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-white/60" />
+            <div className="flex justify-center mb-6">
+              <div
+                className="overflow-hidden"
+                style={{
+                  width: '90%',
+                  borderRadius: '14px',
+                  border: '2px solid rgba(220, 230, 245, 0.9)',
+                  boxShadow: '0 0 0 1px rgba(180,200,230,0.4), 0 4px 24px rgba(160,190,220,0.25), inset 0 1px 0 rgba(255,255,255,0.8)',
+                }}
+              >
+                <img
+                  src={luxuryCarImg}
+                  alt="Luxury valet car"
+                  className="w-full object-cover"
+                  style={{ height: '160px', objectPosition: 'center 55%' }}
+                />
+              </div>
             </div>
 
             <h2 className="text-xl font-semibold text-regis-navy mb-5 text-center">Enter Your Ticket Number</h2>
