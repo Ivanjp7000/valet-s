@@ -79,7 +79,7 @@ export default function Home() {
             </div>
           </div>
           {/* Banner fills the empty centre space on desktop */}
-          <div className="hidden sm:flex flex-1 justify-center px-4">
+          <div className="hidden sm:flex flex-1 justify-center" style={{ paddingLeft: 0, paddingRight: 0, marginLeft: '-4px', marginRight: '-4px' }}>
             <img src={valetHeaderBanner} alt="" className="h-[70px] rounded object-cover" style={{ maxWidth: '550px', width: '100%' }} />
           </div>
           <a
