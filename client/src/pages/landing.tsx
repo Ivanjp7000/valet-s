@@ -37,6 +37,7 @@ export default function Landing() {
   const [ticketPreview, setTicketPreview] = useState<TicketPreview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [guestNameInput, setGuestNameInput] = useState("");
+  const [guestPinInput, setGuestPinInput] = useState("");
   const [nameError, setNameError] = useState("");
   const { toast } = useToast();
 
@@ -54,17 +55,19 @@ export default function Landing() {
       return;
     }
 
-    if (!guestNameInput.trim()) {
-      setNameError("Please enter your name as it appears on the ticket.");
+    const pinTrimmed = guestPinInput.trim().toUpperCase();
+    if (!guestNameInput.trim() && !pinTrimmed) {
+      setNameError("Please enter your name or PIN as printed on the label.");
       return;
     }
 
     setIsLoading(true);
     setNameError("");
     try {
-      const response = await fetch(
-        `/api/tickets/${ticketNumber}?name=${encodeURIComponent(guestNameInput.trim())}`
-      );
+      const params = new URLSearchParams();
+      if (guestNameInput.trim()) params.set("name", guestNameInput.trim());
+      if (pinTrimmed) params.set("pin", pinTrimmed);
+      const response = await fetch(`/api/tickets/${ticketNumber}?${params.toString()}`);
       if (!response.ok) {
         if (response.status === 429) {
           toast({
@@ -107,6 +110,7 @@ export default function Landing() {
     setScheduleDate("");
     setScheduleTime("");
     setGuestNameInput("");
+    setGuestPinInput("");
     setNameError("");
   };
 
@@ -141,7 +145,7 @@ export default function Landing() {
       const response = await fetch(`/api/tickets/${submittedTicket}/request-retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName: guestNameInput.trim() }),
+        body: JSON.stringify({ guestName: guestNameInput.trim(), guestPin: guestPinInput.trim().toUpperCase() || undefined }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -512,7 +516,7 @@ export default function Landing() {
             </div>
 
             {/* Name Input */}
-            <div className="mb-4">
+            <div className="mb-3">
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                 Your Name (as on ticket)
               </label>
@@ -524,6 +528,30 @@ export default function Landing() {
                 placeholder="Enter your full name"
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
               />
+            </div>
+
+            {/* Divider with OR */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 font-medium">OR</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            {/* PIN Input */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                PIN (from label)
+              </label>
+              <input
+                type="text"
+                value={guestPinInput}
+                onChange={e => { setGuestPinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)); setNameError(""); }}
+                onKeyDown={e => { if (e.key === 'Enter') handleTicketSubmit(); }}
+                placeholder="e.g. AC36"
+                maxLength={4}
+                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white uppercase"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">4-character code printed on your label — use this instead of your name</p>
               {nameError && (
                 <p className="text-red-500 text-xs mt-1">{nameError}</p>
               )}

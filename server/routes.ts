@@ -591,10 +591,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { ticketNumber } = req.params;
       const nameParam = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+      const pinParam = typeof req.query.pin === 'string' ? req.query.pin.trim().toUpperCase() : '';
 
-      // Require name as a second factor on every read — eliminates validity oracle
-      if (!nameParam) {
-        return res.status(400).json({ message: "Name is required" });
+      // Require name OR pin as a second factor — eliminates validity oracle
+      if (!nameParam && !pinParam) {
+        return res.status(400).json({ message: "Name or PIN is required" });
       }
 
       // Rate limit per-ticket — generous limit to allow continuous status polling
@@ -610,9 +611,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      // Return the same 404 whether the ticket doesn't exist or the name doesn't match
+      // Verify identity: PIN match (if provided and ticket has a PIN) OR name match
+      const pinMatch = pinParam && ticket?.guestPin && pinParam === ticket.guestPin.toUpperCase();
+      const nameMatch = nameParam && ticket && namesMatch(nameParam, ticket.guestName);
+
+      // Return the same 404 whether the ticket doesn't exist or verification fails
       // — prevents enumeration oracle
-      if (!ticket || !namesMatch(nameParam, ticket.guestName)) {
+      if (!ticket || (!pinMatch && !nameMatch)) {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
@@ -643,16 +648,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { ticketNumber } = req.params;
-      const { guestName } = req.body;
+      const { guestName, guestPin: bodyPin } = req.body;
+      const pinParam = typeof bodyPin === 'string' ? bodyPin.trim().toUpperCase() : '';
 
-      if (!guestName || typeof guestName !== 'string' || !guestName.trim()) {
-        return res.status(400).json({ message: "Name verification is required" });
+      if (!guestName?.trim() && !pinParam) {
+        return res.status(400).json({ message: "Name or PIN verification is required" });
       }
 
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      // Return the same 404 for both not-found and name-mismatch — eliminates oracle
-      if (!ticket || !namesMatch(guestName, ticket.guestName)) {
+      // Verify identity: PIN match OR name match — return same 404 for both failures
+      const pinMatch = pinParam && ticket?.guestPin && pinParam === ticket.guestPin.toUpperCase();
+      const nameMatch = guestName?.trim() && ticket && namesMatch(guestName, ticket.guestName);
+      if (!ticket || (!pinMatch && !nameMatch)) {
         return res.status(404).json({ message: "Ticket not found" });
       }
       if (ticket.status !== 'active') {
@@ -984,11 +992,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Auto-determine roster category from visitorType
       const autoRosterCategory = (visitorType === 'restaurant' || visitorType === 'event' || visitorType === 'others') ? 'events' : 'arriving';
 
+      const { guestPin } = req.body;
+
       const ticket = await storage.createValetTicket({
         ticketNumber,
         visitorType,
         visitorSubType: visitorSubType || null,
         guestName,
+        guestPin: guestPin || null,
         carMake,
         carModel,
         carColor,

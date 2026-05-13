@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, ScanLine, Printer
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, ScanLine, Printer, RefreshCw
 } from "lucide-react";
 import qrCodeUrl from "@/assets/qr-valet-s.jpg";
 import { apiRequest } from "@/lib/queryClient";
@@ -29,6 +29,18 @@ const fmtGuest = (name: string | null | undefined) =>
  * iPhone: Safari downloads → tap download icon → open file → share to Phomemo → Print
  * Desktop: Ctrl/Cmd+P → select Phomemo M110s → paper 30×38mm
  */
+/** Generate a random PIN: 2 uppercase letters + 2 digits, e.g. "AC36" */
+function generatePin(): string {
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O to avoid confusion
+  const digits = '0123456789';
+  return (
+    letters[Math.floor(Math.random() * letters.length)] +
+    letters[Math.floor(Math.random() * letters.length)] +
+    digits[Math.floor(Math.random() * digits.length)] +
+    digits[Math.floor(Math.random() * digits.length)]
+  );
+}
+
 async function printNameLabel(guestName: string): Promise<void> {
   const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
 
@@ -87,6 +99,81 @@ async function printNameLabel(guestName: string): Promise<void> {
   const a        = document.createElement('a');
   a.href         = url;
   a.download     = `${guestName.trim()}.pdf`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * Generate a 30×38mm PIN label PDF and trigger a local file download.
+ * Label shows "PIN  XX00" instead of the guest name.
+ */
+async function printPinLabel(pin: string): Promise<void> {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+
+  const mmToPt = (mm: number) => mm * 2.8346;
+  const W = mmToPt(30);
+  const H = mmToPt(38);
+
+  const doc  = await PDFDocument.create();
+  const page = doc.addPage([W, H]);
+  page.setMediaBox(0, 0, W, H);
+
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const font     = await doc.embedFont(StandardFonts.Helvetica);
+
+  let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
+  try {
+    const { default: qrUrl } = await import('@/assets/qr-valet-s.jpg');
+    const resp  = await fetch(qrUrl);
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    try { qrImage = await doc.embedJpg(bytes); } catch { qrImage = await doc.embedPng(bytes); }
+  } catch { /* skip */ }
+
+  const pad    = mmToPt(2);
+  const innerW = W - pad * 2;
+  let cursor   = H - pad;
+
+  // QR code
+  const qrSize = mmToPt(18);
+  if (qrImage) page.drawImage(qrImage, { x: (W - qrSize) / 2, y: cursor - qrSize, width: qrSize, height: qrSize });
+  cursor -= qrSize + mmToPt(1.5);
+
+  // "Visit Valet-s.com"
+  const visitSize = 6;
+  const visitText = 'Visit  Valet-s.com';
+  page.drawText(visitText, {
+    x: pad + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
+    y: cursor - visitSize, font, size: visitSize, color: rgb(0.4, 0.4, 0.4),
+  });
+  cursor -= visitSize + mmToPt(1.5);
+
+  // Gold divider
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.6, color: rgb(0.79, 0.66, 0.3) });
+
+  // PIN label at bottom
+  const labelSize = 7;
+  const labelText = 'PIN';
+  page.drawText(labelText, {
+    x: pad,
+    y: pad + 14,
+    font, size: labelSize, color: rgb(0.5, 0.5, 0.5),
+  });
+  const pinSize = 13;
+  page.drawText(pin, {
+    x: pad + (innerW - fontBold.widthOfTextAtSize(pin, pinSize)) / 2,
+    y: pad, font: fontBold, size: pinSize, color: rgb(0.1, 0.12, 0.27),
+  });
+
+  // Download the PDF file
+  const pdfBytes = await doc.save();
+  const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href         = url;
+  a.download     = `PIN-${pin}.pdf`;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
@@ -268,6 +355,7 @@ interface TicketFormData {
   guestName: string;
   roomNumber: string;
   ticketNumber: string;
+  guestPin: string;
 }
 
 const STEPS = [
@@ -399,6 +487,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     guestName: "",
     roomNumber: "",
     ticketNumber: "",
+    guestPin: generatePin(),
   });
 
   // Guest name autocomplete
@@ -438,6 +527,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         visitorType: data.visitorType,
         visitorSubType: data.visitorSubType || null,
         guestName: data.guestName,
+        guestPin: data.guestPin || null,
         roomNumber: data.roomNumber || null,
         carMake: data.carMake,
         carModel: data.carModel,
@@ -481,6 +571,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
       guestName: "",
       roomNumber: "",
       ticketNumber: "",
+      guestPin: generatePin(),
     });
     setCarMakeSearch("");
     onClose();
@@ -585,6 +676,28 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           >
             <Printer size={12} />
             Print Label
+          </button>
+        </div>
+
+        {/* PIN row */}
+        <div className="mt-2 flex items-center gap-2 bg-regis-navy/5 border border-regis-navy/20 rounded-lg px-3 py-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider shrink-0">PIN</span>
+          <span className="font-mono font-bold text-regis-navy text-base tracking-widest">{formData.guestPin}</span>
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, guestPin: generatePin() })}
+            title="Generate new PIN"
+            className="ml-0.5 p-1 rounded hover:bg-regis-navy/10 text-gray-400 hover:text-regis-navy transition-colors"
+          >
+            <RefreshCw size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => printPinLabel(formData.guestPin)}
+            title="Print PIN label"
+            className="p-1 rounded hover:bg-amber-50 text-amber-600 hover:text-amber-800 transition-colors border border-amber-200 hover:border-amber-400"
+          >
+            <Printer size={13} />
           </button>
         </div>
       </div>

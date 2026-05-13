@@ -411,7 +411,14 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               {countdownDisplay}
             </span>
           </div>
-          <p className="font-bold text-regis-navy truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-bold text-regis-navy truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
+            {(ticket as any).guestPin && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0">
+                PIN&nbsp;{(ticket as any).guestPin}
+              </span>
+            )}
+          </div>
           {!collapsed && (
             <>
               <p className="text-[10px] text-blue-600 font-semibold">⏱ {totalDisplay} in parking</p>
