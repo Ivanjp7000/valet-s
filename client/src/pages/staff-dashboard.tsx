@@ -975,19 +975,22 @@ export default function StaffDashboard() {
   };
 
   const togglePanel = (id: string) => {
+    let opening = false;
     setExpandedPanels(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        setTimeout(() => {
-          const el = document.getElementById(`panel-${id}`);
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 80);
-      }
+      if (next.has(id)) { next.delete(id); } else { next.add(id); opening = true; }
       return next;
     });
+    if (opening) {
+      setTimeout(() => {
+        const el = document.getElementById(`panel-${id}`);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const absoluteTop = rect.top + window.scrollY;
+        const centeredTop = absoluteTop - (window.innerHeight / 2) + 60;
+        window.scrollTo({ top: Math.max(0, centeredTop), behavior: 'smooth' });
+      }, 320);
+    }
   };
 
   const sensors = useSensors(
