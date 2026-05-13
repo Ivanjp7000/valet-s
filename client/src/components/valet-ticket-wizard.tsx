@@ -670,12 +670,11 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </button>
           <button
             type="button"
-            disabled={!formData.guestName.trim()}
-            onClick={() => printNameLabel(formData.guestName)}
-            className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-500 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={() => printPinLabel(formData.guestPin)}
+            className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:border-amber-500 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 transition-colors"
           >
             <Printer size={12} />
-            Print Label
+            PIN
           </button>
         </div>
 
