@@ -30,6 +30,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import type { ValetTicket, SafeUser as UserType, OULicense, OrganizationalUnit } from "@shared/schema";
 import { RESTAURANT_SUB_TYPES, VISITOR_TYPES } from "@shared/schema";
 import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import licenseCertImg from "@assets/Valet-S_Software_License1_1778373848645.png";
 
 // Strip leading honorifics (Mr., Mrs., Ms., Mx., Dr., etc.) from a guest name
@@ -69,6 +70,7 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     const innerW = W - PAD * 2;
 
     const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
 
     // Embed Noto Sans JP — supports Japanese + Latin characters
     const fontBytes = await fetch('/fonts/NotoSansJP-Regular.ttf').then(r => r.arrayBuffer());
