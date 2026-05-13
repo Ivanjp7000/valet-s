@@ -6076,6 +6076,8 @@ export default function StaffDashboard() {
                     onClick={() => updateTicketMutation.mutate({
                       ticketNumber: editTicketData.ticketNumber,
                       status: editTicketData.status,
+                      visitorType: editTicketData.visitorType,
+                      visitorSubType: editTicketData.visitorSubType,
                       guestName: editTicketData.guestName,
                       roomNumber: editTicketData.roomNumber,
                       licensePlate: editTicketData.licensePlate,
