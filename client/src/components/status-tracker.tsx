@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Button } from "@/components/ui/button";
-import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles } from "lucide-react";
+import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles, CalendarClock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ValetTicket } from "@shared/schema";
 
@@ -283,6 +283,57 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
           <X className="mr-2" size={16} />
           Back to Home
         </Button>
+      </div>
+    );
+  }
+
+  // Active ticket with a scheduled retrieval time — show scheduled state
+  if (ticket?.status === 'active' && ticket?.scheduledRetrievalAt) {
+    const scheduledTime = new Date(ticket.scheduledRetrievalAt as unknown as string);
+    const msLeft = scheduledTime.getTime() - Date.now();
+    const hoursLeft = Math.floor(msLeft / 3600000);
+    const minutesLeft = Math.floor((msLeft % 3600000) / 60000);
+
+    return (
+      <div className="min-h-screen bg-white flex flex-col">
+        <div className="bg-regis-navy text-white px-6 py-8 text-center">
+          <div className="w-16 h-16 bg-regis-gold rounded-full flex items-center justify-center mx-auto mb-4">
+            <CalendarClock className="text-white" size={24} />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Pickup Scheduled</h2>
+          <p className="text-blue-200 text-sm">Ticket #{ticketNumber}</p>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto w-full">
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-8 mb-6 w-full">
+            <CalendarClock className="text-amber-500 mx-auto mb-4" size={40} />
+            <h3 className="text-xl font-bold text-regis-navy mb-2">Scheduled for</h3>
+            <p className="text-2xl font-bold text-amber-700">
+              {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <p className="text-gray-500 text-sm mt-1">
+              {scheduledTime.toLocaleDateString([], { month: 'long', day: 'numeric' })}
+            </p>
+            {msLeft > 0 && (
+              <p className="text-sm text-amber-600 font-medium mt-3">
+                {hoursLeft > 0 ? `${hoursLeft}h ` : ''}{minutesLeft}m until pickup
+              </p>
+            )}
+          </div>
+
+          <p className="text-gray-500 text-sm text-center mb-6">
+            Staff will start preparing your vehicle before your scheduled time. This page updates automatically.
+          </p>
+
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="mr-2" size={16} />
+            Back to Home
+          </Button>
+        </div>
       </div>
     );
   }

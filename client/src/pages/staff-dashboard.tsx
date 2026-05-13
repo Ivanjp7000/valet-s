@@ -471,6 +471,13 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                   >✕ Cancel</button>
                 </div>
               )}
+              {ticket.scheduledRetrievalAt && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <p className="text-[10px] text-amber-600 font-semibold">
+                    🚗 Pickup: {fmtScheduled(ticket.scheduledRetrievalAt as unknown as string)}
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -746,6 +753,12 @@ export default function StaffDashboard() {
   const [inHouseSortBy, setInHouseSortBy] = useState<'newest'|'oldest'|'name_az'|'name_za'|'ticket_asc'|'ticket_desc'>('newest');
   const [autoCloseDate, setAutoCloseDate] = useState('');
   const [autoCloseTime, setAutoCloseTime] = useState('12:00');
+
+  // Schedule alert state — fired by the server 15 minutes before a guest's scheduled pickup
+  const [scheduleAlerts, setScheduleAlerts] = useState<Array<{ ticketNumber: string; guestName: string | null; scheduledRetrievalAt: string }>>([]);
+  // Schedule picker state inside viewTicket dialog
+  const [viewTicketScheduleInput, setViewTicketScheduleInput] = useState('');
+  const [viewTicketScheduleSaving, setViewTicketScheduleSaving] = useState(false);
 
   // Ticket management modals state
   const [viewTicket, setViewTicket] = useState<ValetTicket | null>(null);
@@ -1308,6 +1321,42 @@ export default function StaffDashboard() {
           setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== cancelled?.ticketNumber));
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
         }
+        if (data.type === 'ticket_scheduled') {
+          queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+          const d = data.data;
+          if (d?.scheduledRetrievalAt) {
+            toast({
+              title: 'Retrieval Scheduled',
+              description: `Ticket #${d.ticketNumber}${d.guestName ? ` (${d.guestName})` : ''} scheduled for ${new Date(d.scheduledRetrievalAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+            });
+          }
+        }
+        if (data.type === 'schedule_alert') {
+          const d = data.data;
+          const isSameOU = user?.role === 'superadmin' || !d?.ouId || d.ouId === user?.ouId;
+          if (isSameOU && d?.ticketNumber) {
+            setScheduleAlerts(prev => {
+              if (prev.some(a => a.ticketNumber === d.ticketNumber)) return prev;
+              return [...prev, { ticketNumber: d.ticketNumber, guestName: d.guestName, scheduledRetrievalAt: d.scheduledRetrievalAt }];
+            });
+            // Play notification sound
+            try {
+              const ctx = new AudioContext();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(880, ctx.currentTime);
+              osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+              gain.gain.setValueAtTime(0.4, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+              osc.start(ctx.currentTime);
+              osc.stop(ctx.currentTime + 0.5);
+            } catch {}
+          }
+        }
         if (['gs_message', 'gs_reply', 'gs_event_created', 'gs_event_updated', 'gs_event_deleted', 'gs_acknowledged', 'gs_member_added', 'gs_member_removed'].includes(data.type)) {
           queryClient.invalidateQueries({ queryKey: ["/api/gs/messages"] });
           queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
@@ -1590,6 +1639,15 @@ export default function StaffDashboard() {
     }
   }
 
+  // Sync schedule picker input when viewTicket opens or changes
+  useEffect(() => {
+    if (viewTicket?.scheduledRetrievalAt) {
+      setViewTicketScheduleInput(toDatetimeLocal(new Date(viewTicket.scheduledRetrievalAt as unknown as string)));
+    } else {
+      setViewTicketScheduleInput('');
+    }
+  }, [viewTicket?.ticketNumber, viewTicket?.scheduledRetrievalAt]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Retrieval request popup — shown to all staff in the OU */}
@@ -1600,6 +1658,58 @@ export default function StaffDashboard() {
           setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== ticketNumber))
         }
       />
+
+      {/* 15-minute pre-alert popups — one card per scheduled pickup */}
+      {scheduleAlerts.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+          {scheduleAlerts.map(alert => (
+            <div key={alert.ticketNumber} className="bg-white border-2 border-amber-400 rounded-xl shadow-xl p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Clock className="text-amber-600" size={18} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm text-regis-navy">Pickup in ~15 min</p>
+                    <p className="text-xs text-gray-500">Ticket #{alert.ticketNumber}</p>
+                  </div>
+                </div>
+                <button
+                  className="text-gray-400 hover:text-gray-600 ml-2 text-sm font-bold"
+                  onClick={() => setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber))}
+                >✕</button>
+              </div>
+              {alert.guestName && (
+                <p className="text-sm text-gray-700 mb-1 font-medium">{fmtGuest(alert.guestName)}</p>
+              )}
+              <p className="text-xs text-amber-700 mb-3">
+                Scheduled: {new Date(alert.scheduledRetrievalAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 bg-regis-navy text-white hover:bg-regis-navy/90 text-xs"
+                  onClick={() => {
+                    acceptRetrievalMutation.mutate(alert.ticketNumber);
+                    setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber));
+                  }}
+                >
+                  <Car size={12} className="mr-1" />
+                  Start Retrieval
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => setScheduleAlerts(prev => prev.filter(a => a.ticketNumber !== alert.ticketNumber))}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="border-b bg-white">
         <div className="px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
@@ -5182,6 +5292,71 @@ export default function StaffDashboard() {
                     {viewTicket.parkingLocation || 'Not assigned'}
                   </div>
                 </div>
+
+                {/* Scheduled Retrieval section — only for active tickets */}
+                {['active', 'pending'].includes(viewTicket.status) && canEdit && (
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold text-regis-navy mb-3 flex items-center gap-2">
+                      <CalendarDays size={16} />
+                      Schedule Pickup
+                    </h3>
+                    {viewTicket.scheduledRetrievalAt && (
+                      <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                        <span className="text-sm text-amber-800 font-medium">
+                          🚗 {new Date(viewTicket.scheduledRetrievalAt as unknown as string).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <button
+                          className="text-xs text-red-500 hover:text-red-700 font-semibold ml-3"
+                          onClick={async () => {
+                            try {
+                              await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                              queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                              setViewTicket(prev => prev ? { ...prev, scheduledRetrievalAt: null } : prev);
+                              toast({ title: 'Schedule cleared' });
+                            } catch {
+                              toast({ title: 'Failed to clear schedule', variant: 'destructive' });
+                            }
+                          }}
+                        >✕ Clear</button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold"
+                        value={viewTicketScheduleInput}
+                        min={new Date().toISOString().slice(0, 16)}
+                        onChange={e => setViewTicketScheduleInput(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!viewTicketScheduleInput || viewTicketScheduleSaving}
+                        onClick={async () => {
+                          if (!viewTicketScheduleInput) return;
+                          setViewTicketScheduleSaving(true);
+                          try {
+                            await fetch(`/api/staff/tickets/${viewTicket.ticketNumber}/schedule-retrieval`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ scheduledAt: new Date(viewTicketScheduleInput).toISOString() }),
+                            });
+                            queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                            setViewTicket(prev => prev ? { ...prev, scheduledRetrievalAt: new Date(viewTicketScheduleInput) as any } : prev);
+                            toast({ title: 'Pickup scheduled' });
+                            setViewTicketScheduleInput('');
+                          } catch {
+                            toast({ title: 'Failed to schedule', variant: 'destructive' });
+                          } finally {
+                            setViewTicketScheduleSaving(false);
+                          }
+                        }}
+                        className="bg-regis-navy text-white hover:bg-regis-navy/90 shrink-0"
+                      >
+                        {viewTicketScheduleSaving ? <Loader2 size={14} className="animate-spin" /> : 'Set'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {viewTicket.staffNotes && (
                   <div className="border-t pt-4">

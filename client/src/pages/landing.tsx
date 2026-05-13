@@ -34,6 +34,7 @@ export default function Landing() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleEmail, setScheduleEmail] = useState("");
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
   const [submittedTicket, setSubmittedTicket] = useState("");
@@ -107,6 +108,7 @@ export default function Landing() {
     setScheduleConfirmed(false);
     setScheduleDate("");
     setScheduleTime("");
+    setScheduleEmail("");
     setGuestNameInput("");
     setGuestPinInput("");
     setNameError("");
@@ -120,10 +122,11 @@ export default function Landing() {
     setScheduleLoading(true);
     try {
       const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
+      const pinVal = guestPinInput.trim().toUpperCase();
       const response = await fetch(`/api/tickets/${submittedTicket}/schedule-retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduledAt, guestName: guestNameInput.trim() }),
+        body: JSON.stringify({ scheduledAt, guestName: guestNameInput.trim(), guestPin: pinVal || undefined, reminderEmail: scheduleEmail.trim() || undefined }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -271,6 +274,21 @@ export default function Landing() {
                     onChange={e => setScheduleTime(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
                   />
+                </div>
+
+                {/* Email reminder — optional */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Email Reminder <span className="text-gray-400 font-normal normal-case">(optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={scheduleEmail}
+                    onChange={e => setScheduleEmail(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">We'll email you when your car is ready.</p>
                 </div>
 
               </div>

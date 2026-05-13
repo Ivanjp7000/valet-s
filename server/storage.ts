@@ -121,6 +121,9 @@ export interface IStorage {
   // Scheduled departure
   getDueScheduledDepartures(): Promise<ValetTicket[]>;
 
+  // Scheduled retrieval alerts
+  getUpcomingScheduledRetrievals(withinMinutes: number): Promise<ValetTicket[]>;
+
   // OU License operations
   createLicense(license: Omit<InsertOULicense, 'id' | 'issuedAt' | 'updatedAt'> & { licenseKey: string }): Promise<OULicense>;
   getLicenseByOU(ouId: string): Promise<OULicense | undefined>;
@@ -414,6 +417,22 @@ export class DatabaseStorage implements IStorage {
           eq(valetTickets.status, 'active'),
           isNotNull(valetTickets.scheduledDepartureAt),
           lte(valetTickets.scheduledDepartureAt, now)
+        )
+      );
+  }
+
+  async getUpcomingScheduledRetrievals(withinMinutes: number): Promise<ValetTicket[]> {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + withinMinutes * 60 * 1000);
+    return await db
+      .select()
+      .from(valetTickets)
+      .where(
+        and(
+          eq(valetTickets.status, 'active'),
+          isNotNull(valetTickets.scheduledRetrievalAt),
+          gt(valetTickets.scheduledRetrievalAt, now),
+          lte(valetTickets.scheduledRetrievalAt, cutoff)
         )
       );
   }

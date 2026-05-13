@@ -13,6 +13,30 @@ import nodemailer from "nodemailer";
 // In-memory OTP store: userId → { code, expiresAt }
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
+// ── Email: car-ready reminder ─────────────────────────────────────────────────
+async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[Email] RESEND_API_KEY not set — skipping reminder email');
+    return;
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      from: 'Valet Service <noreply@valet-s.com>',
+      to: [to],
+      subject: '🚗 Your Car is Ready for Pickup — Ticket #' + ticketNumber,
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Your Vehicle is Ready!</h2><p>Dear ${guestName},</p><p>Your vehicle <strong>(Ticket #${ticketNumber})</strong> is ready and waiting for you at the valet entrance.</p><p>Please proceed to the pickup area at your earliest convenience.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Resend error: ${JSON.stringify(err)}`);
+  }
+  console.log(`[Email] Car-ready reminder sent to ${to} for ticket ${ticketNumber}`);
+}
+
 // ── Session Audit Helpers ─────────────────────────────────────────────────────
 
 // Simple user-agent parser (no external package needed)
@@ -641,6 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         carMake: ticket.carMake,
         carModel: ticket.carModel,
         carColor: ticket.carColor,
+        scheduledRetrievalAt: ticket.scheduledRetrievalAt,
       });
     } catch (error) {
       console.error("Error fetching ticket:", error);
@@ -741,9 +766,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No pending retrieval request to cancel' });
       }
       const updated = await storage.updateValetTicketStatus(ticketNumber, 'active');
+      // Clear the scheduled retrieval time when a guest cancels their request
+      await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: null });
       broadcastToOU(updated!.ouId, {
         type: 'retrieval_cancelled',
         data: { ticketNumber },
+      });
+      broadcastToOU(updated!.ouId, {
+        type: 'ticket_scheduled',
+        data: { ticketNumber, scheduledRetrievalAt: null },
       });
       res.json({ message: 'Retrieval request cancelled' });
     } catch (err: any) {
@@ -764,10 +795,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { ticketNumber } = req.params;
-      const { scheduledAt, guestName } = req.body;
+      const { scheduledAt, guestName, guestPin: bodyPin, reminderEmail } = req.body;
+      const pinParam = typeof bodyPin === 'string' ? bodyPin.trim().toUpperCase() : '';
 
-      if (!guestName || typeof guestName !== 'string' || !guestName.trim()) {
-        return res.status(400).json({ message: "Name verification is required" });
+      if (!pinParam && (!guestName || typeof guestName !== 'string' || !guestName.trim())) {
+        return res.status(400).json({ message: "Name or PIN verification is required" });
       }
 
       if (!scheduledAt) {
@@ -789,19 +821,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const ticket = await storage.getValetTicket(ticketNumber);
-      // Return the same 404 for both not-found and name-mismatch — eliminates oracle
-      if (!ticket || !namesMatch(guestName, ticket.guestName)) {
+      let verified = false;
+      if (!ticket) {
+        verified = false;
+      } else if (pinParam && ticket.guestPin) {
+        verified = pinParam === ticket.guestPin.toUpperCase();
+      } else {
+        verified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+      }
+      // Return the same 404 for both not-found and verification-failure — eliminates oracle
+      if (!ticket || !verified) {
         return res.status(404).json({ message: "Ticket not found" });
       }
       if (!['active', 'pending'].includes(ticket.status)) {
         return res.status(400).json({ message: "Ticket is not available for scheduling" });
       }
 
-      await storage.updateValetTicket(ticketNumber, {
-        scheduledRetrievalAt: scheduledDate,
+      const updates: Record<string, any> = { scheduledRetrievalAt: scheduledDate };
+      if (reminderEmail && typeof reminderEmail === 'string' && reminderEmail.includes('@')) {
+        updates.reminderEmail = reminderEmail.trim().toLowerCase();
+      }
+      const updated = await storage.updateValetTicket(ticketNumber, updates);
+
+      // Notify staff in real time
+      broadcastToOU(ticket.ouId, {
+        type: 'ticket_scheduled',
+        data: {
+          ticketNumber: ticket.ticketNumber,
+          guestName: ticket.guestName,
+          scheduledRetrievalAt: scheduledDate.toISOString(),
+          ouId: ticket.ouId,
+        },
+      });
+      // Also push a status update so the customer tracker refreshes
+      broadcastToOU(ticket.ouId, {
+        type: 'ticket_status_updated',
+        data: updated ?? ticket,
       });
 
-      res.json({ success: true });
+      res.json({ success: true, scheduledRetrievalAt: scheduledDate.toISOString() });
     } catch (error) {
       console.error("Error scheduling retrieval:", error);
       res.status(500).json({ message: "Failed to schedule retrieval" });
@@ -854,6 +912,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.currentUser = user;
     next();
   };
+
+  // Authenticated staff: schedule a retrieval time for a ticket
+  app.post('/api/staff/tickets/:ticketNumber/schedule-retrieval', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { scheduledAt } = req.body;
+
+      if (!scheduledAt) {
+        return res.status(400).json({ message: "scheduledAt is required" });
+      }
+
+      const scheduledDate = new Date(scheduledAt);
+      const now = new Date();
+      if (isNaN(scheduledDate.getTime())) {
+        return res.status(400).json({ message: "Invalid date" });
+      }
+      if (scheduledDate <= now) {
+        return res.status(400).json({ message: "Scheduled time must be in the future" });
+      }
+
+      const ticket = await storage.getValetTicket(ticketNumber);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(ticket, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (!['active', 'pending'].includes(ticket.status)) {
+        return res.status(400).json({ message: "Ticket is not available for scheduling" });
+      }
+
+      const updated = await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: scheduledDate });
+
+      broadcastToOU(ticket.ouId, {
+        type: 'ticket_scheduled',
+        data: {
+          ticketNumber: ticket.ticketNumber,
+          guestName: ticket.guestName,
+          scheduledRetrievalAt: scheduledDate.toISOString(),
+          ouId: ticket.ouId,
+        },
+      });
+      broadcastToOU(ticket.ouId, {
+        type: 'ticket_status_updated',
+        data: updated ?? ticket,
+      });
+
+      res.json({ success: true, scheduledRetrievalAt: scheduledDate.toISOString() });
+    } catch (error) {
+      console.error("Error scheduling retrieval (staff):", error);
+      res.status(500).json({ message: "Failed to schedule retrieval" });
+    }
+  });
+
+  // Authenticated staff: clear scheduled retrieval time
+  app.delete('/api/staff/tickets/:ticketNumber/schedule-retrieval', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+
+      const ticket = await storage.getValetTicket(ticketNumber);
+      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+      if (!await isTicketInScope(ticket, req.currentUser)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updated = await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: null });
+
+      broadcastToOU(ticket.ouId, {
+        type: 'ticket_scheduled',
+        data: { ticketNumber: ticket.ticketNumber, scheduledRetrievalAt: null, ouId: ticket.ouId },
+      });
+      broadcastToOU(ticket.ouId, {
+        type: 'ticket_status_updated',
+        data: updated ?? ticket,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing schedule (staff):", error);
+      res.status(500).json({ message: "Failed to clear schedule" });
+    }
+  });
 
   // Read-only access - allows Standard Users to VIEW data but not modify
   const requireReadAccess = async (req: any, res: any, next: any) => {
@@ -1082,6 +1220,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === 'completed') {
         const depCategory = (existing.visitorType === 'restaurant' || existing.visitorType === 'event' || existing.visitorType === 'others') ? 'events' : 'departing';
         ticket = await storage.updateValetTicket(ticketNumber, { rosterCategory: depCategory, inRoster: true }) ?? ticket;
+      }
+
+      // When car is ready, send reminder email if guest provided one
+      if (status === 'ready' && existing.reminderEmail) {
+        sendCarReadyEmail(existing.reminderEmail, existing.guestName ?? 'Guest', existing.ticketNumber).catch((e: any) => {
+          console.error('[Email] Failed to send car-ready reminder:', e.message);
+        });
       }
 
       // Broadcast status update to clients in the same OU
@@ -2669,6 +2814,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('[Auto-Close] Error processing scheduled departures:', e);
     }
   }, 60 * 1000);
+
+  // ── 15-minute pre-alert for scheduled retrievals ─────────────────────────────
+  // Tracks which tickets have already fired their 15-min alert this session
+  const scheduleAlertedSet = new Set<string>();
+
+  setInterval(async () => {
+    try {
+      const upcoming = await storage.getUpcomingScheduledRetrievals(15);
+      for (const ticket of upcoming) {
+        if (scheduleAlertedSet.has(ticket.ticketNumber)) continue;
+        scheduleAlertedSet.add(ticket.ticketNumber);
+        broadcastToOU(ticket.ouId, {
+          type: 'schedule_alert',
+          data: {
+            ticketNumber: ticket.ticketNumber,
+            guestName: ticket.guestName,
+            scheduledRetrievalAt: ticket.scheduledRetrievalAt,
+            ouId: ticket.ouId,
+          },
+        });
+        console.log(`[Schedule Alert] Fired 15-min pre-alert for ticket ${ticket.ticketNumber}`);
+      }
+      // Clean up entries for tickets no longer in 'active' or past their scheduled time
+      // to allow re-alerting if a schedule is updated
+    } catch (e) {
+      console.error('[Schedule Alert] Error checking upcoming retrievals:', e);
+    }
+  }, 30 * 1000);
 
   // Broadcast to clients in the same OU (super admins receive all broadcasts)
   // Public (unauthenticated / customer) connections receive ticket_status_updated
