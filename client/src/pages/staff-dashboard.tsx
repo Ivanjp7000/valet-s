@@ -53,154 +53,94 @@ function formatDuration(seconds: number): string {
 }
 
 async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
-  // Open the window NOW (synchronously, inside the user-gesture call stack)
-  // before any awaits — otherwise the popup blocker will kill it.
+  const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
+    : ticket.visitorType === 'restaurant'
+      ? `Restaurant${ticket.visitorSubType ? ` – ${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
+      : ticket.visitorType === 'event' ? 'Event'
+      : ticket.visitorType === 'others' ? 'Others'
+      : ticket.visitorType || '–';
+
+  const carLine = [ticket.carMake, ticket.carModel, ticket.carColor].filter(Boolean).join(' ');
+
+  const checkinStr = ticket.createdAt ? (() => {
+    const d = new Date(ticket.createdAt as unknown as string);
+    const p = (n: number) => n.toString().padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}  ${p(d.getHours())}:${p(d.getMinutes())}`;
+  })() : '';
+
+  const row = (label: string, value: string | null | undefined) => value
+    ? `<div class="row"><span class="label">${label}</span><span class="value">${value}</span></div>`
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: 50mm 80mm; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 50mm; height: 80mm; overflow: hidden;
+    font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    font-size: 8pt; color: #1a1f45;
+  }
+  .header {
+    background: #1a1f45; color: #fff;
+    text-align: center; padding: 2.5mm 0 1.5mm;
+    font-size: 7pt; letter-spacing: 2px; font-weight: bold;
+  }
+  .ticket-num {
+    text-align: center; font-size: 22pt; font-weight: bold;
+    color: #1a1f45; padding: 1mm 0;
+    line-height: 1;
+  }
+  .gold-line { height: 0.5mm; background: #c9a84c; margin: 0 3mm; }
+  .body { padding: 2mm 3mm 0; }
+  .row { margin-bottom: 2mm; }
+  .label {
+    display: block; font-size: 6pt; color: #888;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 0.5mm;
+  }
+  .value {
+    display: block; font-size: 9pt; font-weight: bold; color: #1a1f45;
+    word-break: break-all;
+  }
+  .value.large { font-size: 10pt; }
+  .footer {
+    position: absolute; bottom: 2mm; left: 0; right: 0;
+    text-align: center; font-size: 5pt; color: #999;
+  }
+</style>
+</head>
+<body>
+  <div class="header">VALET TICKET</div>
+  <div class="ticket-num">#${ticket.ticketNumber}</div>
+  <div class="gold-line"></div>
+  <div class="body">
+    ${row('Guest Name', ticket.guestName || '–')}
+    ${row('Visitor Type', visitorLabel)}
+    ${ticket.roomNumber ? row('Room No.', ticket.roomNumber) : ''}
+    <div class="gold-line" style="margin:2mm -3mm;"></div>
+    ${carLine ? row('Vehicle', carLine) : ''}
+    ${row('License Plate', ticket.licensePlate || '–')}
+    ${row('Parking Spot', ticket.parkingLocation || '–')}
+    <div class="gold-line" style="margin:2mm -3mm;"></div>
+    ${checkinStr ? row('Check-in', checkinStr) : ''}
+    ${ticket.guestPin ? `<div class="row"><span class="label">PIN</span><span class="value large">${ticket.guestPin}</span></div>` : ''}
+  </div>
+  <div class="footer">Valet-s.com</div>
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('Please allow popups for this site to print tickets.');
     return;
   }
-  printWindow.document.write('<html><body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#555">Generating PDF…</body></html>');
-
-  try {
-    const mmToPt = (mm: number) => mm * 2.8346;
-    const W = mmToPt(50);
-    const H = mmToPt(80);
-    const PAD = mmToPt(3);
-    const innerW = W - PAD * 2;
-
-    const doc = await PDFDocument.create();
-    doc.registerFontkit(fontkit);
-
-    // Embed Noto Sans JP — supports Japanese + Latin characters
-    const fontBytes = await fetch('/fonts/NotoSansJP-Regular.ttf').then(r => r.arrayBuffer());
-    const jpFont     = await doc.embedFont(fontBytes);
-    const jpFontBold = await doc.embedFont(fontBytes); // same face used for "bold" rows (heavier weight not bundled)
-
-    // Fallback Latin fonts for header / footer where we know text is ASCII
-    const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-    const fontReg  = await doc.embedFont(StandardFonts.Helvetica);
-
-    const page = doc.addPage([W, H]);
-    page.setMediaBox(0, 0, W, H);
-
-    const gold  = rgb(0.79, 0.66, 0.3);
-    const navy  = rgb(0.1,  0.12, 0.27);
-    const gray  = rgb(0.50, 0.50, 0.50);
-    const white = rgb(1, 1, 1);
-
-    let cursor = H - PAD;
-
-    // ── Header bar ────────────────────────────────────────────────────────
-    const headerH    = mmToPt(9);
-    const headerLabel = 'VALET TICKET';
-    const headerSize  = 9;
-    page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: navy });
-    page.drawText(headerLabel, {
-      x: (W - fontBold.widthOfTextAtSize(headerLabel, headerSize)) / 2,
-      y: H - headerH + (headerH - headerSize) / 2,
-      font: fontBold, size: headerSize, color: white,
-    });
-    cursor = H - headerH - mmToPt(3);
-
-    // ── Ticket number ──────────────────────────────────────────────────────
-    const numStr  = `#${ticket.ticketNumber}`;
-    const numSize = 22;
-    page.drawText(numStr, {
-      x: (W - fontBold.widthOfTextAtSize(numStr, numSize)) / 2,
-      y: cursor - numSize,
-      font: fontBold, size: numSize, color: navy,
-    });
-    cursor -= numSize + mmToPt(1.5);
-
-    // Gold rule
-    page.drawRectangle({ x: PAD, y: cursor, width: innerW, height: 0.8, color: gold });
-    cursor -= mmToPt(3);
-
-    // ── Label / value row helper ───────────────────────────────────────────
-    // labelSz: small grey caps above the value
-    // valueSz: larger bold value below — default 9pt, shrinks to fit width
-    const drawRow = (label: string, value: string | null | undefined, valueSz = 9) => {
-      if (!value) return;
-      const labelTxt = label.toUpperCase();
-      const labelSz  = 6;
-
-      // Label line (grey, Latin-safe)
-      page.drawText(labelTxt, {
-        x: PAD, y: cursor,
-        font: fontReg, size: labelSz, color: gray,
-      });
-      cursor -= mmToPt(2); // gap between label and value
-
-      // Value line (Japanese-capable, navy)
-      let vSz = valueSz;
-      while (vSz > 6 && jpFont.widthOfTextAtSize(value, vSz) > innerW) vSz -= 0.5;
-      page.drawText(value, {
-        x: PAD, y: cursor,
-        font: jpFontBold, size: vSz, color: navy,
-      });
-      cursor -= vSz + mmToPt(3); // generous gap after each row
-    };
-
-    // Guest name
-    drawRow('Guest Name', ticket.guestName || '-', 10);
-
-    // Visitor type
-    const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
-      : ticket.visitorType === 'restaurant'
-        ? `Restaurant${ticket.visitorSubType ? ` - ${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
-        : ticket.visitorType === 'event' ? 'Event'
-        : ticket.visitorType === 'others' ? 'Others'
-        : ticket.visitorType || '-';
-    drawRow('Visitor Type', visitorLabel, 9);
-
-    // Room number (hotel guests only)
-    if (ticket.roomNumber) drawRow('Room No.', ticket.roomNumber, 9);
-
-    // Gold rule
-    page.drawRectangle({ x: PAD, y: cursor, width: innerW, height: 0.5, color: gold });
-    cursor -= mmToPt(2.5);
-
-    // Vehicle details
-    const carLine = [ticket.carMake, ticket.carModel, ticket.carColor].filter(Boolean).join('  ');
-    drawRow('Vehicle', carLine || '-', 9);
-    drawRow('License Plate', ticket.licensePlate || '-', 9);
-    drawRow('Parking Spot', ticket.parkingLocation || '-', 9);
-
-    // Gold rule
-    page.drawRectangle({ x: PAD, y: cursor, width: innerW, height: 0.5, color: gold });
-    cursor -= mmToPt(2.5);
-
-    // Check-in time
-    if (ticket.createdAt) {
-      const d    = new Date(ticket.createdAt);
-      const p2   = (n: number) => n.toString().padStart(2, '0');
-      drawRow('Check-in', `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}  ${p2(d.getHours())}:${p2(d.getMinutes())}`, 8);
-    }
-
-    // PIN
-    if (ticket.guestPin) drawRow('PIN', ticket.guestPin, 11);
-
-    // ── Footer ─────────────────────────────────────────────────────────────
-    const footerSz  = 5;
-    const footerTxt = 'Valet-s.com';
-    page.drawText(footerTxt, {
-      x: (W - fontReg.widthOfTextAtSize(footerTxt, footerSz)) / 2,
-      y: PAD,
-      font: fontReg, size: footerSz, color: gray,
-    });
-
-    const pdfBytes = await doc.save();
-    const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
-    const url      = URL.createObjectURL(blob);
-    // Navigate the already-open window to the PDF (bypasses popup blocker)
-    printWindow.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (err) {
-    console.error('Print ticket error:', err);
-    printWindow.close();
-    alert('Could not generate PDF. Check the browser console for details.');
-  }
+  printWindow.document.write(html);
+  printWindow.document.close();
 }
 
 function TripLogSection({
