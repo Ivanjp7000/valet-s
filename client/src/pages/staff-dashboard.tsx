@@ -314,6 +314,39 @@ function useParkedTimers(createdAt: Date | string | undefined | null) {
   return { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay };
 }
 
+function useScheduleCountdown(scheduledAt: Date | string | undefined | null) {
+  const [remaining, setRemaining] = useState(0);
+  useEffect(() => {
+    if (!scheduledAt) return;
+    const target = new Date(scheduledAt as string).getTime();
+    const update = () => setRemaining(target - Date.now());
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [scheduledAt]);
+
+  if (!scheduledAt) return { display: '', isOverdue: false, isUrgent: false };
+  const isOverdue = remaining <= 0;
+  const abs = Math.abs(remaining);
+  const h = Math.floor(abs / 3600000);
+  const m = Math.floor((abs % 3600000) / 60000);
+  const s = Math.floor((abs % 60000) / 1000);
+  const display = h > 0
+    ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    : `${m}:${s.toString().padStart(2, '0')}`;
+  const isUrgent = !isOverdue && remaining < 15 * 60 * 1000;
+  return { display, isOverdue, isUrgent };
+}
+
+function ScheduleCountdownBadge({ scheduledAt }: { scheduledAt: string }) {
+  const { display, isOverdue, isUrgent } = useScheduleCountdown(scheduledAt);
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded ${isOverdue ? 'bg-red-100 text-red-600 border border-red-200' : isUrgent ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}>
+      ⏱ {isOverdue ? `+${display} overdue` : display}
+    </span>
+  );
+}
+
 function carColorStyle(name: string): { bg: string; text: string } {
   const n = name.toLowerCase().trim();
   const map: Record<string, { bg: string; text: string }> = {
@@ -476,10 +509,11 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                 </div>
               )}
               {ticket.scheduledRetrievalAt && (
-                <div className="flex items-center gap-1 mt-0.5">
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                   <p className="text-[10px] text-amber-600 font-semibold">
                     🚗 Pickup: {fmtScheduled(ticket.scheduledRetrievalAt as unknown as string)}
                   </p>
+                  <ScheduleCountdownBadge scheduledAt={ticket.scheduledRetrievalAt as unknown as string} />
                 </div>
               )}
             </>
@@ -2942,6 +2976,14 @@ export default function StaffDashboard() {
                                           className="text-[10px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1.5 py-0.5 leading-tight"
                                           onClick={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
                                         >✕ Cancel</button>
+                                      </div>
+                                    )}
+                                    {!inHouseCollapsed && ticket.scheduledRetrievalAt && (
+                                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                        <p className="text-xs text-amber-600 font-semibold">
+                                          🚗 Pickup: {(() => { const d = new Date(ticket.scheduledRetrievalAt as unknown as string); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
+                                        </p>
+                                        <ScheduleCountdownBadge scheduledAt={ticket.scheduledRetrievalAt as unknown as string} />
                                       </div>
                                     )}
                                     {!inHouseCollapsed && canEdit && (
