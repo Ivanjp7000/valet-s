@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CameraScanner } from "@/components/camera-scanner";
 import { StatusTracker } from "@/components/status-tracker";
 import { SystemLoginModal } from "@/components/system-login-modal";
 import { FAQModal } from "@/components/faq-modal";
-import { Camera, HelpCircle, Settings, Ticket, Car, Calendar, User, Building2, X, Clock, CheckCircle, ChevronLeft } from "lucide-react";
+import { HelpCircle, Settings, Ticket, Car, Calendar, User, Building2, X, Clock, CheckCircle, ChevronLeft } from "lucide-react";
+import luxuryCarImg from "@assets/generated_images/ultra_luxury_black_sedan_51d2.png";
 import { useToast } from "@/hooks/use-toast";
 import type { Faq } from "@shared/schema";
 import { VISITOR_TYPES } from "@shared/schema";
@@ -23,7 +23,6 @@ interface TicketPreview {
 
 export default function Landing() {
   const [ticketNumber, setTicketNumber] = useState("");
-  const [showCamera, setShowCamera] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showSystemLogin, setShowSystemLogin] = useState(() => new URLSearchParams(window.location.search).get("login") === "1");
@@ -96,11 +95,6 @@ export default function Landing() {
     }
   };
 
-  const handleScanComplete = (scannedNumber: string) => {
-    setTicketNumber(scannedNumber);
-    setShowCamera(false);
-  };
-
   const handleCancelConfirmation = () => {
     setShowConfirmation(false);
     setTicketPreview(null);
@@ -170,10 +164,6 @@ export default function Landing() {
 
   if (showStatus) {
     return <StatusTracker ticketNumber={submittedTicket} guestName={guestNameInput.trim()} guestPin={guestPinInput.trim().toUpperCase() || undefined} onBack={() => setShowStatus(false)} />;
-  }
-
-  if (showCamera) {
-    return <CameraScanner onScanComplete={handleScanComplete} onClose={() => setShowCamera(false)} />;
   }
 
   // Schedule Screen
@@ -464,27 +454,18 @@ export default function Landing() {
         {/* Ticket Input Card */}
         <Card className="mb-6 shadow-lg">
           <CardContent className="p-8">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-light-gold rounded-full flex items-center justify-center mx-auto mb-4">
-                <Ticket className="text-regis-gold" size={24} />
-              </div>
-              <h2 className="text-xl font-semibold text-regis-navy mb-2">Enter Your Ticket</h2>
+            {/* Luxury car hero image */}
+            <div className="relative -mx-8 -mt-8 mb-6 overflow-hidden rounded-t-xl">
+              <img
+                src={luxuryCarImg}
+                alt="Luxury valet car"
+                className="w-full object-cover"
+                style={{ height: '180px', objectPosition: 'center 60%' }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-white/60" />
             </div>
 
-            {/* Camera Scan Button */}
-            <Button 
-              onClick={() => setShowCamera(true)}
-              className="w-full bg-regis-gold hover:bg-yellow-600 text-white font-medium py-4 mb-4 h-auto"
-              data-testid="button-scan-ticket"
-            >
-              <Camera className="mr-3" size={18} />
-              Scan Ticket Number
-            </Button>
-
-            {/* Manual Input Option */}
-            <div className="text-center mb-6">
-              <span className="text-regis-navy text-xl font-semibold">Or Enter Manually</span>
-            </div>
+            <h2 className="text-xl font-semibold text-regis-navy mb-5 text-center">Enter Your Ticket Number</h2>
 
             {/* 5 Digit Boxes */}
             <div className="flex flex-col items-center mb-6">

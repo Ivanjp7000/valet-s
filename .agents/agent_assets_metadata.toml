@@ -1,0 +1,13 @@
+uploads = []
+
+[[generated]]
+id = "ktwaQ6G-8iTVmsR7-qjWd"
+uri = "file://attached_assets/generated_images/ultra_luxury_black_sedan_51d2.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "ojKbNnBRMc7YjWie-HaQV"
+uri = "file://attached_assets/generated_images/ultra_luxury_black_sedan_51d2.png"
+type = "image"
+title = "Luxury car image"
