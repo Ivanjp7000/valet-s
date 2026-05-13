@@ -51,6 +51,122 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
+async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
+  const mmToPt = (mm: number) => mm * 2.8346;
+  const W = mmToPt(50);
+  const H = mmToPt(80);
+  const pad = mmToPt(3);
+  const innerW = W - pad * 2;
+
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([W, H]);
+  page.setMediaBox(0, 0, W, H);
+
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const font     = await doc.embedFont(StandardFonts.Helvetica);
+
+  const gold  = rgb(0.79, 0.66, 0.3);
+  const navy  = rgb(0.1,  0.12, 0.27);
+  const gray  = rgb(0.45, 0.45, 0.45);
+  const white = rgb(1, 1, 1);
+
+  let cursor = H - pad;
+
+  // ── Header bar ──────────────────────────────────────────────────────────
+  const headerH = mmToPt(9);
+  page.drawRectangle({ x: 0, y: H - headerH, width: W, height: headerH, color: navy });
+  const headerLabel = 'VALET TICKET';
+  const headerSize  = 9;
+  page.drawText(headerLabel, {
+    x: (W - fontBold.widthOfTextAtSize(headerLabel, headerSize)) / 2,
+    y: H - headerH + (headerH - headerSize) / 2,
+    font: fontBold, size: headerSize, color: white,
+  });
+  cursor = H - headerH - mmToPt(3);
+
+  // ── Ticket number ────────────────────────────────────────────────────────
+  const numStr  = `#${ticket.ticketNumber}`;
+  const numSize = 22;
+  page.drawText(numStr, {
+    x: (W - fontBold.widthOfTextAtSize(numStr, numSize)) / 2,
+    y: cursor - numSize,
+    font: fontBold, size: numSize, color: navy,
+  });
+  cursor -= numSize + mmToPt(1);
+
+  // Gold rule
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.8, color: gold });
+  cursor -= mmToPt(2.5);
+
+  // ── Helper to draw a label/value row ────────────────────────────────────
+  const drawRow = (label: string, value: string | null | undefined, sz = 6.5) => {
+    if (!value) return;
+    const labelTxt = label.toUpperCase();
+    const labelSz  = 5;
+    page.drawText(labelTxt, { x: pad, y: cursor, font, size: labelSz, color: gray });
+    cursor -= labelSz + 1;
+    let vSz = sz;
+    while (vSz > 5 && fontBold.widthOfTextAtSize(value, vSz) > innerW) vSz -= 0.5;
+    page.drawText(value, { x: pad, y: cursor, font: fontBold, size: vSz, color: navy });
+    cursor -= vSz + mmToPt(1.8);
+  };
+
+  // Guest name
+  drawRow('Guest Name', ticket.guestName || '—', 8);
+
+  // Visitor type
+  const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
+    : ticket.visitorType === 'restaurant'
+      ? `Restaurant${ticket.visitorSubType ? ` — ${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
+      : ticket.visitorType === 'event' ? 'Event'
+      : ticket.visitorType === 'others' ? 'Others'
+      : ticket.visitorType || '—';
+  drawRow('Visitor Type', visitorLabel);
+
+  // Room number (hotel only)
+  if (ticket.roomNumber) drawRow('Room No.', ticket.roomNumber);
+
+  // Gold rule
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
+  cursor -= mmToPt(2);
+
+  // Vehicle
+  const carLine = [ticket.carMake, ticket.carModel, ticket.carColor].filter(Boolean).join('  ');
+  drawRow('Vehicle', carLine || '—');
+  drawRow('License Plate', ticket.licensePlate || '—');
+  drawRow('Parking Spot', ticket.parkingLocation || '—');
+
+  // Gold rule
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.5, color: gold });
+  cursor -= mmToPt(2);
+
+  // Check-in time
+  if (ticket.createdAt) {
+    const d   = new Date(ticket.createdAt);
+    const pad2 = (n: number) => n.toString().padStart(2, '0');
+    const timeStr = `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()}  ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    drawRow('Check-in', timeStr);
+  }
+
+  // PIN (if exists)
+  if (ticket.guestPin) drawRow('PIN', ticket.guestPin, 9);
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+  const footerSz = 5;
+  const footerTxt = 'Valet-s.com';
+  page.drawText(footerTxt, {
+    x: (W - font.widthOfTextAtSize(footerTxt, footerSz)) / 2,
+    y: pad,
+    font, size: footerSz, color: gray,
+  });
+
+  const pdfBytes = await doc.save();
+  const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url      = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function TripLogSection({
   trips,
   ticketNumber,
@@ -5929,42 +6045,53 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
-                {/* Row: Visitor Type (+ sub-type if restaurant) */}
-                <div className={`grid gap-2 ${editTicketData.visitorType === 'restaurant' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <div>
-                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Visitor Type</label>
-                    <Select
-                      value={editTicketData.visitorType}
-                      onValueChange={(value) => setEditTicketData({ ...editTicketData, visitorType: value, visitorSubType: value !== 'restaurant' ? null : editTicketData.visitorSubType })}
-                    >
-                      <SelectTrigger className="h-8 text-xs mt-0.5">
-                        <SelectValue placeholder="Visitor Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(VISITOR_TYPES).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {editTicketData.visitorType === 'restaurant' && (
+                {/* Row: Visitor Type (+ sub-type if restaurant) + Print button */}
+                <div className="flex gap-2 items-end">
+                  <div className={`grid gap-2 flex-1 ${editTicketData.visitorType === 'restaurant' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     <div>
-                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Restaurant</label>
+                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Visitor Type</label>
                       <Select
-                        value={editTicketData.visitorSubType || ''}
-                        onValueChange={(value) => setEditTicketData({ ...editTicketData, visitorSubType: value })}
+                        value={editTicketData.visitorType}
+                        onValueChange={(value) => setEditTicketData({ ...editTicketData, visitorType: value, visitorSubType: value !== 'restaurant' ? null : editTicketData.visitorSubType })}
                       >
                         <SelectTrigger className="h-8 text-xs mt-0.5">
-                          <SelectValue placeholder="Select restaurant" />
+                          <SelectValue placeholder="Visitor Type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(RESTAURANT_SUB_TYPES).map(([key, label]) => (
+                          {Object.entries(VISITOR_TYPES).map(([key, label]) => (
                             <SelectItem key={key} value={key}>{label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
+                    {editTicketData.visitorType === 'restaurant' && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Restaurant</label>
+                        <Select
+                          value={editTicketData.visitorSubType || ''}
+                          onValueChange={(value) => setEditTicketData({ ...editTicketData, visitorSubType: value })}
+                        >
+                          <SelectTrigger className="h-8 text-xs mt-0.5">
+                            <SelectValue placeholder="Select restaurant" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(RESTAURANT_SUB_TYPES).map(([key, label]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="h-8 text-xs px-2.5 flex-shrink-0 border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
+                    onClick={() => printFullTicket(editTicketData)}
+                    title="Print ticket label (50×80mm)"
+                  >
+                    <Printer size={13} className="mr-1" />
+                    Print
+                  </Button>
                 </div>
 
                 {/* Row: Guest Name + Room */}
