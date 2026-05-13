@@ -413,9 +413,9 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="font-bold text-regis-navy truncate" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
-            {(ticket as any).guestPin && (
+            {ticket.guestPin && (
               <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0">
-                PIN&nbsp;{(ticket as any).guestPin}
+                PIN&nbsp;{ticket.guestPin}
               </span>
             )}
           </div>
@@ -2664,7 +2664,14 @@ export default function StaffDashboard() {
                                             {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
-                                        <p className="mt-0.5 font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
+                                        <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                          <p className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>{fmtGuest(ticket.guestName)}</p>
+                                          {ticket.guestPin && (
+                                            <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-bold text-regis-navy bg-regis-gold/20 border border-regis-gold/50 rounded px-1.5 py-0.5 shrink-0">
+                                              PIN&nbsp;{ticket.guestPin}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                       <div className="flex items-start gap-2">
                                         <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setViewTicket(ticket)}>

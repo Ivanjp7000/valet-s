@@ -611,13 +611,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      // Verify identity: PIN match (if provided and ticket has a PIN) OR name match
-      const pinMatch = pinParam && ticket?.guestPin && pinParam === ticket.guestPin.toUpperCase();
-      const nameMatch = nameParam && ticket && namesMatch(nameParam, ticket.guestName);
+      // Verify identity:
+      // - If PIN supplied AND ticket has a stored PIN → PIN must match (name is irrelevant)
+      // - If PIN supplied but ticket has no stored PIN → fall back to name match
+      // - If no PIN supplied → require name match
+      let verified = false;
+      if (!ticket) {
+        verified = false;
+      } else if (pinParam && ticket.guestPin) {
+        verified = pinParam === ticket.guestPin.toUpperCase();
+      } else {
+        verified = !!nameParam && namesMatch(nameParam, ticket.guestName);
+      }
 
       // Return the same 404 whether the ticket doesn't exist or verification fails
       // — prevents enumeration oracle
-      if (!ticket || (!pinMatch && !nameMatch)) {
+      if (!ticket || !verified) {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
@@ -657,10 +666,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      // Verify identity: PIN match OR name match — return same 404 for both failures
-      const pinMatch = pinParam && ticket?.guestPin && pinParam === ticket.guestPin.toUpperCase();
-      const nameMatch = guestName?.trim() && ticket && namesMatch(guestName, ticket.guestName);
-      if (!ticket || (!pinMatch && !nameMatch)) {
+      // Verify identity (same authoritative-PIN logic as the GET lookup):
+      // - PIN supplied AND ticket has stored PIN → PIN must match (name is irrelevant)
+      // - PIN supplied but ticket has no stored PIN → fall back to name match
+      // - No PIN supplied → require name match
+      let retrievalVerified = false;
+      if (!ticket) {
+        retrievalVerified = false;
+      } else if (pinParam && ticket.guestPin) {
+        retrievalVerified = pinParam === ticket.guestPin.toUpperCase();
+      } else {
+        retrievalVerified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+      }
+      if (!ticket || !retrievalVerified) {
         return res.status(404).json({ message: "Ticket not found" });
       }
       if (ticket.status !== 'active') {
