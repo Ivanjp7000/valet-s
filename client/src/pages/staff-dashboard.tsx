@@ -80,9 +80,7 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     ? `<div class="line${cls ? ' ' + cls : ''}">${value}</div>`
     : '';
 
-  const plateParts = (ticket.licensePlate || '').match(/^(・[^・]+)(・.+)$/);
-  const plateLine1 = plateParts ? plateParts[1] : (ticket.licensePlate || '–');
-  const plateLine2 = plateParts ? plateParts[2] : null;
+  const plateLine1 = ticket.licensePlate || '–';
 
   const html = `<!DOCTYPE html>
 <html>
@@ -126,7 +124,6 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     ${restaurantLine ? line(restaurantLine) : ''}
     ${ticket.roomNumber ? line(`Room ${ticket.roomNumber}`) : ''}
     ${line(plateLine1)}
-    ${plateLine2 ? line(plateLine2) : ''}
     ${ticket.parkingLocation ? line(ticket.parkingLocation) : ''}
     ${carLine ? line(carLine) : ''}
     ${checkinStr ? line(checkinStr) : ''}
