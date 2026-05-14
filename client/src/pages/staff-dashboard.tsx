@@ -1604,6 +1604,18 @@ export default function StaffDashboard() {
             } catch {}
           }
         }
+        if (data.type === 'new_stregis_account') {
+          const acc = data.data;
+          const name = [acc?.firstName, acc?.lastName].filter(Boolean).join(' ') || acc?.email || 'New user';
+          toast({
+            title: 'New Staff Account Request',
+            description: `${name} (${acc?.email}) has registered and is awaiting Super Admin approval.`,
+            duration: 8000,
+          });
+          // Refresh admin panel lists for Super Admins
+          queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/admin/new-stregis-accounts'] });
+        }
         if (['gs_message', 'gs_reply', 'gs_event_created', 'gs_event_updated', 'gs_event_deleted', 'gs_acknowledged', 'gs_member_added', 'gs_member_removed'].includes(data.type)) {
           queryClient.invalidateQueries({ queryKey: ["/api/gs/messages"] });
           queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });

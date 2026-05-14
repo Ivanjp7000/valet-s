@@ -1497,7 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ackedIds: string[] = ackedSetting ? JSON.parse(ackedSetting.value) : [];
       const newAccounts = allUsers.filter((u: any) =>
         u.email?.toLowerCase().endsWith('@stregis.com') &&
-        u.accountStatus === 'active' &&
+        u.accountStatus === 'pending_approval' &&
         u.createdAt && new Date(u.createdAt) >= since &&
         !u.password &&
         !ackedIds.includes(u.id)
@@ -1548,7 +1548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(id);
       const status = (user as any).accountStatus;
       if (!user || (status !== 'pending_approval' && status !== 'pending_email_verification')) return res.status(404).json({ message: "Not found" });
-      await storage.updateUser(id, { accountStatus: 'active', ouId, role } as any);
+      await storage.updateUser(id, { accountStatus: 'active', isActive: true, ouId, role } as any);
       if (user.email) {
         const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
         try {
