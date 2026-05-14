@@ -11,7 +11,7 @@ import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 
 // In-memory OTP store: userId → { code, expiresAt }
-const otpStore = new Map<string, { code: string; expiresAt: number }>();
+const otpStore = new Map<string, { code: string; expiresAt: number; attempts: number }>();
 
 // ── Email: car-ready reminder ─────────────────────────────────────────────────
 async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
@@ -314,8 +314,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: lastName || '',
           role: 'standard_user',
           twoFactorEnabled: true,
-          isActive: true,
-          accountStatus: 'active',
+          isActive: false,
+          accountStatus: 'pending_approval',
           ouId: ST_REGIS_OSAKA_OU_ID,
         } as any);
         // Notify all superadmins via WebSocket
@@ -353,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2FA: required for self-registered accounts and any account with 2FA enabled
       if ((user.twoFactorEnabled || isPasswordlessAccount) && user.email) {
         const code = generateOtp();
-        otpStore.set(user.id, { code, expiresAt: Date.now() + 30 * 60 * 1000 }); // 30 minutes
+        otpStore.set(user.id, { code, expiresAt: Date.now() + 30 * 60 * 1000, attempts: 0 }); // 30 minutes
         try {
           await sendOtpEmail(user.email, code);
         } catch (emailErr) {
@@ -403,7 +403,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         otpStore.delete(userId);
         return res.status(401).json({ message: "Code expired. Please log in again." });
       }
+
+      const MAX_OTP_ATTEMPTS = 5;
       if (stored.code !== code) {
+        stored.attempts += 1;
+        if (stored.attempts >= MAX_OTP_ATTEMPTS) {
+          otpStore.delete(userId);
+          return res.status(429).json({ message: "Too many failed attempts. Please log in again to receive a new code." });
+        }
         return res.status(401).json({ message: "Invalid code. Please try again." });
       }
 
