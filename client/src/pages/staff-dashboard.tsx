@@ -111,7 +111,9 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     margin-bottom: 1.2mm; line-height: 1.2;
   }
   .line.pin { font-size: 12pt; margin-top: 0.5mm; }
-  .line.footer-line { font-size: 5pt; font-weight: normal; color: #aaa; text-align: center; margin-top: 1.5mm; }
+  .footer-block { text-align: center; margin-top: 2mm; }
+  .footer-block .site { font-size: 9pt; font-weight: bold; color: #1a1f45; margin-bottom: 1.5mm; }
+  .footer-block img { width: 18mm; height: 18mm; display: block; margin: 0 auto; }
 </style>
 </head>
 <body>
@@ -127,7 +129,10 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     ${carLine ? line(carLine) : ''}
     ${checkinStr ? line(checkinStr) : ''}
     ${ticket.guestPin ? line(ticket.guestPin, 'pin') : ''}
-    ${line('Valet-s.com', 'footer-line')}
+  </div>
+  <div class="footer-block">
+    <div class="site">Valet-s.com</div>
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://valet-s.com" alt="QR"/>
   </div>
   <script>window.onload = function(){ window.print(); }<\/script>
 </body>
