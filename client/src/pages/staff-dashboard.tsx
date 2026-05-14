@@ -55,7 +55,7 @@ function formatDuration(seconds: number): string {
 async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
   const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
     : ticket.visitorType === 'restaurant'
-      ? `Restaurant${ticket.visitorSubType ? ` – ${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
+      ? `Restaurant${ticket.visitorSubType ? `<br>${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
       : ticket.visitorType === 'event' ? 'Event'
       : ticket.visitorType === 'others' ? 'Others'
       : ticket.visitorType || '–';
@@ -111,7 +111,7 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     ${row('Guest', ticket.guestName || '–')}
     ${row('Type', visitorLabel)}
     ${ticket.roomNumber ? row('Room', ticket.roomNumber) : ''}
-    ${row('Plate', ticket.licensePlate || '–')}
+    ${row('Plate', (ticket.licensePlate || '–').replace(/^(・[^・]+)・/, '$1<br>・'))}
     ${ticket.parkingLocation ? row('Parking', ticket.parkingLocation) : ''}
     ${carLine ? row('Car', carLine) : ''}
     ${checkinStr ? row('Check-in', checkinStr) : ''}
