@@ -22,7 +22,7 @@ import type { User as UserType } from "@shared/schema";
 const stripHonorifics = (name: string) =>
   name.replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
 const fmtGuest = (name: string | null | undefined) =>
-  name ? stripHonorifics(name) + ' 様' : '';
+  name ? stripHonorifics(name) : '';
 
 /**
  * Generate a 30×38mm name label PDF and trigger a local file download.

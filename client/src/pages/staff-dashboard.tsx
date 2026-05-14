@@ -2338,7 +2338,7 @@ export default function StaffDashboard() {
                               </td>
                               <td className="border border-black text-center px-1 py-1 font-mono font-bold align-middle text-sm">#{ticket.ticketNumber}</td>
                               <td className="border border-black px-2 py-1 align-middle">
-                                <span className="font-semibold">{stripHonorifics(ticket.guestName || '')}</span><span className="text-xs ml-0.5">様</span>
+                                <span className="font-semibold">{stripHonorifics(ticket.guestName || '')}</span>
                                 {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
                                   <span className="ml-1 text-[8px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
                                 )}
@@ -2376,7 +2376,7 @@ export default function StaffDashboard() {
                             </td>
                             <td className="border border-black px-1 py-1 align-top"><div className="text-xs text-gray-300">#</div></td>
                             <td className="border border-black px-2 align-bottom pb-1">
-                              <div className="text-xs text-gray-300">様</div>
+                              <div className="text-xs text-gray-300"></div>
                             </td>
                             <td className="border border-black"></td>
                             <td className="border border-black text-center align-middle"><span className="text-xs text-gray-300 whitespace-nowrap">黒白銀（　）</span></td>
@@ -2510,7 +2510,6 @@ export default function StaffDashboard() {
                         </div>
                         <div className="flex items-baseline gap-1 mb-0.5 flex-wrap">
                           <span className="text-sm font-medium text-gray-800">{stripHonorifics(ticket.guestName || '')}</span>
-                          <span className="text-[10px] text-gray-500">様</span>
                           {ticket.roomNumber && <span className="text-[10px] text-gray-400 ml-1">Rm {ticket.roomNumber}</span>}
                           {ticket.visitorType === 'hotel_guest' && !ticket.roomNumber && (
                             <span className="text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">Room Pending</span>
