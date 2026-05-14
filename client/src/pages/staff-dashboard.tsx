@@ -86,21 +86,21 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
   }
   .header {
     background: #1a1f45; color: #fff;
-    text-align: center; padding: 1.2mm 0;
-    font-size: 6.5pt; letter-spacing: 2px; font-weight: bold;
+    text-align: center; padding: 1.8mm 0;
+    font-size: 8pt; letter-spacing: 2px; font-weight: bold;
   }
   .ticket-num {
-    text-align: center; font-size: 18pt; font-weight: bold;
-    color: #1a1f45; line-height: 1; padding: 0.8mm 0 0.5mm;
+    text-align: center; font-size: 23pt; font-weight: bold;
+    color: #1a1f45; line-height: 1; padding: 1.2mm 0 0.8mm;
   }
-  .gold-line { height: 0.4mm; background: #c9a84c; margin: 0 2.5mm 1.5mm; }
+  .gold-line { height: 0.4mm; background: #c9a84c; margin: 0 2.5mm 2mm; }
   .body { padding: 0 2.5mm; }
-  .row { display: flex; align-items: baseline; margin-bottom: 1mm; gap: 1.5mm; }
-  .label { font-size: 5.5pt; color: #888; white-space: nowrap; flex-shrink: 0; min-width: 14mm; }
-  .value { font-size: 7.5pt; font-weight: bold; word-break: break-all; }
-  .pin-row { margin-top: 1mm; }
-  .pin-val { font-size: 10pt; font-weight: bold; }
-  .footer { text-align: center; font-size: 5pt; color: #aaa; margin-top: 1mm; }
+  .row { display: flex; align-items: baseline; margin-bottom: 1.4mm; gap: 2mm; }
+  .label { font-size: 7pt; color: #888; white-space: nowrap; flex-shrink: 0; min-width: 17mm; }
+  .value { font-size: 9.5pt; font-weight: bold; word-break: break-all; }
+  .pin-row { margin-top: 1.5mm; }
+  .pin-val { font-size: 13pt; font-weight: bold; }
+  .footer { text-align: center; font-size: 6pt; color: #aaa; margin-top: 1.5mm; }
 </style>
 </head>
 <body>
