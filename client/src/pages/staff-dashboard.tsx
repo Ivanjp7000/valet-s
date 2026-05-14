@@ -72,6 +72,18 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     ? `<div class="row"><span class="label">${label}</span><span class="value">${value}</span></div>`
     : '';
 
+  const restaurantLine = ticket.visitorType === 'restaurant' && ticket.visitorSubType
+    ? (RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType
+    : null;
+
+  const line = (value: string | null | undefined, cls = '') => value
+    ? `<div class="line${cls ? ' ' + cls : ''}">${value}</div>`
+    : '';
+
+  const plateParts = (ticket.licensePlate || '').match(/^(・[^・]+)(・.+)$/);
+  const plateLine1 = plateParts ? plateParts[1] : (ticket.licensePlate || '–');
+  const plateLine2 = plateParts ? plateParts[2] : null;
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -86,21 +98,22 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
   }
   .header {
     background: #1a1f45; color: #fff;
-    text-align: center; padding: 1.2mm 0;
-    font-size: 6.5pt; letter-spacing: 2px; font-weight: bold;
+    text-align: center; padding: 1.5mm 0;
+    font-size: 7pt; letter-spacing: 2px; font-weight: bold;
   }
   .ticket-num {
-    text-align: center; font-size: 18pt; font-weight: bold;
-    color: #1a1f45; line-height: 1; padding: 0.8mm 0 0.5mm;
+    text-align: center; font-size: 20pt; font-weight: bold;
+    color: #1a1f45; line-height: 1; padding: 1mm 0;
   }
   .gold-line { height: 0.4mm; background: #c9a84c; margin: 0 2.5mm 1.5mm; }
-  .body { padding: 0 2.5mm; }
-  .row { display: flex; align-items: baseline; margin-bottom: 1mm; gap: 1.5mm; }
-  .label { font-size: 5.5pt; color: #888; white-space: nowrap; flex-shrink: 0; min-width: 14mm; }
-  .value { font-size: 7.5pt; font-weight: bold; overflow-wrap: break-word; word-break: break-word; min-width: 0; flex: 1; }
-  .pin-row { margin-top: 1mm; }
-  .pin-val { font-size: 10pt; font-weight: bold; }
-  .footer { text-align: center; font-size: 5pt; color: #aaa; margin-top: 1mm; }
+  .body { padding: 0 3mm; }
+  .line {
+    font-size: 9pt; font-weight: bold;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 1.2mm; line-height: 1.2;
+  }
+  .line.pin { font-size: 12pt; margin-top: 0.5mm; }
+  .line.footer-line { font-size: 5pt; font-weight: normal; color: #aaa; text-align: center; margin-top: 1.5mm; }
 </style>
 </head>
 <body>
@@ -108,16 +121,18 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
   <div class="ticket-num">#${ticket.ticketNumber}</div>
   <div class="gold-line"></div>
   <div class="body">
-    ${row('Guest', ticket.guestName || '–')}
-    ${row('Type', visitorLabel)}
-    ${ticket.roomNumber ? row('Room', ticket.roomNumber) : ''}
-    ${row('Plate', (ticket.licensePlate || '–').replace(/^(・[^・]+)・/, '$1<br>・'))}
-    ${ticket.parkingLocation ? row('Parking', ticket.parkingLocation) : ''}
-    ${carLine ? row('Car', carLine) : ''}
-    ${checkinStr ? row('Check-in', checkinStr) : ''}
-    ${ticket.guestPin ? `<div class="row pin-row"><span class="label">PIN</span><span class="value pin-val">${ticket.guestPin}</span></div>` : ''}
+    ${line(ticket.guestName || '–')}
+    ${line(visitorLabel.replace(/<br>/g, ' '))}
+    ${restaurantLine ? line(restaurantLine) : ''}
+    ${ticket.roomNumber ? line(`Room ${ticket.roomNumber}`) : ''}
+    ${line(plateLine1)}
+    ${plateLine2 ? line(plateLine2) : ''}
+    ${ticket.parkingLocation ? line(ticket.parkingLocation) : ''}
+    ${carLine ? line(carLine) : ''}
+    ${checkinStr ? line(checkinStr) : ''}
+    ${ticket.guestPin ? line(ticket.guestPin, 'pin') : ''}
+    ${line('Valet-s.com', 'footer-line')}
   </div>
-  <div class="footer">Valet-s.com</div>
   <script>window.onload = function(){ window.print(); }<\/script>
 </body>
 </html>`;
