@@ -1488,49 +1488,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== PENDING REGISTRATIONS (Super Admin Only) =====
-  // New auto-approved @stregis.com accounts (last 30 days), excluding acknowledged ones
+  // @stregis.com accounts pending activation (auto-provisioned, awaiting Super Admin approval)
   app.get('/api/admin/new-stregis-accounts', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const allUsers = await storage.getAllUsers();
-      const ackedSetting = await storage.getSystemSetting('acknowledged_stregis_ids');
-      const ackedIds: string[] = ackedSetting ? JSON.parse(ackedSetting.value) : [];
-      const newAccounts = allUsers.filter((u: any) =>
-        u.email?.toLowerCase().endsWith('@stregis.com') &&
-        u.accountStatus === 'pending_approval' &&
-        u.createdAt && new Date(u.createdAt) >= since &&
-        !u.password &&
-        !ackedIds.includes(u.id)
-      ).sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      res.json(newAccounts.map((u: any) => ({
+      const pending = await storage.getPendingRegistrations();
+      const stregisAccounts = pending
+        .filter((u: any) =>
+          u.email?.toLowerCase().endsWith('@stregis.com') &&
+          !u.password
+        )
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      res.json(stregisAccounts.map((u: any) => ({
         id: u.id, firstName: u.firstName, lastName: u.lastName,
-        email: u.email, createdAt: u.createdAt, role: u.role,
+        email: u.email, createdAt: u.createdAt, role: u.role, ouId: u.ouId,
       })));
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch new accounts" });
     }
   });
 
-  // Acknowledge a new @stregis.com account (removes it from the notification list)
-  app.post('/api/admin/new-stregis-accounts/:id/acknowledge', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+  // Activate a pending @stregis.com account (OU and role already pre-set at registration)
+  app.post('/api/admin/new-stregis-accounts/:id/activate', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const ackedSetting = await storage.getSystemSetting('acknowledged_stregis_ids');
-      const ackedIds: string[] = ackedSetting ? JSON.parse(ackedSetting.value) : [];
-      if (!ackedIds.includes(id)) ackedIds.push(id);
-      await storage.upsertSystemSetting({ key: 'acknowledged_stregis_ids', value: JSON.stringify(ackedIds) });
+      const user = await storage.getUser(id);
+      if (!user || (user as any).accountStatus !== 'pending_approval') {
+        return res.status(404).json({ message: "Account not found or not pending approval" });
+      }
+      await storage.updateUser(id, { accountStatus: 'active', isActive: true } as any);
+      if (user.email) {
+        const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+        try {
+          await sendApprovalEmail(user.email, fullName || 'there');
+          console.log(`[activate-stregis] Approval email sent to ${user.email}`);
+        } catch (e: any) {
+          console.error("[activate-stregis] Email failed:", e?.message || e);
+        }
+      }
       res.json({ success: true });
     } catch (err) {
-      res.status(500).json({ message: "Failed to acknowledge account" });
+      res.status(500).json({ message: "Failed to activate account" });
+    }
+  });
+
+  // Reject a pending @stregis.com account
+  app.post('/api/admin/new-stregis-accounts/:id/reject', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUser(id);
+      if (!user) return res.status(404).json({ message: "Not found" });
+      await storage.updateUser(id, { isActive: false, accountStatus: 'rejected' } as any);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to reject account" });
     }
   });
 
   app.get('/api/admin/pending-registrations', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const pending = await storage.getPendingRegistrations();
-      res.json(pending.map((u: any) => ({
+      // Exclude @stregis.com auto-provisioned accounts (they appear in new-stregis-accounts instead)
+      const nonStregis = pending.filter((u: any) =>
+        !u.email?.toLowerCase().endsWith('@stregis.com') || u.password
+      );
+      res.json(nonStregis.map((u: any) => ({
         id: u.id, firstName: u.firstName, lastName: u.lastName,
-        email: u.email, createdAt: u.createdAt,
+        email: u.email, createdAt: u.createdAt, accountStatus: u.accountStatus,
       })));
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch pending registrations" });

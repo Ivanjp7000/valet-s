@@ -45,18 +45,28 @@ function PendingRegistrationsTab() {
     refetchInterval: 15000,
   });
 
-  const { data: newStregisAccounts } = useQuery<any[]>({
+  const { data: newStregisAccounts, isLoading: isLoadingStregis } = useQuery<any[]>({
     queryKey: ['/api/admin/new-stregis-accounts'],
     refetchInterval: 15000,
   });
 
-  const acknowledgeMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/admin/new-stregis-accounts/${id}/acknowledge`),
+  const activateStregisMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/new-stregis-accounts/${id}/activate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/new-stregis-accounts'] });
-      toast({ title: "Acknowledged", description: "Account removed from notifications." });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: "Account Activated", description: "The staff account is now active. A confirmation email has been sent." });
     },
-    onError: () => toast({ title: "Error", description: "Failed to acknowledge.", variant: "destructive" }),
+    onError: () => toast({ title: "Error", description: "Failed to activate account.", variant: "destructive" }),
+  });
+
+  const rejectStregisMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/new-stregis-accounts/${id}/reject`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/new-stregis-accounts'] });
+      toast({ title: "Account Rejected", description: "The registration has been rejected." });
+    },
+    onError: () => toast({ title: "Error", description: "Failed to reject account.", variant: "destructive" }),
   });
 
   const { data: ous } = useQuery<any[]>({ queryKey: ['/api/ous'] });
@@ -90,33 +100,42 @@ function PendingRegistrationsTab() {
     approveMutation.mutate({ id: approveTarget.id, ouId: approveOU, role: approveRole });
   };
 
-  const newCount = (newStregisAccounts?.length ?? 0) + (pending?.length ?? 0);
+  const totalCount = (newStregisAccounts?.length ?? 0) + (pending?.length ?? 0);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Registrations</h2>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Self-registered accounts awaiting review, plus new @stregis.com accounts auto-approved via the SRO portal.
+          Staff accounts awaiting your approval before they can access the system.
         </p>
       </div>
 
-      {/* Auto-approved @stregis.com accounts */}
-      {Array.isArray(newStregisAccounts) && newStregisAccounts.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-700">New @stregis.com Accounts</h3>
-            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-              Auto-Approved · {newStregisAccounts.length}
+      {/* @stregis.com accounts pending activation */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-gray-700">@stregis.com Staff Registrations</h3>
+          {Array.isArray(newStregisAccounts) && newStregisAccounts.length > 0 && (
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+              {newStregisAccounts.length} awaiting activation
             </span>
-          </div>
-          <Card className="border-emerald-200">
-            <CardContent className="p-0">
+          )}
+        </div>
+        <Card className="border-amber-200">
+          <CardContent className="p-0">
+            {isLoadingStregis ? (
+              <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin text-gray-400" size={20} /></div>
+            ) : !Array.isArray(newStregisAccounts) || newStregisAccounts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <UserCheck size={32} className="text-gray-200 mb-2" />
+                <p className="text-gray-400 text-sm">No pending @stregis.com registrations</p>
+              </div>
+            ) : (
               <div className="divide-y divide-gray-100">
                 {newStregisAccounts.map((acc) => (
-                  <div key={acc.id} className="flex items-center gap-3 px-4 py-3">
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-emerald-700">
+                  <div key={acc.id} className="flex items-start gap-3 px-4 py-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-xs font-bold text-amber-700">
                         {(acc.firstName?.[0] || '?').toUpperCase()}
                       </span>
                     </div>
@@ -125,35 +144,40 @@ function PendingRegistrationsTab() {
                         {[acc.firstName, acc.lastName].filter(Boolean).join(' ') || 'Unknown'}
                       </p>
                       <p className="text-xs text-gray-500 truncate">{acc.email}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {acc.createdAt ? format(new Date(acc.createdAt), 'MMM d, yyyy HH:mm') : '—'}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] text-gray-400">
-                        {acc.createdAt ? format(new Date(acc.createdAt), 'MMM d, HH:mm') : '—'}
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        ✓ Active
-                      </span>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white text-xs h-7 px-3 gap-1"
+                        disabled={activateStregisMutation.isPending || rejectStregisMutation.isPending}
+                        onClick={() => activateStregisMutation.mutate(acc.id)}
+                      >
+                        <UserCheck size={12} /> Activate
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-6 px-2 text-[10px] border-gray-300 text-gray-500 hover:border-regis-navy hover:text-regis-navy"
-                        disabled={acknowledgeMutation.isPending}
-                        onClick={() => acknowledgeMutation.mutate(acc.id)}
+                        className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-7 px-3 gap-1"
+                        disabled={activateStregisMutation.isPending || rejectStregisMutation.isPending}
+                        onClick={() => rejectStregisMutation.mutate(acc.id)}
                       >
-                        Acknowledge
+                        <UserX size={12} /> Reject
                       </Button>
                     </div>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">Pending Approval</h3>
+          <h3 className="text-sm font-semibold text-gray-700">Other Pending Registrations</h3>
           {Array.isArray(pending) && pending.length > 0 && (
             <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
               {pending.length} waiting
