@@ -10,8 +10,48 @@ import { z } from "zod";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 
-// In-memory OTP store: userId → { code, expiresAt }
+// In-memory OTP store: userId → { code, expiresAt, attempts }
 const otpStore = new Map<string, { code: string; expiresAt: number; attempts: number }>();
+
+// Per-user issuance throttle: userId → timestamps of recent OTP sends
+const otpIssuanceLog = new Map<string, number[]>();
+// Per-user cross-OTP failure lockout (survives OTP regeneration)
+const otpFailureLockout = new Map<string, { failures: number; lockedUntil: number }>();
+
+const OTP_MAX_ISSUANCES       = 3;                    // OTPs per user per window
+const OTP_ISSUANCE_WINDOW_MS  = 10 * 60 * 1000;      // 10-minute window
+const OTP_MAX_TOTAL_FAILURES  = 10;                   // wrong guesses across all OTPs before lockout
+const OTP_LOCKOUT_DURATION_MS = 15 * 60 * 1000;      // 15-minute lockout
+
+function checkOtpLockout(userId: string): boolean {
+  const entry = otpFailureLockout.get(userId);
+  if (!entry) return false;
+  if (entry.lockedUntil > Date.now()) return true;
+  // Lockout expired — clear it
+  otpFailureLockout.delete(userId);
+  return false;
+}
+
+function recordOtpFailure(userId: string): boolean {
+  const entry = otpFailureLockout.get(userId) ?? { failures: 0, lockedUntil: 0 };
+  entry.failures += 1;
+  if (entry.failures >= OTP_MAX_TOTAL_FAILURES) {
+    entry.lockedUntil = Date.now() + OTP_LOCKOUT_DURATION_MS;
+    otpFailureLockout.set(userId, entry);
+    return true; // now locked
+  }
+  otpFailureLockout.set(userId, entry);
+  return false;
+}
+
+function checkOtpIssuanceRate(userId: string): boolean {
+  const now = Date.now();
+  const log = (otpIssuanceLog.get(userId) ?? []).filter(t => now - t < OTP_ISSUANCE_WINDOW_MS);
+  if (log.length >= OTP_MAX_ISSUANCES) return false; // rate exceeded
+  log.push(now);
+  otpIssuanceLog.set(userId, log);
+  return true;
+}
 
 // ── Email: car-ready reminder ─────────────────────────────────────────────────
 async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
@@ -352,8 +392,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2FA: required for self-registered accounts and any account with 2FA enabled
       if ((user.twoFactorEnabled || isPasswordlessAccount) && user.email) {
+        // Reject if user is locked out due to too many failed guesses
+        if (checkOtpLockout(user.id)) {
+          return res.status(429).json({ message: "Account temporarily locked due to too many failed attempts. Please try again later." });
+        }
+        // Rate-limit OTP re-issuance to prevent re-issuance loops
+        if (!checkOtpIssuanceRate(user.id)) {
+          return res.status(429).json({ message: "Too many code requests. Please wait before requesting another code." });
+        }
         const code = generateOtp();
         otpStore.set(user.id, { code, expiresAt: Date.now() + 30 * 60 * 1000, attempts: 0 }); // 30 minutes
+        // Bind this OTP flow to the current session so only this browser can verify
+        (req.session as any).pendingOtpUserId = user.id;
         try {
           await sendOtpEmail(user.email, code);
         } catch (emailErr) {
@@ -398,6 +448,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, code } = req.body;
       if (!userId || !code) return res.status(400).json({ message: "userId and code required" });
 
+      // Session binding: only the browser that started the login flow may verify
+      const sessionPending = (req.session as any).pendingOtpUserId;
+      if (!sessionPending || sessionPending !== userId) {
+        return res.status(403).json({ message: "No active login session for this user. Please log in again." });
+      }
+
+      // Cross-OTP lockout: reject if user has too many failures across all OTP attempts
+      if (checkOtpLockout(userId)) {
+        return res.status(429).json({ message: "Account temporarily locked due to too many failed attempts. Please try again later." });
+      }
+
       const stored = otpStore.get(userId);
       if (!stored || Date.now() > stored.expiresAt) {
         otpStore.delete(userId);
@@ -407,14 +468,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const MAX_OTP_ATTEMPTS = 5;
       if (stored.code !== code) {
         stored.attempts += 1;
-        if (stored.attempts >= MAX_OTP_ATTEMPTS) {
+        // Record in cross-OTP lockout store — survives OTP regeneration
+        const nowLocked = recordOtpFailure(userId);
+        if (nowLocked || stored.attempts >= MAX_OTP_ATTEMPTS) {
           otpStore.delete(userId);
           return res.status(429).json({ message: "Too many failed attempts. Please log in again to receive a new code." });
         }
         return res.status(401).json({ message: "Invalid code. Please try again." });
       }
 
+      // Success — clean up all OTP state
       otpStore.delete(userId);
+      otpFailureLockout.delete(userId);
+      delete (req.session as any).pendingOtpUserId;
+
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
