@@ -121,7 +121,6 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
   <div class="body">
     ${line(ticket.guestName || '–')}
     ${line(visitorLabel.replace(/<br>/g, ' '))}
-    ${restaurantLine ? line(restaurantLine) : ''}
     ${ticket.roomNumber ? line(`Room ${ticket.roomNumber}`) : ''}
     ${line(plateLine1)}
     ${ticket.parkingLocation ? line(ticket.parkingLocation) : ''}
