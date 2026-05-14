@@ -358,8 +358,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           accountStatus: 'pending_approval',
           ouId: ST_REGIS_OSAKA_OU_ID,
         } as any);
-        // Notify all superadmins via WebSocket
-        broadcastToOU(ST_REGIS_OSAKA_OU_ID, {
+        // Notify only privilege_admin and superadmin via WebSocket
+        broadcastToRoles(ST_REGIS_OSAKA_OU_ID, ['privilege_admin', 'superadmin'], {
           type: 'new_stregis_account',
           data: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, createdAt: (user as any).createdAt },
         });
@@ -1846,7 +1846,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const { password, role, ouId, locationId, ...safeUpdateData } = req.body;
+      const { password, role, ouId, locationId, accountStatus, isActive, ...safeUpdateData } = req.body;
+
+      // Only Super Admin may activate/deactivate accounts
+      if (currentUser.role === 'superadmin') {
+        if (accountStatus !== undefined) safeUpdateData.accountStatus = accountStatus;
+        if (isActive !== undefined) safeUpdateData.isActive = isActive;
+      }
       
       // Privilege Admin cannot change role to higher levels or change OU assignment
       if (currentUser.role === 'privilege_admin') {
@@ -2945,6 +2951,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (info.role === 'superadmin') {
         client.send(messageStr);
       } else if (ouId && info.ouId === ouId) {
+        client.send(messageStr);
+      }
+    });
+  }
+
+  // Like broadcastToOU but only sends to clients whose role is in the allowedRoles list
+  function broadcastToRoles(ouId: string | null | undefined, allowedRoles: string[], message: any) {
+    const messageStr = JSON.stringify(message);
+    clients.forEach((info, client) => {
+      if (client.readyState !== WebSocket.OPEN) return;
+      if (!allowedRoles.includes(info.role)) return;
+      if (info.role === 'superadmin' || (ouId && info.ouId === ouId)) {
         client.send(messageStr);
       }
     });
