@@ -26,10 +26,13 @@ export function useWebSocket() {
       setLastMessage(event.data);
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (unmounted.current) return;
       setIsConnected(false);
-      // Auto-reconnect after 3 seconds
+      // Code 1008 (Policy Violation) means the server rejected us as unauthenticated.
+      // Stop reconnecting — the caller relies on HTTP polling for updates instead.
+      if (event.code === 1008) return;
+      // Auto-reconnect after 3 seconds for other close reasons
       reconnectTimeout.current = setTimeout(() => {
         if (!unmounted.current) connect();
       }, 3000);

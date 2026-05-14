@@ -2531,18 +2531,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = localUserId || passportUserId;
 
       if (!userId) {
-        // Unauthenticated connection — allow as public (customer status-tracking)
-        clients.set(ws, { ouId: null, role: 'public' });
-        ws.on('close', () => clients.delete(ws));
-        ws.on('error', () => clients.delete(ws));
+        // Reject unauthenticated connections — customers use HTTP polling instead
+        ws.close(1008, 'Authentication required');
         return;
       }
 
       const user = await storage.getUser(userId);
       if (!user) {
-        clients.set(ws, { ouId: null, role: 'public' });
-        ws.on('close', () => clients.delete(ws));
-        ws.on('error', () => clients.delete(ws));
+        ws.close(1008, 'Authentication required');
         return;
       }
 
@@ -2939,16 +2935,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 30 * 1000);
 
-  // Broadcast to clients in the same OU (super admins receive all broadcasts)
-  // Public (unauthenticated / customer) connections receive ticket_status_updated
-  // so the customer status-tracking page updates in real time.
+  // Broadcast to authenticated clients in the same OU (super admins receive all broadcasts).
+  // Unauthenticated (customer) connections are rejected at handshake time; they rely on
+  // HTTP polling for status updates instead.
   function broadcastToOU(ouId: string | null | undefined, message: any) {
     const messageStr = JSON.stringify(message);
     clients.forEach((info, client) => {
       if (client.readyState !== WebSocket.OPEN) return;
       if (info.role === 'superadmin') {
-        client.send(messageStr);
-      } else if (info.role === 'public' && message.type === 'ticket_status_updated') {
         client.send(messageStr);
       } else if (ouId && info.ouId === ouId) {
         client.send(messageStr);
