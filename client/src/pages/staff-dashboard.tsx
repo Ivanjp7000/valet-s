@@ -631,15 +631,6 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
       </div>
       {!collapsed && canEdit && (
         <div className="space-y-1">
-          {/* Print Ticket */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white font-semibold"
-            onClick={() => printFullTicket(ticket)}
-          >
-            <Printer size={12} className="mr-1" />Print Ticket
-          </Button>
           {/* Row 1: Retrieve | Schedule */}
           <div className="flex gap-1">
             <Button
@@ -681,6 +672,15 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               <Timer size={12} className="mr-1" />Auto Close
             </Button>
           </div>
+          {/* Print Ticket */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white font-semibold"
+            onClick={() => printFullTicket(ticket)}
+          >
+            <Printer size={12} className="mr-1" />Print Ticket
+          </Button>
           {/* Inline schedule picker — shown when Schedule button is toggled */}
           {showSchedulePicker && (
             <div className="bg-blue-50 border border-blue-200 rounded p-1.5 space-y-1">
@@ -3114,13 +3114,6 @@ export default function StaffDashboard() {
                                     )}
                                     {!inHouseCollapsed && canEdit && (
                                       <div className="space-y-1.5">
-                                        {/* Print Ticket */}
-                                        <Button size="sm" variant="outline"
-                                          className="w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white font-semibold"
-                                          onClick={() => printFullTicket(ticket)}
-                                        >
-                                          <Printer size={13} className="mr-1" /> Print Ticket
-                                        </Button>
                                         {/* Row 1: Retrieve | Schedule */}
                                         <div className="flex gap-1.5">
                                           <Button size="sm" className="flex-1 bg-regis-gold hover:bg-yellow-600 text-regis-navy font-semibold text-xs sm:text-sm"
@@ -3172,6 +3165,13 @@ export default function StaffDashboard() {
                                             <Timer size={13} className="mr-1" /> Auto Close
                                           </Button>
                                         </div>
+                                        {/* Print Ticket */}
+                                        <Button size="sm" variant="outline"
+                                          className="w-full text-xs border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white font-semibold"
+                                          onClick={() => printFullTicket(ticket)}
+                                        >
+                                          <Printer size={13} className="mr-1" /> Print Ticket
+                                        </Button>
                                         {/* Inline schedule picker */}
                                         {desktopSchedulingId === ticket.id && (
                                           <div className="bg-blue-50 border border-blue-200 rounded p-2 space-y-1.5">
