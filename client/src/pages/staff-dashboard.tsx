@@ -1298,7 +1298,20 @@ export default function StaffDashboard() {
     mutationFn: async ({ ticketNumber, status }: { ticketNumber: string; status: string }) => {
       await apiRequest("PATCH", `/api/staff/tickets/${ticketNumber}/status`, { status });
     },
-    onSuccess: () => {
+    onMutate: async ({ ticketNumber, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/staff/tickets"] });
+      const previousTickets = queryClient.getQueryData<ValetTicket[]>(["/api/staff/tickets"]);
+      queryClient.setQueryData<ValetTicket[]>(["/api/staff/tickets"], (old) =>
+        old ? old.map(t => t.ticketNumber === ticketNumber ? { ...t, status } : t) : old
+      );
+      return { previousTickets };
+    },
+    onError: (_err, _vars, context: any) => {
+      if (context?.previousTickets) {
+        queryClient.setQueryData(["/api/staff/tickets"], context.previousTickets);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
     },
