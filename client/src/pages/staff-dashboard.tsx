@@ -522,7 +522,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
   };
 
   return (
-    <div className={`rounded-lg p-2 space-y-1 ${isOvernight ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
+    <div className={`rounded-lg p-2 space-y-1 ${scheduled ? 'bg-blue-50 border border-blue-300' : isOvernight ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -594,14 +594,20 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                 </div>
               )}
               {scheduled && (
-                <div className="flex items-center gap-1 mt-0.5">
+                <div className="mt-0.5 space-y-0.5">
                   <p className="text-[10px] text-purple-600 font-semibold">
                     ⏰ Auto-close: {fmtScheduled(scheduled)}
                   </p>
-                  <button
-                    className="text-[9px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1 leading-tight"
-                    onClick={onCancelAutoClose}
-                  >✕ Cancel</button>
+                  <div className="flex gap-1">
+                    <button
+                      className="text-[9px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-1.5 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
+                      onClick={onCancelAutoClose}
+                    >✕ Cancel</button>
+                    <button
+                      className="text-[9px] text-blue-600 hover:text-blue-800 font-semibold border border-blue-300 hover:border-blue-500 rounded px-1.5 py-0.5 leading-tight bg-blue-100 hover:bg-blue-200"
+                      onClick={onAutoClose}
+                    >✎ Change</button>
+                  </div>
                 </div>
               )}
               {ticket.scheduledRetrievalAt && (
@@ -3043,7 +3049,7 @@ export default function StaffDashboard() {
                           const freshD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) < 24*60*60*1000), inHouseSortBy);
                           const overnightD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) >= 24*60*60*1000), inHouseSortBy);
                           const renderDesktopCard = (ticket: any) => (
-                                  <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
+                                  <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${(ticket as any).scheduledDepartureAt ? 'border-blue-400 bg-blue-50/60' : ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3">
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -3118,14 +3124,25 @@ export default function StaffDashboard() {
                                       )}
                                     </div>}
                                     {!inHouseCollapsed && (ticket as any).scheduledDepartureAt && (
-                                      <div className="flex items-center gap-2 mb-1.5">
+                                      <div className="mb-1.5 space-y-1">
                                         <p className="text-xs text-purple-600 font-semibold">
                                           ⏰ Auto-close: {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
                                         </p>
-                                        <button
-                                          className="text-[10px] text-red-400 hover:text-red-600 font-semibold border border-red-200 hover:border-red-400 rounded px-1.5 py-0.5 leading-tight"
-                                          onClick={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
-                                        >✕ Cancel</button>
+                                        <div className="flex gap-1.5">
+                                          <button
+                                            className="text-[10px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-2 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
+                                            onClick={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
+                                          >✕ Cancel Schedule</button>
+                                          <button
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold border border-blue-300 hover:border-blue-500 rounded px-2 py-0.5 leading-tight bg-blue-100 hover:bg-blue-200"
+                                            onClick={() => {
+                                              setAutoCloseTicket(ticket);
+                                              const d = new Date((ticket as any).scheduledDepartureAt);
+                                              setAutoCloseDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                                              setAutoCloseTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
+                                            }}
+                                          >✎ Change Schedule</button>
+                                        </div>
                                       </div>
                                     )}
                                     {!inHouseCollapsed && ticket.scheduledRetrievalAt && (
