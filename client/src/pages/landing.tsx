@@ -54,7 +54,7 @@ export default function Landing() {
     if (ticketNumber.length !== 5) {
       toast({
         title: "Invalid Ticket",
-        description: "Please enter 5 digits of your ticket number",
+        description: "Please enter your 5-character ticket number",
         variant: "destructive",
       });
       return;
@@ -454,13 +454,16 @@ export default function Landing() {
   }
 
   const handleDigitChange = (index: number, value: string) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
+    // Box 0 accepts a letter or digit; boxes 1-4 accept digits only
+    const char = index === 0
+      ? value.replace(/[^A-Za-z0-9]/g, '').slice(-1).toUpperCase()
+      : value.replace(/\D/g, '').slice(-1);
     const digits = ticketNumber.padEnd(5, ' ').split('');
-    digits[index] = digit;
+    digits[index] = char;
     setTicketNumber(digits.join('').trim());
-    
+
     // Auto-focus next input
-    if (digit && index < 4) {
+    if (char && index < 4) {
       const nextInput = document.getElementById(`digit-${index + 1}`);
       nextInput?.focus();
     }
@@ -522,7 +525,7 @@ export default function Landing() {
                     key={index}
                     id={`digit-${index}`}
                     type="text"
-                    inputMode="numeric"
+                    inputMode={index === 0 ? "text" : "numeric"}
                     maxLength={1}
                     value={ticketNumber[index] || ''}
                     onChange={(e) => handleDigitChange(index, e.target.value)}
