@@ -294,7 +294,7 @@ export default function Landing() {
                     onChange={e => setScheduleEmail(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
                   />
-                  <p className="text-xs text-gray-400 mt-1">We'll email you when your car is ready.</p>
+                  <p className="text-xs text-gray-400 mt-1">You'll receive a confirmation now, and another when your car is ready.</p>
                 </div>
 
               </div>

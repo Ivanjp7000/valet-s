@@ -958,9 +958,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send confirmation email immediately if the guest provided one
       const emailTo = updates.reminderEmail ?? ticket.reminderEmail;
       const isReschedule = !!ticket.scheduledRetrievalAt;
+      console.log(`[Email] Schedule request — emailTo=${emailTo ?? 'none'} isReschedule=${isReschedule} ticket=${ticketNumber}`);
       if (emailTo) {
         sendScheduleConfirmationEmail(emailTo, ticket.guestName ?? 'Guest', ticketNumber, scheduledDate, isReschedule)
+          .then(() => console.log(`[Email] Confirmation sent OK to ${emailTo}`))
           .catch((e: unknown) => console.error('[Email] Failed to send schedule confirmation:', e instanceof Error ? e.message : String(e)));
+      } else {
+        console.log('[Email] No email address on file — skipping confirmation email');
       }
 
       res.json({ success: true, scheduledRetrievalAt: scheduledDate.toISOString() });
