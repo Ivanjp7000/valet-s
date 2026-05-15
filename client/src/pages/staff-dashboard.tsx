@@ -2253,7 +2253,7 @@ export default function StaffDashboard() {
               const arrivingTickets = (() => {
                 const byId = new Map<string, ValetTicket>();
                 allTickets
-                  .filter(t => t.visitorType === 'hotel_guest' && new Date(t.createdAt!).toDateString() === selDateStr)
+                  .filter(t => t.visitorType === 'hotel_guest' && new Date(t.createdAt!).toDateString() === selDateStr && (!isToday || t.status !== 'completed'))
                   .forEach(t => byId.set(t.id, t));
                 if (isToday) {
                   allTickets
