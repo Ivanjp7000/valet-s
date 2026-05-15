@@ -16,6 +16,7 @@ import { UnifiedRetrievalBox, CompactRetrievalProgress } from "@/components/acti
 import { RetrievalNotificationPopup } from "@/components/retrieval-notification-popup";
 import type { RetrievalRequest } from "@/components/retrieval-notification-popup";
 import { CircularTimer } from "@/components/circular-timer";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Crown, Clock, Construction, Check, Timer, LogOut, Car, Camera, MapPin, User, Edit, Save, X, Plus, Users, TicketIcon, Settings, Home, Eye, EyeOff, Trash2, Archive, AlertTriangle, Play, ChevronDown, ChevronLeft, ChevronRight, Printer, GripVertical, BarChart2, Database, TrendingUp, TrendingDown, CalendarDays, Download, FileText, FileJson, CheckSquare, Square, Loader2, FileDown, List, ShieldCheck, Building2, Key, Copy, CheckCircle2, Ban, Monitor, Smartphone, Globe, Activity, MessageSquare, Mail } from "lucide-react";
 import { GSHub } from "@/components/gs-hub";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
@@ -483,6 +484,30 @@ function sortInHouseTickets(tickets: any[], sortBy: string) {
   }
 }
 
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!domain) return email;
+  const visible = local.charAt(0);
+  return `${visible}***@${domain}`;
+}
+
+function EmailBadge({ email }: { email: string }) {
+  return (
+    <TooltipProvider>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-700 cursor-default shrink-0">
+            <Mail size={10} />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <span className="font-medium">Email notifications:</span> {maskEmail(email)}
+        </TooltipContent>
+      </UITooltip>
+    </TooltipProvider>
+  );
+}
+
 function CarColorBadge({ color }: { color: string }) {
   if (!color) return null;
   const { bg, text } = carColorStyle(color);
@@ -552,6 +577,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                 PIN&nbsp;{ticket.guestPin}
               </span>
             )}
+            {ticket.reminderEmail && <EmailBadge email={ticket.reminderEmail} />}
           </div>
           {!collapsed && (
             <>
