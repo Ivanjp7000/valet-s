@@ -522,7 +522,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
   };
 
   return (
-    <div className={`rounded-lg p-2 space-y-1 ${scheduled ? 'bg-blue-50 border border-blue-300' : isOvernight ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
+    <div className="rounded-lg p-2 space-y-1" style={scheduled ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#3b82f6', background: 'rgba(219,234,254,0.55)' } : isOvernight ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#fcd34d', background: 'rgb(255,251,235)' } : { background: 'rgb(249,250,251)' }}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -3049,7 +3049,7 @@ export default function StaffDashboard() {
                           const freshD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) < 24*60*60*1000), inHouseSortBy);
                           const overnightD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) >= 24*60*60*1000), inHouseSortBy);
                           const renderDesktopCard = (ticket: any) => (
-                                  <div key={ticket.id} className={`rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2 ${(ticket as any).scheduledDepartureAt ? 'border-blue-400 bg-blue-50/60' : ticket.parkingLocation ? 'border-green-400 bg-green-50/40' : 'border-red-400 bg-red-50/40'}`}>
+                                  <div key={ticket.id} className="rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2" style={(ticket as any).scheduledDepartureAt ? { borderColor: '#3b82f6', background: 'rgba(219,234,254,0.55)' } : ticket.parkingLocation ? { borderColor: '#4ade80', background: 'rgba(240,253,244,0.4)' } : { borderColor: '#f87171', background: 'rgba(254,242,242,0.4)' }}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3">
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap">
