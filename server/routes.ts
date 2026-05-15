@@ -53,79 +53,49 @@ function checkOtpIssuanceRate(userId: string): boolean {
   return true;
 }
 
-// ── Email helpers ──────────────────────────────────────────────────────────────
+// ── Guest notification emails (Gmail SMTP) ────────────────────────────────────
+const GMAIL_FOOTER = `<div style="background:#f4f2ee;padding:16px 36px;text-align:center"><p style="color:#aaa;font-size:12px;margin:0">St. Regis Osaka &nbsp;·&nbsp; Valet Services</p></div>`;
+const GMAIL_HEADER = (title: string) => `<div style="background:#1a2744;padding:28px 36px;text-align:center"><p style="color:#c9a84c;letter-spacing:3px;font-size:11px;text-transform:uppercase;margin:0 0 6px">St. Regis Osaka</p><h1 style="color:#fff;font-size:20px;font-weight:400;margin:0">${title}</h1></div>`;
+
 async function sendScheduleConfirmationEmail(to: string, guestName: string, ticketNumber: string, scheduledAt: Date, isReschedule = false): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.warn('[Email] RESEND_API_KEY not set — skipping schedule confirmation email');
-    return;
-  }
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
   const dateStr = scheduledAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = scheduledAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const heading = isReschedule ? 'Pickup Rescheduled' : 'Pickup Scheduled';
-  const subject = isReschedule ? '📅 Pickup Rescheduled — Ticket #' + ticketNumber : '📅 Pickup Scheduled — Ticket #' + ticketNumber;
-  const rescheduleNote = isReschedule ? '<p style="color:#b45309;background:#fffbeb;padding:8px 12px;border-radius:6px;border-left:4px solid #f59e0b">Your pickup time has been updated to the new time shown above.</p>' : '';
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: 'Valet Service <no-reply@valet-s.com>',
-      to: [to],
-      subject,
-      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">${heading}</h2><p>Dear ${guestName},</p><p>Your valet pickup has been confirmed for:</p><p style="font-size:20px;font-weight:bold;color:#1a2744">${timeStr}</p><p style="color:#555">${dateStr}</p>${rescheduleNote}<p>Ticket number: <strong>#${ticketNumber}</strong></p><p>Our team will have your vehicle ready before your scheduled time. If you need to change or cancel, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
-    }),
+  const subject = isReschedule ? 'Your valet pickup has been rescheduled — Ticket #' + ticketNumber : 'Pickup confirmed — Ticket #' + ticketNumber;
+  const rescheduleNote = isReschedule ? `<p style="color:#b45309;background:#fffbeb;padding:10px 14px;border-radius:4px;border-left:3px solid #c9a84c;font-size:13px">Your pickup time has been updated to the new time shown above.</p>` : '';
+  await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
+    to,
+    subject,
+    html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">${GMAIL_HEADER(heading)}<div style="padding:36px"><p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${guestName},</p><p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 20px">Your valet pickup has been confirmed for:</p><div style="background:#f9f7f3;border-left:3px solid #c9a84c;border-radius:4px;padding:20px;text-align:center;margin-bottom:20px"><p style="font-size:28px;font-weight:700;color:#1a2744;margin:0">${timeStr}</p><p style="color:#555;font-size:15px;margin:6px 0 0">${dateStr}</p></div>${rescheduleNote}<p style="color:#555;font-size:14px;line-height:1.7;margin:16px 0">Ticket number: <strong>#${ticketNumber}</strong></p><p style="color:#555;font-size:14px;line-height:1.7;margin:0">Our team will have your vehicle ready before your scheduled time. To change or cancel, visit <a href="https://valet-s.com" style="color:#1a2744">valet-s.com</a> and enter your ticket number.</p></div>${GMAIL_FOOTER}</div>`,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Resend error: ${JSON.stringify(err)}`);
-  }
-  console.log(`[Email] Schedule ${isReschedule ? 'reschedule' : 'confirmation'} sent to ${to} for ticket ${ticketNumber} (${timeStr} ${dateStr})`);
+  console.log(`[Email] Schedule ${isReschedule ? 'reschedule' : 'confirmation'} sent to ${to} for ticket ${ticketNumber}`);
 }
 
 async function sendScheduleCancellationEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.warn('[Email] RESEND_API_KEY not set — skipping schedule cancellation email');
-    return;
-  }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: 'Valet Service <no-reply@valet-s.com>',
-      to: [to],
-      subject: '❌ Pickup Cancelled — Ticket #' + ticketNumber,
-      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Pickup Cancelled</h2><p>Dear ${guestName},</p><p>Your scheduled valet pickup for ticket <strong>#${ticketNumber}</strong> has been cancelled.</p><p>If you would like to schedule a new pickup time, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
-    }),
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
+  await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
+    to,
+    subject: 'Pickup cancelled — Ticket #' + ticketNumber,
+    html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">${GMAIL_HEADER('Pickup Cancelled')}<div style="padding:36px"><p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${guestName},</p><p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Your scheduled valet pickup for ticket <strong>#${ticketNumber}</strong> has been cancelled.</p><p style="color:#555;font-size:14px;line-height:1.7;margin:0">To schedule a new pickup time, visit <a href="https://valet-s.com" style="color:#1a2744">valet-s.com</a> and enter your ticket number.</p></div>${GMAIL_FOOTER}</div>`,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Resend error: ${JSON.stringify(err)}`);
-  }
   console.log(`[Email] Schedule cancellation sent to ${to} for ticket ${ticketNumber}`);
 }
 
 async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.warn('[Email] RESEND_API_KEY not set — skipping reminder email');
-    return;
-  }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from: 'Valet Service <no-reply@valet-s.com>',
-      to: [to],
-      subject: '🚗 Your Car is Ready for Pickup — Ticket #' + ticketNumber,
-      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Your Vehicle is Ready!</h2><p>Dear ${guestName},</p><p>Your vehicle <strong>(Ticket #${ticketNumber})</strong> is ready and waiting for you at the valet entrance.</p><p>Please proceed to the pickup area at your earliest convenience.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
-    }),
+  const transporter = getMailTransporter();
+  const fromEmail = process.env.GMAIL_USER!;
+  await transporter.sendMail({
+    from: `"St. Regis Osaka Valet" <${fromEmail}>`,
+    to,
+    subject: 'Your car is ready — Ticket #' + ticketNumber,
+    html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;border:1px solid #e5e0d5;border-radius:8px;overflow:hidden">${GMAIL_HEADER('Your Vehicle is Ready!')}<div style="padding:36px"><p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${guestName},</p><p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 28px">Your vehicle <strong>(Ticket #${ticketNumber})</strong> is ready and waiting for you at the valet entrance.</p><p style="color:#555;font-size:14px;line-height:1.7;margin:0">Please proceed to the pickup area at your earliest convenience.</p></div>${GMAIL_FOOTER}</div>`,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Resend error: ${JSON.stringify(err)}`);
-  }
-  console.log(`[Email] Car-ready reminder sent to ${to} for ticket ${ticketNumber}`);
+  console.log(`[Email] Car-ready notification sent to ${to} for ticket ${ticketNumber}`);
 }
 
 // ── Session Audit Helpers ─────────────────────────────────────────────────────
