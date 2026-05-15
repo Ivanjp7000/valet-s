@@ -2508,7 +2508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/staff/tickets/:ticketNumber/edit', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
-      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes, createdAt, visitorType, visitorSubType } = req.body;
+      const { status, guestName, roomNumber, licensePlate, carMake, carModel, carColor, parkingLocation, parkingSector, staffNotes, createdAt, visitorType, visitorSubType, reminderEmail } = req.body;
 
       const existing = await storage.getValetTicket(ticketNumber);
       if (!existing) return res.status(404).json({ message: "Ticket not found" });
@@ -2522,6 +2522,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const d = new Date(createdAt);
         if (isNaN(d.getTime())) return res.status(400).json({ message: "Invalid createdAt date" });
         parsedCreatedAt = d;
+      }
+
+      // Validate and normalize reminderEmail if provided
+      let normalizedReminderEmail: string | null | undefined;
+      if (reminderEmail === undefined) {
+        // Field not sent — leave as-is
+        normalizedReminderEmail = undefined;
+      } else if (reminderEmail === null || reminderEmail === '') {
+        normalizedReminderEmail = null;
+      } else if (typeof reminderEmail === 'string') {
+        const trimmed = reminderEmail.trim().toLowerCase();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmed)) {
+          return res.status(400).json({ message: "Invalid email address" });
+        }
+        normalizedReminderEmail = trimmed;
       }
 
       const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
@@ -2538,6 +2554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(visitorType ? { visitorType } : {}),
         ...(visitorType ? { visitorSubType: visitorType === 'restaurant' ? (visitorSubType ?? null) : null } : {}),
         ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
+        ...(normalizedReminderEmail !== undefined ? { reminderEmail: normalizedReminderEmail } : {}),
       } as any);
 
       // Broadcast update to WebSocket clients in the same OU

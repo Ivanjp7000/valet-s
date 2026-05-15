@@ -1532,13 +1532,23 @@ export default function StaffDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
       toast({ title: "Success", description: "Ticket updated successfully" });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
         setTimeout(() => { window.location.href = "/api/login"; }, 500);
         return;
       }
-      toast({ title: "Error", description: "Failed to update ticket", variant: "destructive" });
+      let msg = "Failed to update ticket";
+      if (error?.message) {
+        try {
+          const jsonStr = error.message.replace(/^\d+:\s*/, '');
+          const parsed = JSON.parse(jsonStr);
+          msg = parsed.message || msg;
+        } catch {
+          msg = error.message;
+        }
+      }
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
@@ -6172,6 +6182,20 @@ export default function StaffDashboard() {
                   </div>
                 </div>
 
+                {/* Notification Email */}
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide flex items-center gap-1">
+                    <Mail size={10} /> Notification Email
+                  </label>
+                  <Input
+                    type="email"
+                    value={editTicketData.reminderEmail || ''}
+                    onChange={(e) => setEditTicketData({ ...editTicketData, reminderEmail: e.target.value || null })}
+                    placeholder="guest@example.com (optional)"
+                    className="h-8 text-xs mt-0.5"
+                  />
+                </div>
+
                 {/* Staff Notes */}
                 <div>
                   <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Staff Notes</label>
@@ -6201,6 +6225,7 @@ export default function StaffDashboard() {
                       parkingLocation: editTicketData.parkingLocation,
                       staffNotes: editTicketData.staffNotes,
                       createdAt: editTicketData.createdAt,
+                      reminderEmail: editTicketData.reminderEmail,
                     })}
                     disabled={updateTicketMutation.isPending}
                     className="flex-1 h-8 text-xs bg-regis-navy hover:bg-blue-900"
