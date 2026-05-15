@@ -323,11 +323,12 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     );
   }
 
-  // Active ticket with a scheduled retrieval time — show scheduled state only while countdown is in the future
-  const _scheduledMs = ticket?.status === 'active' && ticket?.scheduledRetrievalAt
+  // Active/pending ticket with a scheduled retrieval time — show scheduled state only while countdown is in the future
+  const _ticketIsParked = ticket?.status === 'active' || ticket?.status === 'pending';
+  const _scheduledMs = _ticketIsParked && ticket?.scheduledRetrievalAt
     ? new Date(ticket.scheduledRetrievalAt as unknown as string).getTime() - Date.now()
     : -1;
-  if (ticket?.status === 'active' && ticket?.scheduledRetrievalAt && _scheduledMs > 0) {
+  if (_ticketIsParked && ticket?.scheduledRetrievalAt && _scheduledMs > 0) {
     const scheduledTime = new Date(ticket.scheduledRetrievalAt as unknown as string);
     const msLeft = _scheduledMs;
     const hoursLeft = Math.floor(msLeft / 3600000);
@@ -436,8 +437,8 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     );
   }
 
-  // Schedule expired — active ticket whose scheduled time has passed. Staff will start retrieval soon.
-  if (ticket?.status === 'active' && ticket?.scheduledRetrievalAt && _scheduledMs <= 0) {
+  // Schedule expired — parked ticket whose scheduled time has passed. Staff will start retrieval soon.
+  if (_ticketIsParked && ticket?.scheduledRetrievalAt && _scheduledMs <= 0) {
     return (
       <div className="min-h-screen bg-white flex flex-col">
         <div className="bg-regis-navy text-white px-6 py-8 text-center">
