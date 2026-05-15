@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
 import { useOCR } from "@/hooks/useOCR";
-import { CameraScanner } from "@/components/camera-scanner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, ScanLine, Printer, RefreshCw
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, Printer, RefreshCw
 } from "lucide-react";
 import qrCodeUrl from "@/assets/qr-valet-s.jpg";
 import { apiRequest } from "@/lib/queryClient";
@@ -174,6 +173,90 @@ async function printPinLabel(pin: string): Promise<void> {
   const a        = document.createElement('a');
   a.href         = url;
   a.download     = `PIN-${pin}.pdf`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * Generate a 30×38mm label showing ticket number + PIN together.
+ */
+async function printTicketPinLabel(ticketNumber: string, pin: string): Promise<void> {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+
+  const mmToPt = (mm: number) => mm * 2.8346;
+  const W = mmToPt(30);
+  const H = mmToPt(38);
+
+  const doc  = await PDFDocument.create();
+  const page = doc.addPage([W, H]);
+  page.setMediaBox(0, 0, W, H);
+
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const font     = await doc.embedFont(StandardFonts.Helvetica);
+
+  let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
+  try {
+    const { default: qrUrl } = await import('@/assets/qr-valet-s.jpg');
+    const resp  = await fetch(qrUrl);
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    try { qrImage = await doc.embedJpg(bytes); } catch { qrImage = await doc.embedPng(bytes); }
+  } catch { /* skip */ }
+
+  const pad    = mmToPt(2);
+  const innerW = W - pad * 2;
+  let cursor   = H - pad;
+
+  // QR code (slightly smaller to fit both values below)
+  const qrSize = mmToPt(14);
+  if (qrImage) page.drawImage(qrImage, { x: (W - qrSize) / 2, y: cursor - qrSize, width: qrSize, height: qrSize });
+  cursor -= qrSize + mmToPt(1.5);
+
+  // "Visit Valet-s.com"
+  const visitSize = 5.5;
+  const visitText = 'Visit  Valet-s.com';
+  page.drawText(visitText, {
+    x: pad + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
+    y: cursor - visitSize, font, size: visitSize, color: rgb(0.4, 0.4, 0.4),
+  });
+  cursor -= visitSize + mmToPt(1.5);
+
+  // Gold divider
+  page.drawRectangle({ x: pad, y: cursor, width: innerW, height: 0.6, color: rgb(0.79, 0.66, 0.3) });
+  cursor -= mmToPt(1.5);
+
+  // Ticket label
+  const lblSize = 5.5;
+  page.drawText('TICKET', { x: pad, y: cursor - lblSize, font, size: lblSize, color: rgb(0.5, 0.5, 0.5) });
+  cursor -= lblSize + mmToPt(0.8);
+
+  // Ticket number (large)
+  const tktSize = 12;
+  page.drawText(ticketNumber, {
+    x: pad + (innerW - fontBold.widthOfTextAtSize(ticketNumber, tktSize)) / 2,
+    y: cursor - tktSize, font: fontBold, size: tktSize, color: rgb(0.1, 0.12, 0.27),
+  });
+  cursor -= tktSize + mmToPt(1.5);
+
+  // PIN label
+  page.drawText('PIN', { x: pad, y: cursor - lblSize, font, size: lblSize, color: rgb(0.5, 0.5, 0.5) });
+  cursor -= lblSize + mmToPt(0.8);
+
+  // PIN value
+  const pinSize = 11;
+  page.drawText(pin, {
+    x: pad + (innerW - fontBold.widthOfTextAtSize(pin, pinSize)) / 2,
+    y: pad, font: fontBold, size: pinSize, color: rgb(0.1, 0.12, 0.27),
+  });
+
+  const pdfBytes = await doc.save();
+  const blob     = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href         = url;
+  a.download     = `Ticket-${ticketNumber}-PIN-${pin}.pdf`;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
@@ -469,8 +552,6 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const { recognizePlate } = useOCR();
   const [isOcrRunning, setIsOcrRunning] = useState(false);
-  const [isTicketOcrRunning, setIsTicketOcrRunning] = useState(false);
-  const [showTicketScanner, setShowTicketScanner] = useState(false);
   const [isCarPhotoProcessing, setIsCarPhotoProcessing] = useState(false);
 
   const [formData, setFormData] = useState<TicketFormData>({
@@ -723,18 +804,17 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 placeholder="12345"
                 className="text-center text-2xl font-bold tracking-widest"
                 maxLength={5}
-                disabled={isTicketOcrRunning}
                 data-testid="input-ticket-number"
               />
               <Button
                 type="button"
                 variant="outline"
-                className="shrink-0 border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
-                onClick={() => setShowTicketScanner(true)}
-                data-testid="button-scan-ticket-number"
+                className="shrink-0 border-amber-500 text-amber-600 hover:bg-amber-50"
+                title="Print ticket + PIN"
+                disabled={formData.ticketNumber.length !== 5}
+                onClick={() => printTicketPinLabel(formData.ticketNumber, formData.guestPin)}
               >
-                <ScanLine className="w-4 h-4 mr-1" />
-                Scan
+                <Printer className="w-4 h-4" />
               </Button>
             </div>
             <Button
@@ -747,11 +827,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             </Button>
             {formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
               <p className="text-sm text-orange-600 mt-1">
-                Enter {5 - formData.ticketNumber.length} more digit(s)
+                Enter {5 - formData.ticketNumber.length} more character(s)
               </p>
-            )}
-            {isTicketOcrRunning && (
-              <p className="text-sm text-regis-navy animate-pulse mt-1">Reading ticket number from image...</p>
             )}
           </div>
         </div>
@@ -1414,17 +1491,6 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         )}
       </DialogContent>
     </Dialog>
-
-    {/* Full-screen CameraScanner — rendered OUTSIDE Dialog to avoid focus trap */}
-    {showTicketScanner && (
-      <CameraScanner
-        onScanComplete={(number) => {
-          setFormData(prev => ({ ...prev, ticketNumber: number }));
-          setShowTicketScanner(false);
-        }}
-        onClose={() => setShowTicketScanner(false)}
-      />
-    )}
 
     </>
   );
