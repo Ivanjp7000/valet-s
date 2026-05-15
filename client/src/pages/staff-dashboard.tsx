@@ -510,10 +510,11 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
   onToggleCollapse?: () => void;
 }) {
   const { countdownDisplay, isUrgent, isOvernight, dayNumber, totalDisplay } = useParkedTimers(ticket.createdAt);
-  const scheduled = (ticket as any).scheduledDepartureAt;
+  const scheduled = ticket.scheduledRetrievalAt as unknown as string | null;
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduleInput, setScheduleInput] = useState('');
   const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleCancelling, setScheduleCancelling] = useState(false);
   const queryClient = useQueryClient();
 
   const fmtScheduled = (dt: string) => {
@@ -595,27 +596,36 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               )}
               {scheduled && (
                 <div className="mt-0.5 space-y-0.5">
-                  <p className="text-[10px] text-purple-600 font-semibold">
-                    ⏰ Auto-close: {fmtScheduled(scheduled)}
-                  </p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <p className="text-[10px] text-blue-700 font-semibold">
+                      📅 Pickup: {fmtScheduled(scheduled)}
+                    </p>
+                    <ScheduleCountdownBadge scheduledAt={scheduled} />
+                  </div>
                   <div className="flex gap-1">
                     <button
-                      className="text-[9px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-1.5 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
-                      onClick={onCancelAutoClose}
-                    >✕ Cancel</button>
+                      disabled={scheduleCancelling}
+                      className="text-[9px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-1.5 py-0.5 leading-tight bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                      onClick={async () => {
+                        setScheduleCancelling(true);
+                        try {
+                          await fetch(`/api/staff/tickets/${ticket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                          queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                          setShowSchedulePicker(false);
+                        } catch { alert('Failed to clear schedule'); }
+                        finally { setScheduleCancelling(false); }
+                      }}
+                    >{scheduleCancelling ? '…' : '✕ Cancel'}</button>
                     <button
                       className="text-[9px] text-blue-600 hover:text-blue-800 font-semibold border border-blue-300 hover:border-blue-500 rounded px-1.5 py-0.5 leading-tight bg-blue-100 hover:bg-blue-200"
-                      onClick={onAutoClose}
+                      onClick={() => {
+                        const d = new Date(scheduled);
+                        const pad = (n: number) => n.toString().padStart(2, '0');
+                        setScheduleInput(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                        setShowSchedulePicker(true);
+                      }}
                     >✎ Change</button>
                   </div>
-                </div>
-              )}
-              {ticket.scheduledRetrievalAt && (
-                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                  <p className="text-[10px] text-amber-600 font-semibold">
-                    🚗 Pickup: {fmtScheduled(ticket.scheduledRetrievalAt as unknown as string)}
-                  </p>
-                  <ScheduleCountdownBadge scheduledAt={ticket.scheduledRetrievalAt as unknown as string} />
                 </div>
               )}
             </>
@@ -3049,7 +3059,7 @@ export default function StaffDashboard() {
                           const freshD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) < 24*60*60*1000), inHouseSortBy);
                           const overnightD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) >= 24*60*60*1000), inHouseSortBy);
                           const renderDesktopCard = (ticket: any) => (
-                                  <div key={ticket.id} className="rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2" style={(ticket as any).scheduledDepartureAt ? { borderColor: '#3b82f6', background: 'rgba(219,234,254,0.55)' } : ticket.parkingLocation ? { borderColor: '#4ade80', background: 'rgba(240,253,244,0.4)' } : { borderColor: '#f87171', background: 'rgba(254,242,242,0.4)' }}>
+                                  <div key={ticket.id} className="rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2" style={ticket.scheduledRetrievalAt ? { borderColor: '#3b82f6', background: 'rgba(219,234,254,0.55)' } : ticket.parkingLocation ? { borderColor: '#4ade80', background: 'rgba(240,253,244,0.4)' } : { borderColor: '#f87171', background: 'rgba(254,242,242,0.4)' }}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3">
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -3146,11 +3156,31 @@ export default function StaffDashboard() {
                                       </div>
                                     )}
                                     {!inHouseCollapsed && ticket.scheduledRetrievalAt && (
-                                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                        <p className="text-xs text-amber-600 font-semibold">
-                                          🚗 Pickup: {(() => { const d = new Date(ticket.scheduledRetrievalAt as unknown as string); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
-                                        </p>
-                                        <ScheduleCountdownBadge scheduledAt={ticket.scheduledRetrievalAt as unknown as string} />
+                                      <div className="mb-1.5 space-y-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <p className="text-xs text-blue-700 font-semibold">
+                                            📅 Pickup: {(() => { const d = new Date(ticket.scheduledRetrievalAt as unknown as string); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
+                                          </p>
+                                          <ScheduleCountdownBadge scheduledAt={ticket.scheduledRetrievalAt as unknown as string} />
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                          <button
+                                            className="text-[10px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-2 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
+                                            onClick={async () => {
+                                              await fetch(`/api/staff/tickets/${ticket.ticketNumber}/schedule-retrieval`, { method: 'DELETE' });
+                                              queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+                                            }}
+                                          >✕ Cancel Schedule</button>
+                                          <button
+                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold border border-blue-300 hover:border-blue-500 rounded px-2 py-0.5 leading-tight bg-blue-100 hover:bg-blue-200"
+                                            onClick={() => {
+                                              const d = new Date(ticket.scheduledRetrievalAt as unknown as string);
+                                              const pad = (n: number) => n.toString().padStart(2, '0');
+                                              setDesktopScheduleInput(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                                              setDesktopSchedulingId(ticket.id);
+                                            }}
+                                          >✎ Change Schedule</button>
+                                        </div>
                                       </div>
                                     )}
                                     {!inHouseCollapsed && canEdit && (
