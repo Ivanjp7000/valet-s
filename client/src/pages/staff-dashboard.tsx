@@ -38,7 +38,7 @@ const stripHonorifics = (name: string) =>
   name.replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
 // Display-ready guest name: stripped prefix + 様
 const fmtGuest = (name: string | null | undefined) =>
-  name ? stripHonorifics(name) + '\u0020\u69D8' : '';
+  name ? stripHonorifics(name) : '';
 
 // Helper: format a Date to datetime-local input value (YYYY-MM-DDTHH:MM)
 function toDatetimeLocal(d: Date): string {
