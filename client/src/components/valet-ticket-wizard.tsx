@@ -576,13 +576,17 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     onClose();
   };
 
-  const PSEUDO_TICKET = 'X7777';
+  const generateTicketNumber = () => {
+    const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    const digits = String(Math.floor(1000 + Math.random() * 9000));
+    return letter + digits;
+  };
 
   const canProceedStep1 = formData.visitorType && 
     (formData.visitorType !== "restaurant" || formData.visitorSubType) &&
     formData.carMake && formData.carModel && formData.carColor &&
     formData.guestName.trim().length > 0 &&
-    (formData.ticketNumber === PSEUDO_TICKET || (formData.ticketNumber.length === 5 && /^[A-Za-z0-9]{5}$/.test(formData.ticketNumber)));
+    (formData.ticketNumber.length === 5 && /^[A-Za-z0-9]{5}$/.test(formData.ticketNumber));
 
   const canProceedStep2 = formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
 
@@ -713,12 +717,11 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
               <Input
                 value={formData.ticketNumber}
                 onChange={(e) => {
-                  if (formData.ticketNumber === PSEUDO_TICKET) return;
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                  const value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 5);
                   setFormData({ ...formData, ticketNumber: value });
                 }}
                 placeholder="12345"
-                className={`text-center text-2xl font-bold tracking-widest ${formData.ticketNumber === PSEUDO_TICKET ? 'text-purple-600 bg-purple-50 border-purple-300' : ''}`}
+                className="text-center text-2xl font-bold tracking-widest"
                 maxLength={5}
                 disabled={isTicketOcrRunning}
                 data-testid="input-ticket-number"
@@ -738,20 +741,11 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
               type="button"
               variant="outline"
               className="w-full border-dashed border-purple-400 text-purple-600 hover:bg-purple-50 hover:border-purple-500 text-sm font-medium mt-2"
-              onClick={() => setFormData({ ...formData, ticketNumber: PSEUDO_TICKET })}
+              onClick={() => setFormData({ ...formData, ticketNumber: generateTicketNumber() })}
             >
               + Generate Ticket
             </Button>
-            {formData.ticketNumber === PSEUDO_TICKET && (
-              <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
-                <p className="text-xs text-purple-700 font-medium">Pseudo ticket <strong>X7777</strong> — can be reused unlimited times</p>
-                <button
-                  className="text-xs text-gray-400 hover:text-gray-600 ml-2"
-                  onClick={() => setFormData({ ...formData, ticketNumber: '' })}
-                >✕</button>
-              </div>
-            )}
-            {formData.ticketNumber !== PSEUDO_TICKET && formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
+            {formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
               <p className="text-sm text-orange-600 mt-1">
                 Enter {5 - formData.ticketNumber.length} more digit(s)
               </p>
