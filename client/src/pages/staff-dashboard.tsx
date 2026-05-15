@@ -5675,6 +5675,15 @@ export default function StaffDashboard() {
                         <p className="font-medium capitalize">{viewTicket.visitorSubType.replace('_', ' ')}</p>
                       </div>
                     )}
+                    {viewTicket.reminderEmail && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Email Notifications</p>
+                        <div className="flex items-center gap-1.5">
+                          <EmailBadge email={viewTicket.reminderEmail} />
+                          <span className="text-sm font-medium text-emerald-700">{maskEmail(viewTicket.reminderEmail)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
