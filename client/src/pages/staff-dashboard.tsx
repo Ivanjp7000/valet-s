@@ -523,7 +523,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
   };
 
   return (
-    <div className="rounded-lg p-2 space-y-1" style={scheduled ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#2563eb', background: 'rgba(147,197,253,0.75)' } : isOvernight ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#fcd34d', background: 'rgb(255,251,235)' } : { background: 'rgb(249,250,251)' }}>
+    <div className="rounded-lg p-2 space-y-1" style={scheduled ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#2563eb', background: 'rgba(147,197,253,0.75)' } : (ticket as any).scheduledDepartureAt ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#7c3aed', background: 'rgba(196,181,253,0.75)' } : isOvernight ? { borderWidth: '1px', borderStyle: 'solid', borderColor: '#fcd34d', background: 'rgb(255,251,235)' } : { background: 'rgb(249,250,251)' }}>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -592,6 +592,23 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                   {ticket.roomNumber && (
                     <span className="text-[9px] font-semibold text-gray-600">Rm {ticket.roomNumber}</span>
                   )}
+                </div>
+              )}
+              {(ticket as any).scheduledDepartureAt && (
+                <div className="mt-0.5 space-y-0.5">
+                  <p className="text-[10px] text-purple-700 font-semibold">
+                    ⏰ Auto-close: {fmtScheduled((ticket as any).scheduledDepartureAt)}
+                  </p>
+                  <div className="flex gap-1">
+                    <button
+                      className="text-[9px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-1.5 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
+                      onClick={onCancelAutoClose}
+                    >✕ Cancel</button>
+                    <button
+                      className="text-[9px] text-purple-600 hover:text-purple-800 font-semibold border border-purple-300 hover:border-purple-500 rounded px-1.5 py-0.5 leading-tight bg-purple-100 hover:bg-purple-200"
+                      onClick={onAutoClose}
+                    >✎ Edit</button>
+                  </div>
                 </div>
               )}
               {scheduled && (
@@ -3059,7 +3076,7 @@ export default function StaffDashboard() {
                           const freshD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) < 24*60*60*1000), inHouseSortBy);
                           const overnightD = sortInHouseTickets(allActiveD.filter(t => (nowD - new Date(t.createdAt||0).getTime()) >= 24*60*60*1000), inHouseSortBy);
                           const renderDesktopCard = (ticket: any) => (
-                                  <div key={ticket.id} className="rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2" style={ticket.scheduledRetrievalAt ? { borderColor: '#2563eb', background: 'rgba(147,197,253,0.75)' } : ticket.parkingLocation ? { borderColor: '#4ade80', background: 'rgba(240,253,244,0.4)' } : { borderColor: '#f87171', background: 'rgba(254,242,242,0.4)' }}>
+                                  <div key={ticket.id} className="rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow border-2" style={ticket.scheduledRetrievalAt ? { borderColor: '#2563eb', background: 'rgba(147,197,253,0.75)' } : (ticket as any).scheduledDepartureAt ? { borderColor: '#7c3aed', background: 'rgba(196,181,253,0.75)' } : ticket.parkingLocation ? { borderColor: '#4ade80', background: 'rgba(240,253,244,0.4)' } : { borderColor: '#f87171', background: 'rgba(254,242,242,0.4)' }}>
                                     <div className="flex justify-between items-start mb-2 sm:mb-3">
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -3144,14 +3161,14 @@ export default function StaffDashboard() {
                                             onClick={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
                                           >✕ Cancel Schedule</button>
                                           <button
-                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold border border-blue-300 hover:border-blue-500 rounded px-2 py-0.5 leading-tight bg-blue-100 hover:bg-blue-200"
+                                            className="text-[10px] text-purple-600 hover:text-purple-800 font-semibold border border-purple-300 hover:border-purple-500 rounded px-2 py-0.5 leading-tight bg-purple-100 hover:bg-purple-200"
                                             onClick={() => {
                                               setAutoCloseTicket(ticket);
                                               const d = new Date((ticket as any).scheduledDepartureAt);
                                               setAutoCloseDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
                                               setAutoCloseTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
                                             }}
-                                          >✎ Change Schedule</button>
+                                          >✎ Edit Schedule</button>
                                         </div>
                                       </div>
                                     )}
