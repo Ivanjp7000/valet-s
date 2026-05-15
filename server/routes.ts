@@ -53,7 +53,32 @@ function checkOtpIssuanceRate(userId: string): boolean {
   return true;
 }
 
-// ── Email: car-ready reminder ─────────────────────────────────────────────────
+// ── Email helpers ──────────────────────────────────────────────────────────────
+async function sendScheduleConfirmationEmail(to: string, guestName: string, ticketNumber: string, scheduledAt: Date): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[Email] RESEND_API_KEY not set — skipping schedule confirmation email');
+    return;
+  }
+  const dateStr = scheduledAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = scheduledAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      from: 'Valet Service <noreply@valet-s.com>',
+      to: [to],
+      subject: '📅 Pickup Scheduled — Ticket #' + ticketNumber,
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Pickup Scheduled</h2><p>Dear ${guestName},</p><p>Your valet pickup has been confirmed for:</p><p style="font-size:20px;font-weight:bold;color:#1a2744">${timeStr}</p><p style="color:#555">${dateStr}</p><p>Ticket number: <strong>#${ticketNumber}</strong></p><p>Our team will have your vehicle ready before your scheduled time. If you need to change or cancel, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Resend error: ${JSON.stringify(err)}`);
+  }
+  console.log(`[Email] Schedule confirmation sent to ${to} for ticket ${ticketNumber} (${timeStr} ${dateStr})`);
+}
+
 async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -933,6 +958,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: 'ticket_status_updated',
         data: updated ?? ticket,
       });
+
+      // Send confirmation email immediately if the guest provided one
+      const emailTo = updates.reminderEmail ?? ticket.reminderEmail;
+      if (emailTo) {
+        sendScheduleConfirmationEmail(emailTo, ticket.guestName ?? 'Guest', ticketNumber, scheduledDate)
+          .catch((e: any) => console.error('[Email] Failed to send schedule confirmation:', e.message));
+      }
 
       res.json({ success: true, scheduledRetrievalAt: scheduledDate.toISOString() });
     } catch (error) {
