@@ -359,9 +359,8 @@ interface TicketFormData {
 }
 
 const STEPS = [
-  { id: 1, title: "Visitor & Vehicle", icon: Car },
-  { id: 2, title: "Registration & Guest", icon: Camera },
-  { id: 3, title: "Ticket & Confirm", icon: Ticket },
+  { id: 1, title: "Guest & Vehicle", icon: Car },
+  { id: 2, title: "Photos & Details", icon: Camera },
 ];
 
 const COLOR_STYLES: Record<string, { bg: string; text: string; border: string }> = {
@@ -577,18 +576,18 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     onClose();
   };
 
+  const PSEUDO_TICKET = 'X7777';
+
   const canProceedStep1 = formData.visitorType && 
     (formData.visitorType !== "restaurant" || formData.visitorSubType) &&
     formData.carMake && formData.carModel && formData.carColor &&
-    formData.guestName.trim().length > 0;
+    formData.guestName.trim().length > 0 &&
+    (formData.ticketNumber === PSEUDO_TICKET || (formData.ticketNumber.length === 5 && /^[A-Za-z0-9]{5}$/.test(formData.ticketNumber)));
 
   const canProceedStep2 = formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
 
-  const PSEUDO_TICKET = 'X7777';
-  const canProceedStep3 = formData.ticketNumber === PSEUDO_TICKET || (formData.ticketNumber.length === 5 && /^\d{5}$/.test(formData.ticketNumber));
-
   const handleNext = () => {
-    if (currentStep < 3) {
+    if (currentStep < 2) {
       setCurrentStep(currentStep + 1);
     } else {
       setShowPreview(true);
@@ -701,6 +700,65 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
             >
               <Printer size={11} />
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Valet Ticket Number</h3>
+        <div className="space-y-2">
+          <div>
+            <label className="text-sm font-medium text-gray-700">Ticket Number *</label>
+            <div className="flex gap-2 mt-1">
+              <Input
+                value={formData.ticketNumber}
+                onChange={(e) => {
+                  if (formData.ticketNumber === PSEUDO_TICKET) return;
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                  setFormData({ ...formData, ticketNumber: value });
+                }}
+                placeholder="12345"
+                className={`text-center text-2xl font-bold tracking-widest ${formData.ticketNumber === PSEUDO_TICKET ? 'text-purple-600 bg-purple-50 border-purple-300' : ''}`}
+                maxLength={5}
+                disabled={isTicketOcrRunning}
+                data-testid="input-ticket-number"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
+                onClick={() => setShowTicketScanner(true)}
+                data-testid="button-scan-ticket-number"
+              >
+                <ScanLine className="w-4 h-4 mr-1" />
+                Scan
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed border-purple-400 text-purple-600 hover:bg-purple-50 hover:border-purple-500 text-sm font-medium mt-2"
+              onClick={() => setFormData({ ...formData, ticketNumber: PSEUDO_TICKET })}
+            >
+              + Generate Ticket
+            </Button>
+            {formData.ticketNumber === PSEUDO_TICKET && (
+              <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
+                <p className="text-xs text-purple-700 font-medium">Pseudo ticket <strong>X7777</strong> — can be reused unlimited times</p>
+                <button
+                  className="text-xs text-gray-400 hover:text-gray-600 ml-2"
+                  onClick={() => setFormData({ ...formData, ticketNumber: '' })}
+                >✕</button>
+              </div>
+            )}
+            {formData.ticketNumber !== PSEUDO_TICKET && formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
+              <p className="text-sm text-orange-600 mt-1">
+                Enter {5 - formData.ticketNumber.length} more digit(s)
+              </p>
+            )}
+            {isTicketOcrRunning && (
+              <p className="text-sm text-regis-navy animate-pulse mt-1">Reading ticket number from image...</p>
+            )}
           </div>
         </div>
       </div>
@@ -1180,96 +1238,26 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
         )}
       </div>
-    </div>
-  );
 
-  const renderStep3 = () => {
-    const now = new Date();
-    const staffName = user?.firstName && user?.lastName 
-      ? `${user.firstName} ${user.lastName}` 
-      : user?.username || "Unknown Staff";
-
-    return (
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Valet Ticket Number</h3>
-          <div className="space-y-2">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Ticket Number *</label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={formData.ticketNumber}
-                  onChange={(e) => {
-                    if (formData.ticketNumber === PSEUDO_TICKET) return;
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 5);
-                    setFormData({ ...formData, ticketNumber: value });
-                  }}
-                  placeholder="12345"
-                  className={`text-center text-2xl font-bold tracking-widest ${formData.ticketNumber === PSEUDO_TICKET ? 'text-purple-600 bg-purple-50 border-purple-300' : ''}`}
-                  maxLength={5}
-                  disabled={isTicketOcrRunning}
-                  data-testid="input-ticket-number"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="shrink-0 border-regis-navy text-regis-navy hover:bg-regis-navy hover:text-white"
-                  onClick={() => setShowTicketScanner(true)}
-                  data-testid="button-scan-ticket-number"
-                >
-                  <ScanLine className="w-4 h-4 mr-1" />
-                  Scan
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-dashed border-purple-400 text-purple-600 hover:bg-purple-50 hover:border-purple-500 text-sm font-medium"
-                onClick={() => setFormData({ ...formData, ticketNumber: PSEUDO_TICKET })}
-              >
-                + Generate Ticket
-              </Button>
-              {formData.ticketNumber === PSEUDO_TICKET && (
-                <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
-                  <p className="text-xs text-purple-700 font-medium">Pseudo ticket <strong>X7777</strong> — can be reused unlimited times</p>
-                  <button
-                    className="text-xs text-gray-400 hover:text-gray-600 ml-2"
-                    onClick={() => setFormData({ ...formData, ticketNumber: '' })}
-                  >✕</button>
-                </div>
-              )}
-              {formData.ticketNumber !== PSEUDO_TICKET && formData.ticketNumber.length > 0 && formData.ticketNumber.length < 5 && (
-                <p className="text-sm text-orange-600 mt-1">
-                  Enter {5 - formData.ticketNumber.length} more digit(s)
-                </p>
-              )}
-              {isTicketOcrRunning && (
-                <p className="text-sm text-regis-navy animate-pulse mt-1">Reading ticket number from image...</p>
-              )}
-            </div>
+      <div className="bg-gray-50 rounded-lg p-3">
+        <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Auto-filled Information</h3>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <span className="text-gray-500">Date:</span>
+            <p className="font-medium">{new Date().toLocaleDateString()}</p>
           </div>
-        </div>
-
-        <div className="bg-gray-50 rounded-lg p-3">
-          <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Auto-filled Information</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <span className="text-gray-500">Date:</span>
-              <p className="font-medium">{now.toLocaleDateString()}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Time:</span>
-              <p className="font-medium">{now.toLocaleTimeString()}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-gray-500">Staff:</span>
-              <p className="font-medium">{staffName}</p>
-            </div>
+          <div>
+            <span className="text-gray-500">Time:</span>
+            <p className="font-medium">{new Date().toLocaleTimeString()}</p>
+          </div>
+          <div className="col-span-2">
+            <span className="text-gray-500">Staff:</span>
+            <p className="font-medium">{user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.username || "Unknown Staff"}</p>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   const renderPreview = () => {
     const now = new Date();
@@ -1407,7 +1395,6 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <>
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
-            {currentStep === 3 && renderStep3()}
 
             <div className="flex gap-3 pt-4 border-t">
               {currentStep > 1 && (
@@ -1421,12 +1408,11 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                 onClick={handleNext}
                 disabled={
                   (currentStep === 1 && !canProceedStep1) ||
-                  (currentStep === 2 && !canProceedStep2) ||
-                  (currentStep === 3 && !canProceedStep3)
+                  (currentStep === 2 && !canProceedStep2)
                 }
                 data-testid="button-next-step"
               >
-                {currentStep === 3 ? "Preview" : "Next"}
+                {currentStep === 2 ? "Preview" : "Next"}
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
