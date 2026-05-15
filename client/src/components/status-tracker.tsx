@@ -31,8 +31,44 @@ function getStageFromStatus(status: string): number {
 export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: StatusTrackerProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(STAGE_DURATIONS.retrieving);
   const [cancelling, setCancelling] = useState(false);
+  const [cancellingSchedule, setCancellingSchedule] = useState(false);
+  const [showEditSchedule, setShowEditSchedule] = useState(false);
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const { lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
+
+  const handleCancelSchedule = async () => {
+    setCancellingSchedule(true);
+    try {
+      await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}/schedule-retrieval`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestName, guestPin: guestPin || undefined }),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName, guestPin ?? ""] });
+    } catch {}
+    setCancellingSchedule(false);
+  };
+
+  const handleEditSchedule = async () => {
+    if (!editDate || !editTime) return;
+    setEditSaving(true);
+    try {
+      const scheduledAt = new Date(`${editDate}T${editTime}`).toISOString();
+      const res = await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}/schedule-retrieval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduledAt, guestName, guestPin: guestPin || undefined }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName, guestPin ?? ""] });
+        setShowEditSchedule(false);
+      }
+    } catch {}
+    setEditSaving(false);
+  };
 
   // Build the polling URL — prefer PIN when provided; fall back to name
   const buildLookupUrl = () => {
@@ -307,32 +343,91 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
           <p className="text-blue-200 text-sm">Ticket #{ticketNumber}</p>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto w-full">
-          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-8 mb-6 w-full">
-            <CalendarClock className="text-amber-500 mx-auto mb-4" size={40} />
-            <h3 className="text-xl font-bold text-regis-navy mb-2">Scheduled for</h3>
-            <p className="text-2xl font-bold text-amber-700">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto w-full">
+          <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-6 mb-4 w-full">
+            <CalendarClock className="text-blue-500 mx-auto mb-3" size={36} />
+            <h3 className="text-lg font-bold text-regis-navy mb-1">Scheduled for</h3>
+            <p className="text-2xl font-bold text-blue-700">
               {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
             <p className="text-gray-500 text-sm mt-1">
               {scheduledTime.toLocaleDateString([], { month: 'long', day: 'numeric' })}
             </p>
             {msLeft > 0 && (
-              <p className="text-sm text-amber-600 font-medium mt-3">
+              <p className="text-sm text-blue-600 font-medium mt-2">
                 {hoursLeft > 0 ? `${hoursLeft}h ` : ''}{minutesLeft}m until pickup
               </p>
             )}
           </div>
 
-          <p className="text-gray-500 text-sm text-center mb-6">
-            Staff will start preparing your vehicle before your scheduled time. This page updates automatically.
+          {/* Edit form */}
+          {showEditSchedule && (
+            <div className="w-full bg-white border border-blue-200 rounded-xl p-4 mb-4 text-left space-y-3">
+              <p className="text-sm font-semibold text-regis-navy">Change your pickup time</p>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Date</label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  max={(() => { const d = new Date(); d.setDate(d.getDate()+7); return d.toISOString().split('T')[0]; })()}
+                  onChange={e => setEditDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Time</label>
+                <input
+                  type="time"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  value={editTime}
+                  onChange={e => setEditTime(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
+                  disabled={!editDate || !editTime || editSaving}
+                  onClick={handleEditSchedule}
+                >
+                  {editSaving ? 'Saving…' : 'Confirm Change'}
+                </Button>
+                <Button variant="outline" className="text-sm" onClick={() => setShowEditSchedule(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <p className="text-gray-500 text-sm text-center mb-5">
+            Staff will have your vehicle ready before your scheduled time.
           </p>
 
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="text-gray-400 hover:text-gray-600"
-          >
+          <div className="flex gap-3 w-full mb-4">
+            <Button
+              variant="outline"
+              className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50 text-sm"
+              onClick={() => {
+                const d = scheduledTime;
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                setEditDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);
+                setEditTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                setShowEditSchedule(true);
+              }}
+            >
+              ✎ Edit Schedule
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 border-red-300 text-red-600 hover:bg-red-50 text-sm"
+              disabled={cancellingSchedule}
+              onClick={handleCancelSchedule}
+            >
+              {cancellingSchedule ? '…' : '✕ Cancel Schedule'}
+            </Button>
+          </div>
+
+          <Button variant="ghost" onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">
             <X className="mr-2" size={16} />
             Back to Home
           </Button>

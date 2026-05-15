@@ -941,6 +941,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/tickets/:ticketNumber/schedule-retrieval', async (req: any, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const { guestName, guestPin } = req.body;
+      const pinParam = typeof guestPin === 'string' ? guestPin.trim().toUpperCase() : '';
+
+      if (!pinParam && (!guestName || typeof guestName !== 'string' || !guestName.trim())) {
+        return res.status(400).json({ message: "Name or PIN verification is required" });
+      }
+
+      const ticket = await storage.getValetTicket(ticketNumber);
+      let verified = false;
+      if (!ticket) {
+        verified = false;
+      } else if (pinParam && ticket.guestPin) {
+        verified = pinParam === ticket.guestPin.toUpperCase();
+      } else {
+        verified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+      }
+      if (!ticket || !verified) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+      if (!['active', 'pending'].includes(ticket.status)) {
+        return res.status(400).json({ message: "Ticket is not available for modification" });
+      }
+
+      const updated = await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: null });
+      broadcastToOU(ticket.ouId, { type: 'ticket_status_updated', data: updated ?? ticket });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error cancelling schedule:", error);
+      res.status(500).json({ message: "Failed to cancel schedule" });
+    }
+  });
+
   app.get('/api/faqs', async (req, res) => {
     try {
       const faqs = await storage.getFaqs();
