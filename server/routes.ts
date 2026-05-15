@@ -963,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const emailTo = updates.reminderEmail ?? ticket.reminderEmail;
       if (emailTo) {
         sendScheduleConfirmationEmail(emailTo, ticket.guestName ?? 'Guest', ticketNumber, scheduledDate)
-          .catch((e: any) => console.error('[Email] Failed to send schedule confirmation:', e.message));
+          .catch((e: unknown) => console.error('[Email] Failed to send schedule confirmation:', e instanceof Error ? e.message : String(e)));
       }
 
       res.json({ success: true, scheduledRetrievalAt: scheduledDate.toISOString() });
