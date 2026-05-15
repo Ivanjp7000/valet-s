@@ -657,6 +657,19 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         <div className="mt-2 flex items-center gap-2 flex-wrap">
           <button
             type="button"
+            title="Generate Japanese name"
+            onClick={() => {
+              const first = ["Haruto","Yuto","Sota","Yuki","Hayato","Kento","Ren","Kaito","Shota","Ryota","Takumi","Daiki","Kenji","Naoki","Hiroshi","Sakura","Yui","Hana","Aoi","Rin","Mio","Nana","Saki","Yuna","Misaki","Akemi","Haruka","Miyu","Riko","Natsuki"];
+              const last = ["Tanaka","Suzuki","Sato","Yamamoto","Watanabe","Ito","Kobayashi","Nakamura","Kato","Yoshida","Yamada","Sasaki","Yamaguchi","Matsumoto","Inoue","Kimura","Hayashi","Shimizu","Yamazaki","Mori","Abe","Ikeda","Hashimoto","Nishimura","Ogawa","Fujita","Okamoto","Nakajima","Maeda","Fujii"];
+              const name = `${last[Math.floor(Math.random()*last.length)]} ${first[Math.floor(Math.random()*first.length)]}`;
+              setFormData({ ...formData, guestName: name });
+            }}
+            className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 border border-red-200 hover:border-red-400 bg-red-50 hover:bg-red-100 rounded-md px-2 py-1 transition-colors font-bold tracking-tight"
+          >
+            JP
+          </button>
+          <button
+            type="button"
             onClick={() => {
               const first = ["Aiden","Blake","Cameron","Dakota","Ellis","Finley","Gray","Harper","Indigo","Jordan","Kendall","Logan","Morgan","Noah","Oakley","Parker","Quinn","Reese","Sage","Taylor","River","Avery","Casey","Drew","Emery","Fallon","Haven","Juno","Kai","Lane","Marlowe","Noel","Onyx","Piper","Remy","Scout","Sloane","Spencer","Sterling","Wynne"];
               const last = ["Ashford","Bennett","Calloway","Davenport","Elsworth","Fairfax","Graham","Harrington","Ingram","Jennings","Kensington","Langley","Merritt","Northcott","Ogilvy","Pemberton","Quinlan","Radcliffe","Stanton","Thornton","Upton","Vane","Whitmore","Xavier","Yardley","Zealand"];
