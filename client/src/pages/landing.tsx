@@ -23,6 +23,7 @@ interface TicketPreview {
   carMake?: string | null;
   carModel?: string | null;
   carColor?: string | null;
+  scheduledRetrievalAt?: string | null;
 }
 
 export default function Landing() {
@@ -87,8 +88,13 @@ export default function Landing() {
       const data: TicketPreview = await response.json();
       setTicketPreview(data);
       setSubmittedTicket(ticketNumber);
-      setShowConfirmation(true);
       setTicketNumber("");
+      // If ticket already has an active schedule, go directly to the tracker
+      if (data.scheduledRetrievalAt && ['active', 'pending'].includes(data.status)) {
+        setShowStatus(true);
+      } else {
+        setShowConfirmation(true);
+      }
     } catch (error) {
       toast({
         title: "Error",
