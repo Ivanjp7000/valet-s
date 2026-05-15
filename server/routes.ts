@@ -69,7 +69,7 @@ async function sendScheduleConfirmationEmail(to: string, guestName: string, tick
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      from: 'Valet Service <noreply@valet-s.com>',
+      from: 'Valet Service <no-reply@valet-s.com>',
       to: [to],
       subject,
       html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">${heading}</h2><p>Dear ${guestName},</p><p>Your valet pickup has been confirmed for:</p><p style="font-size:20px;font-weight:bold;color:#1a2744">${timeStr}</p><p style="color:#555">${dateStr}</p>${rescheduleNote}<p>Ticket number: <strong>#${ticketNumber}</strong></p><p>Our team will have your vehicle ready before your scheduled time. If you need to change or cancel, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
@@ -92,7 +92,7 @@ async function sendScheduleCancellationEmail(to: string, guestName: string, tick
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      from: 'Valet Service <noreply@valet-s.com>',
+      from: 'Valet Service <no-reply@valet-s.com>',
       to: [to],
       subject: '❌ Pickup Cancelled — Ticket #' + ticketNumber,
       html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Pickup Cancelled</h2><p>Dear ${guestName},</p><p>Your scheduled valet pickup for ticket <strong>#${ticketNumber}</strong> has been cancelled.</p><p>If you would like to schedule a new pickup time, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
@@ -115,7 +115,7 @@ async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: st
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      from: 'Valet Service <noreply@valet-s.com>',
+      from: 'Valet Service <no-reply@valet-s.com>',
       to: [to],
       subject: '🚗 Your Car is Ready for Pickup — Ticket #' + ticketNumber,
       html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Your Vehicle is Ready!</h2><p>Dear ${guestName},</p><p>Your vehicle <strong>(Ticket #${ticketNumber})</strong> is ready and waiting for you at the valet entrance.</p><p>Please proceed to the pickup area at your earliest convenience.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
