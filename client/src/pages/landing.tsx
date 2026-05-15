@@ -422,8 +422,7 @@ export default function Landing() {
                 </Button>
                 <Button
                   onClick={() => setShowSchedule(true)}
-                  variant="outline"
-                  className="w-full py-3 h-auto text-regis-navy border-regis-navy/30 hover:bg-regis-navy/5 font-medium"
+                  className="w-full py-3 h-auto bg-blue-600 hover:bg-blue-700 text-white font-medium"
                 >
                   <Calendar className="mr-2" size={16} />
                   Schedule a Retrieval Time
