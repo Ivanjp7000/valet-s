@@ -54,7 +54,7 @@ function checkOtpIssuanceRate(userId: string): boolean {
 }
 
 // ── Email helpers ──────────────────────────────────────────────────────────────
-async function sendScheduleConfirmationEmail(to: string, guestName: string, ticketNumber: string, scheduledAt: Date): Promise<void> {
+async function sendScheduleConfirmationEmail(to: string, guestName: string, ticketNumber: string, scheduledAt: Date, isReschedule = false): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn('[Email] RESEND_API_KEY not set — skipping schedule confirmation email');
@@ -62,21 +62,47 @@ async function sendScheduleConfirmationEmail(to: string, guestName: string, tick
   }
   const dateStr = scheduledAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = scheduledAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const heading = isReschedule ? 'Pickup Rescheduled' : 'Pickup Scheduled';
+  const subject = isReschedule ? '📅 Pickup Rescheduled — Ticket #' + ticketNumber : '📅 Pickup Scheduled — Ticket #' + ticketNumber;
+  const rescheduleNote = isReschedule ? '<p style="color:#b45309;background:#fffbeb;padding:8px 12px;border-radius:6px;border-left:4px solid #f59e0b">Your pickup time has been updated to the new time shown above.</p>' : '';
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
       from: 'Valet Service <noreply@valet-s.com>',
       to: [to],
-      subject: '📅 Pickup Scheduled — Ticket #' + ticketNumber,
-      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Pickup Scheduled</h2><p>Dear ${guestName},</p><p>Your valet pickup has been confirmed for:</p><p style="font-size:20px;font-weight:bold;color:#1a2744">${timeStr}</p><p style="color:#555">${dateStr}</p><p>Ticket number: <strong>#${ticketNumber}</strong></p><p>Our team will have your vehicle ready before your scheduled time. If you need to change or cancel, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
+      subject,
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">${heading}</h2><p>Dear ${guestName},</p><p>Your valet pickup has been confirmed for:</p><p style="font-size:20px;font-weight:bold;color:#1a2744">${timeStr}</p><p style="color:#555">${dateStr}</p>${rescheduleNote}<p>Ticket number: <strong>#${ticketNumber}</strong></p><p>Our team will have your vehicle ready before your scheduled time. If you need to change or cancel, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
     }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(`Resend error: ${JSON.stringify(err)}`);
   }
-  console.log(`[Email] Schedule confirmation sent to ${to} for ticket ${ticketNumber} (${timeStr} ${dateStr})`);
+  console.log(`[Email] Schedule ${isReschedule ? 'reschedule' : 'confirmation'} sent to ${to} for ticket ${ticketNumber} (${timeStr} ${dateStr})`);
+}
+
+async function sendScheduleCancellationEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[Email] RESEND_API_KEY not set — skipping schedule cancellation email');
+    return;
+  }
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      from: 'Valet Service <noreply@valet-s.com>',
+      to: [to],
+      subject: '❌ Pickup Cancelled — Ticket #' + ticketNumber,
+      html: `<div style="font-family:sans-serif;max-width:480px;margin:auto"><h2 style="color:#1a2744">Pickup Cancelled</h2><p>Dear ${guestName},</p><p>Your scheduled valet pickup for ticket <strong>#${ticketNumber}</strong> has been cancelled.</p><p>If you would like to schedule a new pickup time, simply visit <a href="https://valet-s.com">valet-s.com</a> and enter your ticket number.</p><hr/><p style="color:#888;font-size:12px">This message was sent automatically by the valet management system.</p></div>`,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Resend error: ${JSON.stringify(err)}`);
+  }
+  console.log(`[Email] Schedule cancellation sent to ${to} for ticket ${ticketNumber}`);
 }
 
 async function sendCarReadyEmail(to: string, guestName: string, ticketNumber: string): Promise<void> {
@@ -961,8 +987,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send confirmation email immediately if the guest provided one
       const emailTo = updates.reminderEmail ?? ticket.reminderEmail;
+      const isReschedule = !!ticket.scheduledRetrievalAt;
       if (emailTo) {
-        sendScheduleConfirmationEmail(emailTo, ticket.guestName ?? 'Guest', ticketNumber, scheduledDate)
+        sendScheduleConfirmationEmail(emailTo, ticket.guestName ?? 'Guest', ticketNumber, scheduledDate, isReschedule)
           .catch((e: unknown) => console.error('[Email] Failed to send schedule confirmation:', e instanceof Error ? e.message : String(e)));
       }
 
@@ -1001,6 +1028,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: null });
       broadcastToOU(ticket.ouId, { type: 'ticket_status_updated', data: updated ?? ticket });
+
+      // Send cancellation email only if there was actually a scheduled time to cancel
+      if (ticket.reminderEmail && ticket.scheduledRetrievalAt) {
+        sendScheduleCancellationEmail(ticket.reminderEmail, ticket.guestName ?? 'Guest', ticketNumber)
+          .catch((e: unknown) => console.error('[Email] Failed to send schedule cancellation:', e instanceof Error ? e.message : String(e)));
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error cancelling schedule:", error);
