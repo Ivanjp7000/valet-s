@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useOCR } from "@/hooks/useOCR";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -465,6 +465,185 @@ const COLOR_STYLES: Record<string, { bg: string; text: string; border: string }>
   'Other': { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
 };
 
+// ─── iOS-style drum wheel picker for car brand ──────────────────────────────
+const WHEEL_ITEM_H = 56;
+
+function BrandWheelPicker({
+  brands,
+  value,
+  onSelect,
+  onClose,
+}: {
+  brands: string[];
+  value: string;
+  onSelect: (brand: string) => void;
+  onClose: () => void;
+}) {
+  const [idx, setIdx] = useState(() => Math.max(0, brands.indexOf(value)));
+  const [dragDelta, setDragDelta] = useState(0);
+  const dragging = useRef(false);
+  const startClientY = useRef(0);
+
+  const effectiveIdx = idx - dragDelta / WHEEL_ITEM_H;
+
+  const commit = (raw: number) => {
+    const clamped = Math.max(0, Math.min(brands.length - 1, Math.round(raw)));
+    setIdx(clamped);
+    setDragDelta(0);
+  };
+
+  // Touch
+  const onTouchStart = (e: React.TouchEvent) => {
+    dragging.current = true;
+    startClientY.current = e.touches[0].clientY;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!dragging.current) return;
+    e.preventDefault();
+    setDragDelta(e.touches[0].clientY - startClientY.current);
+  };
+  const onTouchEnd = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    commit(idx - dragDelta / WHEEL_ITEM_H);
+  };
+
+  // Mouse drag
+  const onMouseDown = (e: React.MouseEvent) => {
+    dragging.current = true;
+    startClientY.current = e.clientY;
+    e.preventDefault();
+  };
+
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      setDragDelta(e.clientY - startClientY.current);
+    };
+    const up = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const delta = e.clientY - startClientY.current;
+      dragging.current = false;
+      commit(idx - delta / WHEEL_ITEM_H);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+  }, [idx]);
+
+  // Mouse wheel
+  const onWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    setIdx(prev => Math.max(0, Math.min(brands.length - 1, prev + (e.deltaY > 0 ? 1 : -1))));
+  };
+
+  // Keyboard
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') setIdx(p => Math.min(brands.length - 1, p + 1));
+      else if (e.key === 'ArrowUp') setIdx(p => Math.max(0, p - 1));
+      else if (e.key === 'Enter') onSelect(brands[idx]);
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [idx, brands, onSelect, onClose]);
+
+  // translateY so brands[idx] sits in the middle row of the 3-row window
+  const translateY = (1 - idx) * WHEEL_ITEM_H + dragDelta;
+  const isAnimating = !dragging.current;
+
+  return (
+    <div className="flex flex-col items-center gap-4 w-full">
+      {/* Drum */}
+      <div
+        className="relative w-full overflow-hidden cursor-grab active:cursor-grabbing"
+        style={{ height: WHEEL_ITEM_H * 3, touchAction: 'none' }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onMouseDown={onMouseDown}
+        onWheel={onWheel}
+      >
+        {/* Top fade */}
+        <div
+          className="absolute inset-x-0 top-0 z-10 pointer-events-none"
+          style={{ height: WHEEL_ITEM_H, background: 'linear-gradient(to bottom, white 60%, transparent 100%)' }}
+        />
+        {/* Bottom fade */}
+        <div
+          className="absolute inset-x-0 bottom-0 z-10 pointer-events-none"
+          style={{ height: WHEEL_ITEM_H, background: 'linear-gradient(to top, white 60%, transparent 100%)' }}
+        />
+        {/* Centre selection band */}
+        <div
+          className="absolute inset-x-6 z-10 pointer-events-none rounded-xl"
+          style={{
+            top: WHEEL_ITEM_H,
+            height: WHEEL_ITEM_H,
+            background: 'rgba(197,168,76,0.08)',
+            border: '1.5px solid rgba(197,168,76,0.5)',
+          }}
+        />
+        {/* Scrolling drum */}
+        <div
+          style={{
+            transform: `translateY(${translateY}px)`,
+            transition: isAnimating ? 'transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+            willChange: 'transform',
+          }}
+        >
+          {brands.map((brand, i) => {
+            const dist = Math.abs(i - effectiveIdx);
+            const isCenter = dist < 0.5;
+            const opacity = dist > 1.5 ? 0 : dist > 1 ? 0.2 : dist > 0.5 ? 0.45 : 1;
+            return (
+              <div
+                key={brand}
+                style={{
+                  height: WHEEL_ITEM_H,
+                  opacity,
+                  fontSize: isCenter ? 22 : 15,
+                  fontWeight: isCenter ? 700 : 400,
+                  color: isCenter ? '#1a1f44' : '#9ca3af',
+                  transition: isAnimating ? 'opacity 0.2s, font-size 0.2s, color 0.2s' : 'none',
+                }}
+                className="flex items-center justify-center px-4 text-center leading-tight"
+                onClick={() => { setIdx(i); setDragDelta(0); }}
+              >
+                {brand}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex w-full gap-3 px-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex-1 py-2.5 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelect(brands[idx])}
+          className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors"
+          style={{ background: 'linear-gradient(135deg, #1a1f44 0%, #2d3561 100%)' }}
+        >
+          Select
+        </button>
+      </div>
+    </div>
+  );
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -472,20 +651,9 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const [showPreview, setShowPreview] = useState(false);
   const [carMakeSearch, setCarMakeSearch] = useState("");
   const [showCarMakeDropdown, setShowCarMakeDropdown] = useState(false);
-  const [showBrandGrid, setShowBrandGrid] = useState(false);
+  const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [editingBrands, setEditingBrands] = useState(false);
   const [newBrandInput, setNewBrandInput] = useState("");
-  const [brandFontSize, setBrandFontSize] = useState<number>(() => {
-    try { return parseInt(localStorage.getItem('wizard-brand-font') || '0', 10); } catch { return 0; }
-  });
-  const changeBrandFont = (delta: number) => {
-    setBrandFontSize(prev => {
-      const next = Math.max(-2, Math.min(6, prev + delta));
-      localStorage.setItem('wizard-brand-font', String(next));
-      return next;
-    });
-  };
-
   const DEFAULT_BRANDS = [
     'Toyota', 'Lexus', 'Honda', 'Nissan', 'Mazda', 'Subaru',
     'Mitsubishi', 'Suzuki', 'Daihatsu', 'Mercedes-Benz', 'BMW', 'Audi',
@@ -886,129 +1054,110 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           <div className="relative">
             <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium text-gray-700">Car Make</label>
-              <div className="flex items-center gap-2">
-                {/* Brand font size controls */}
-                <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => changeBrandFont(-1)}
-                    disabled={brandFontSize <= -2}
-                    className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                    title="Smaller text"
-                  >A-</button>
-                  <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">{brandFontSize > 0 ? `+${brandFontSize}` : brandFontSize}</span>
-                  <button
-                    type="button"
-                    onClick={() => changeBrandFont(1)}
-                    disabled={brandFontSize >= 6}
-                    className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                    title="Larger text"
-                  >A+</button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowBrandGrid(!showBrandGrid)}
-                  className="flex items-center gap-1 text-xs font-medium text-regis-gold hover:text-yellow-600 border border-regis-gold hover:border-yellow-600 rounded-md px-2 py-1 transition-colors"
-                >
-                  {showBrandGrid ? <ChevronUp size={12} /> : <Plus size={12} />}
-                  {showBrandGrid ? "Hide Brands" : "Add Brand"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowBrandPicker(true)}
+                className="flex items-center gap-1 text-xs font-medium text-regis-gold hover:text-yellow-600 border border-regis-gold hover:border-yellow-600 rounded-md px-2 py-1 transition-colors"
+              >
+                <Plus size={12} />
+                Add Brand
+              </button>
             </div>
-            {showBrandGrid && (
-              <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex flex-wrap gap-2">
-                  {quickBrands.map((brand, idx) => {
-                    const palette = [
-                      "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100",
-                      "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
-                      "bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100",
-                      "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100",
-                      "bg-pink-50 border-pink-200 text-pink-700 hover:bg-pink-100",
-                      "bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100",
-                    ];
-                    const color = palette[idx % palette.length];
-                    return (
-                      <div key={brand} className="relative">
-                        {editingBrands ? (
-                          <span
-                            style={{ fontSize: 12 + brandFontSize * 2 }}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-full font-medium border ${color}`}
-                          >
-                            {brand}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveBrand(brand)}
-                              className="ml-0.5 text-red-400 hover:text-red-600 transition-colors"
-                            >
-                              <X size={11} />
-                            </button>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            style={{ fontSize: 12 + brandFontSize * 2 }}
-                            onClick={() => {
-                              setFormData({ ...formData, carMake: brand });
-                              setCarMakeSearch(brand);
-                              setShowCarMakeDropdown(false);
-                              setShowBrandGrid(false);
-                            }}
-                            className={`px-3 py-1.5 rounded-full font-medium border transition-all ${
-                              formData.carMake === brand
-                                ? "bg-regis-gold border-regis-gold text-white shadow-sm"
-                                : color
-                            }`}
-                          >
-                            {brand}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
 
-                  {/* Edit toggle button at the end */}
-                  {!editingBrands && (
+            {/* iOS wheel picker modal */}
+            {showBrandPicker && (
+              <div
+                className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
+                style={{ background: 'rgba(0,0,0,0.45)' }}
+                onClick={(e) => { if (e.target === e.currentTarget) { setShowBrandPicker(false); setEditingBrands(false); } }}
+              >
+                <div className="bg-white w-full sm:w-80 sm:rounded-2xl rounded-t-2xl overflow-hidden shadow-2xl">
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 pt-5 pb-2">
+                    <span className="text-base font-semibold text-regis-navy">Select Brand</span>
                     <button
                       type="button"
-                      onClick={() => setEditingBrands(true)}
-                      className="px-3 py-1.5 rounded-full text-xs font-medium border border-red-300 bg-red-50 text-red-500 hover:bg-red-100 hover:border-red-400 transition-colors"
+                      onClick={() => { setShowBrandPicker(false); setEditingBrands(false); setNewBrandInput(""); }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
                     >
-                      Edit
-                    </button>
-                  )}
-                </div>
-
-                {/* Edit mode: add new brand + done */}
-                {editingBrands && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newBrandInput}
-                        onChange={(e) => setNewBrandInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
-                        placeholder="Type a brand name and press Add"
-                        className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:border-regis-gold"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddBrand}
-                        disabled={!newBrandInput.trim()}
-                        className="px-3 py-1.5 text-xs font-medium bg-regis-navy text-white rounded-md hover:bg-blue-900 disabled:opacity-40 transition-colors"
-                      >
-                        Add
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setEditingBrands(false); setNewBrandInput(""); }}
-                      className="w-full text-xs font-medium text-regis-gold hover:text-yellow-600 py-1 transition-colors"
-                    >
-                      Done Editing
+                      <X size={18} />
                     </button>
                   </div>
-                )}
+
+                  {/* Wheel */}
+                  <div className="px-4 pb-2">
+                    <BrandWheelPicker
+                      brands={quickBrands}
+                      value={formData.carMake}
+                      onSelect={(brand) => {
+                        setFormData({ ...formData, carMake: brand });
+                        setCarMakeSearch(brand);
+                        setShowCarMakeDropdown(false);
+                        setShowBrandPicker(false);
+                        setEditingBrands(false);
+                      }}
+                      onClose={() => { setShowBrandPicker(false); setEditingBrands(false); }}
+                    />
+                  </div>
+
+                  {/* Edit list section */}
+                  <div className="border-t border-gray-100 mx-4 pt-3 pb-4">
+                    {!editingBrands ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingBrands(true)}
+                        className="w-full text-xs text-gray-400 hover:text-red-500 transition-colors py-1"
+                      >
+                        Edit brand list
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {quickBrands.map((brand) => (
+                            <span
+                              key={brand}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                            >
+                              {brand}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveBrand(brand)}
+                                className="text-red-400 hover:text-red-600 transition-colors"
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <input
+                            type="text"
+                            value={newBrandInput}
+                            onChange={(e) => setNewBrandInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
+                            placeholder="Add new brand…"
+                            className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:border-regis-gold"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddBrand}
+                            disabled={!newBrandInput.trim()}
+                            className="px-3 py-1.5 text-xs font-medium bg-regis-navy text-white rounded-lg hover:bg-blue-900 disabled:opacity-40 transition-colors"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingBrands(false); setNewBrandInput(""); }}
+                          className="w-full text-xs font-medium text-regis-gold hover:text-yellow-600 py-1 transition-colors"
+                        >
+                          Done Editing
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
             {formData.carMake && (
