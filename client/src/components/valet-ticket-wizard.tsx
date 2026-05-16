@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, Printer, RefreshCw
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, Printer, RefreshCw,
+  LayoutGrid, List as ListIcon, Search
 } from "lucide-react";
 import qrCodeUrl from "@/assets/qr-valet-s.jpg";
 import { apiRequest } from "@/lib/queryClient";
@@ -795,6 +796,23 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const [colorFontSize, setColorFontSize] = useState<number>(() => {
     try { return parseInt(localStorage.getItem('wizard-color-font') || '0', 10); } catch { return 0; }
   });
+  const [brandPickerMode, setBrandPickerMode] = useState<'wheel' | 'list'>(() => {
+    try { return (localStorage.getItem('wizard-brand-mode') as 'wheel' | 'list') || 'wheel'; } catch { return 'wheel'; }
+  });
+  const toggleBrandMode = () => setBrandPickerMode(prev => {
+    const next = prev === 'wheel' ? 'list' : 'wheel';
+    localStorage.setItem('wizard-brand-mode', next);
+    return next;
+  });
+  const [colorPickerMode, setColorPickerMode] = useState<'wheel' | 'list'>(() => {
+    try { return (localStorage.getItem('wizard-color-mode') as 'wheel' | 'list') || 'wheel'; } catch { return 'wheel'; }
+  });
+  const toggleColorMode = () => setColorPickerMode(prev => {
+    const next = prev === 'wheel' ? 'list' : 'wheel';
+    localStorage.setItem('wizard-color-mode', next);
+    return next;
+  });
+  const [brandListSearch, setBrandListSearch] = useState("");
   const changeColorFont = (delta: number) => {
     setColorFontSize(prev => {
       const next = Math.max(-2, Math.min(6, prev + delta));
@@ -1205,29 +1223,41 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   <div className="flex items-center justify-between px-5 pt-5 pb-2">
                     <span className="text-base font-semibold text-regis-navy">Select Brand</span>
                     <div className="flex items-center gap-2">
-                      {/* Font size controls */}
-                      <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => changeBrandFont(-1)}
-                          disabled={brandFontSize <= -2}
-                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                          title="Smaller text"
-                        >A-</button>
-                        <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">
-                          {brandFontSize > 0 ? `+${brandFontSize}` : brandFontSize}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => changeBrandFont(1)}
-                          disabled={brandFontSize >= 6}
-                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                          title="Larger text"
-                        >A+</button>
-                      </div>
+                      {/* View toggle */}
                       <button
                         type="button"
-                        onClick={() => { setShowBrandPicker(false); setEditingBrands(false); setNewBrandInput(""); }}
+                        onClick={toggleBrandMode}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium border border-gray-200 rounded-md text-gray-500 hover:text-regis-navy hover:border-regis-navy transition-colors"
+                        title={brandPickerMode === 'wheel' ? 'Switch to list view' : 'Switch to wheel view'}
+                      >
+                        {brandPickerMode === 'wheel' ? <LayoutGrid size={11} /> : <ListIcon size={11} />}
+                        {brandPickerMode === 'wheel' ? 'List' : 'Wheel'}
+                      </button>
+                      {/* Font size controls — wheel mode only */}
+                      {brandPickerMode === 'wheel' && (
+                        <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => changeBrandFont(-1)}
+                            disabled={brandFontSize <= -2}
+                            className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            title="Smaller text"
+                          >A-</button>
+                          <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">
+                            {brandFontSize > 0 ? `+${brandFontSize}` : brandFontSize}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => changeBrandFont(1)}
+                            disabled={brandFontSize >= 6}
+                            className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            title="Larger text"
+                          >A+</button>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => { setShowBrandPicker(false); setEditingBrands(false); setNewBrandInput(""); setBrandListSearch(""); }}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
                       >
                         <X size={18} />
@@ -1235,23 +1265,88 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                     </div>
                   </div>
 
-                  {/* Wheel */}
-                  <div className="px-4 pb-2">
-                    <WheelPicker
-                      items={quickBrands}
-                      value={formData.carMake}
-                      fontSizeOffset={brandFontSize}
-                      emptyMessage="No brands in list. Add one below."
-                      onSelect={(brand) => {
-                        setFormData({ ...formData, carMake: brand });
-                        setCarMakeSearch(brand);
-                        setShowCarMakeDropdown(false);
-                        setShowBrandPicker(false);
-                        setEditingBrands(false);
-                      }}
-                      onClose={() => { setShowBrandPicker(false); setEditingBrands(false); }}
-                    />
-                  </div>
+                  {/* Wheel view */}
+                  {brandPickerMode === 'wheel' && (
+                    <div className="px-4 pb-2">
+                      <WheelPicker
+                        items={quickBrands}
+                        value={formData.carMake}
+                        fontSizeOffset={brandFontSize}
+                        emptyMessage="No brands in list. Add one below."
+                        onSelect={(brand) => {
+                          setFormData({ ...formData, carMake: brand });
+                          setCarMakeSearch(brand);
+                          setShowCarMakeDropdown(false);
+                          setShowBrandPicker(false);
+                          setEditingBrands(false);
+                        }}
+                        onClose={() => { setShowBrandPicker(false); setEditingBrands(false); }}
+                      />
+                    </div>
+                  )}
+
+                  {/* List view */}
+                  {brandPickerMode === 'list' && (
+                    <div className="px-4 pb-2 space-y-2">
+                      <div className="relative">
+                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          autoFocus
+                          value={brandListSearch}
+                          onChange={(e) => setBrandListSearch(e.target.value)}
+                          placeholder="Search all brands…"
+                          className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-regis-gold"
+                        />
+                      </div>
+                      {brandListSearch.length >= 1 ? (
+                        <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                          {CAR_MAKES.filter(m => m.toLowerCase().includes(brandListSearch.toLowerCase())).slice(0, 12).map(brand => (
+                            <button
+                              key={brand}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, carMake: brand });
+                                setCarMakeSearch(brand);
+                                setBrandListSearch("");
+                                setShowBrandPicker(false);
+                                setEditingBrands(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-regis-gold/10 transition-colors ${formData.carMake === brand ? 'bg-regis-gold/10 font-medium text-regis-navy' : 'text-gray-700'}`}
+                            >
+                              {brand}
+                            </button>
+                          ))}
+                          {CAR_MAKES.filter(m => m.toLowerCase().includes(brandListSearch.toLowerCase())).length === 0 && (
+                            <p className="px-3 py-2 text-sm text-gray-400">No results</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto py-1">
+                          {quickBrands.map(brand => (
+                            <button
+                              key={brand}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, carMake: brand });
+                                setCarMakeSearch(brand);
+                                setBrandListSearch("");
+                                setShowBrandPicker(false);
+                                setEditingBrands(false);
+                              }}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                formData.carMake === brand
+                                  ? 'bg-regis-navy text-white border-regis-navy'
+                                  : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-regis-navy hover:text-regis-navy'
+                              }`}
+                            >
+                              {brand}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Edit list section */}
                   <div className="border-t border-gray-100 mx-4 pt-3 pb-4">
@@ -1374,26 +1469,38 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   <div className="flex items-center justify-between px-5 pt-5 pb-2">
                     <span className="text-base font-semibold text-regis-navy">Select Color</span>
                     <div className="flex items-center gap-2">
-                      {/* Font size controls */}
-                      <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => changeColorFont(-1)}
-                          disabled={colorFontSize <= -2}
-                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                          title="Smaller text"
-                        >A-</button>
-                        <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">
-                          {colorFontSize > 0 ? `+${colorFontSize}` : colorFontSize}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => changeColorFont(1)}
-                          disabled={colorFontSize >= 6}
-                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
-                          title="Larger text"
-                        >A+</button>
-                      </div>
+                      {/* View toggle */}
+                      <button
+                        type="button"
+                        onClick={toggleColorMode}
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium border border-gray-200 rounded-md text-gray-500 hover:text-regis-navy hover:border-regis-navy transition-colors"
+                        title={colorPickerMode === 'wheel' ? 'Switch to grid view' : 'Switch to wheel view'}
+                      >
+                        {colorPickerMode === 'wheel' ? <LayoutGrid size={11} /> : <ListIcon size={11} />}
+                        {colorPickerMode === 'wheel' ? 'Grid' : 'Wheel'}
+                      </button>
+                      {/* Font size controls — wheel mode only */}
+                      {colorPickerMode === 'wheel' && (
+                        <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => changeColorFont(-1)}
+                            disabled={colorFontSize <= -2}
+                            className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            title="Smaller text"
+                          >A-</button>
+                          <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">
+                            {colorFontSize > 0 ? `+${colorFontSize}` : colorFontSize}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => changeColorFont(1)}
+                            disabled={colorFontSize >= 6}
+                            className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            title="Larger text"
+                          >A+</button>
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => { setShowColorPicker(false); setEditingColors(false); setNewColorInput(""); }}
@@ -1404,22 +1511,56 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                     </div>
                   </div>
 
-                  {/* Wheel */}
-                  <div className="px-4 pb-2">
-                    <WheelPicker
-                      items={quickColors}
-                      value={formData.carColor}
-                      fontSizeOffset={colorFontSize}
-                      emptyMessage="No colors in list. Add one below."
-                      getItemDotColor={(c) => getColorStyle(c).bg}
-                      onSelect={(color) => {
-                        setFormData({ ...formData, carColor: color });
-                        setShowColorPicker(false);
-                        setEditingColors(false);
-                      }}
-                      onClose={() => { setShowColorPicker(false); setEditingColors(false); }}
-                    />
-                  </div>
+                  {/* Wheel view */}
+                  {colorPickerMode === 'wheel' && (
+                    <div className="px-4 pb-2">
+                      <WheelPicker
+                        items={quickColors}
+                        value={formData.carColor}
+                        fontSizeOffset={colorFontSize}
+                        emptyMessage="No colors in list. Add one below."
+                        getItemDotColor={(c) => getColorStyle(c).bg}
+                        onSelect={(color) => {
+                          setFormData({ ...formData, carColor: color });
+                          setShowColorPicker(false);
+                          setEditingColors(false);
+                        }}
+                        onClose={() => { setShowColorPicker(false); setEditingColors(false); }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Grid view */}
+                  {colorPickerMode === 'list' && (
+                    <div className="px-4 pb-3">
+                      <div className="flex flex-wrap gap-2 max-h-52 overflow-y-auto py-1">
+                        {quickColors.map(color => {
+                          const cs = getColorStyle(color);
+                          return (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, carColor: color });
+                                setShowColorPicker(false);
+                                setEditingColors(false);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border-2 transition-all active:scale-95"
+                              style={{
+                                backgroundColor: cs.bg,
+                                color: cs.text,
+                                borderColor: formData.carColor === color ? '#1a3a5c' : cs.border,
+                                boxShadow: formData.carColor === color ? '0 0 0 2px #1a3a5c' : 'none',
+                              }}
+                            >
+                              {formData.carColor === color && <Check size={12} />}
+                              {color}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Edit list section */}
                   <div className="border-t border-gray-100 mx-4 pt-3 pb-4">
