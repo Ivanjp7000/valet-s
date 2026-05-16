@@ -45,6 +45,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Warn loudly in production if SESSION_SECRET is unset — CAPTCHA signing and session security depend on it
+  if (!process.env.SESSION_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[FATAL] SESSION_SECRET environment variable is not set. CAPTCHA token signing is insecure. Set SESSION_SECRET before deploying.');
+      process.exit(1);
+    } else {
+      console.warn('[WARN] SESSION_SECRET is not set — using insecure fallback for development only.');
+    }
+  }
+
   // Run DB migrations for new columns that may not exist yet
   const { pool } = await import("./db");
   await pool.query(`
