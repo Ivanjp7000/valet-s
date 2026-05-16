@@ -1262,8 +1262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let ticketNumber: string = req.body.ticketNumber;
 
       // Validate required fields
-      if (!ticketNumber || (ticketNumber !== PSEUDO_TICKET && !/^\d{5}$/.test(ticketNumber))) {
-        return res.status(400).json({ message: "Invalid ticket number. Must be 5 digits." });
+      if (!ticketNumber || (ticketNumber !== PSEUDO_TICKET && !/^\d{5}$/.test(ticketNumber) && !/^[A-Za-z]\d{4}$/.test(ticketNumber))) {
+        return res.status(400).json({ message: "Invalid ticket number. Must be 5 digits or a letter followed by 4 digits." });
       }
       if (!visitorType || !guestName || !carMake || !carModel || !carColor) {
         return res.status(400).json({ message: "Missing required fields" });
