@@ -867,11 +867,37 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     ).slice(0, 8);
   }, [carMakeSearch]);
 
+  const uploadDataUrlToServer = async (dataUrl: string): Promise<string | null> => {
+    try {
+      const uploadRes = await fetch('/api/car-photos/upload', { method: 'POST', credentials: 'include' });
+      if (!uploadRes.ok) return null;
+      const { uploadURL, issuedPath } = await uploadRes.json();
+      const base64 = dataUrl.split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      const putRes = await fetch(uploadURL, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
+      if (!putRes.ok) return null;
+      return issuedPath as string;
+    } catch {
+      return null;
+    }
+  };
+
   const createTicketMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const staffName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
         : user?.username || "Unknown Staff";
+
+      const platePhotoUrl = data.platePhotoUrl?.startsWith('data:')
+        ? await uploadDataUrlToServer(data.platePhotoUrl)
+        : (data.platePhotoUrl || null);
+
+      const carPhoto = data.carPhotoUrl?.startsWith('data:')
+        ? await uploadDataUrlToServer(data.carPhotoUrl)
+        : (data.carPhotoUrl || null);
       
       return await apiRequest("POST", "/api/staff/tickets", {
         ticketNumber: data.ticketNumber,
@@ -883,9 +909,9 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         carMake: data.carMake,
         carModel: data.carModel,
         carColor: data.carColor,
-        platePhotoUrl: data.platePhotoUrl || null,
+        platePhotoUrl,
         licensePlate: data.licensePlate || null,
-        carPhoto: data.carPhotoUrl || null,
+        carPhoto,
         createdByUserId: user?.id,
         createdByName: staffName,
         locationId: user?.locationId || null,

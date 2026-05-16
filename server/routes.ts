@@ -2501,7 +2501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const objectStorageService = new ObjectStorageService();
       const { uploadURL, issuedPath } = await objectStorageService.getCarPhotoUploadURL();
       issuedPhotoPaths.set(issuedPath, Date.now() + PHOTO_PATH_TTL_MS);
-      res.json({ uploadURL });
+      res.json({ uploadURL, issuedPath });
     } catch (error) {
       console.error("Error generating car photo upload URL:", error);
       res.status(500).json({ message: "Failed to generate upload URL" });
