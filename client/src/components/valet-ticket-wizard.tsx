@@ -468,34 +468,36 @@ const COLOR_STYLES: Record<string, { bg: string; text: string; border: string }>
 // ─── iOS-style drum wheel picker for car brand ──────────────────────────────
 const WHEEL_ITEM_H = 56;
 
-function BrandWheelPicker({
-  brands,
+function WheelPicker({
+  items,
   value,
   fontSizeOffset = 0,
+  emptyMessage = 'No items in list. Add one below.',
   onSelect,
   onClose,
 }: {
-  brands: string[];
+  items: string[];
   value: string;
   fontSizeOffset?: number;
-  onSelect: (brand: string) => void;
+  emptyMessage?: string;
+  onSelect: (item: string) => void;
   onClose: () => void;
 }) {
-  const [idx, setIdx] = useState(() => Math.max(0, brands.indexOf(value)));
+  const [idx, setIdx] = useState(() => Math.max(0, items.indexOf(value)));
   const [dragDelta, setDragDelta] = useState(0);
   const dragging = useRef(false);
   const startClientY = useRef(0);
 
-  // Clamp idx whenever brands list changes (e.g. after deleting a brand)
+  // Clamp idx whenever items list changes (e.g. after deleting an item)
   useEffect(() => {
-    if (brands.length === 0) return;
-    setIdx(prev => Math.min(prev, brands.length - 1));
-  }, [brands.length]);
+    if (items.length === 0) return;
+    setIdx(prev => Math.min(prev, items.length - 1));
+  }, [items.length]);
 
   const effectiveIdx = idx - dragDelta / WHEEL_ITEM_H;
 
   const commit = (raw: number) => {
-    const clamped = Math.max(0, Math.min(brands.length - 1, Math.round(raw)));
+    const clamped = Math.max(0, Math.min(items.length - 1, Math.round(raw)));
     setIdx(clamped);
     setDragDelta(0);
   };
@@ -545,31 +547,31 @@ function BrandWheelPicker({
   // Mouse wheel
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    setIdx(prev => Math.max(0, Math.min(brands.length - 1, prev + (e.deltaY > 0 ? 1 : -1))));
+    setIdx(prev => Math.max(0, Math.min(items.length - 1, prev + (e.deltaY > 0 ? 1 : -1))));
   };
 
-  // Keyboard — skip when focus is on an input/textarea (e.g. "Add new brand" field)
+  // Keyboard — skip when focus is on an input/textarea
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (e.key === 'ArrowDown') { e.preventDefault(); setIdx(p => Math.min(brands.length - 1, p + 1)); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setIdx(p => Math.min(items.length - 1, p + 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setIdx(p => Math.max(0, p - 1)); }
-      else if (e.key === 'Enter') onSelect(brands[idx]);
+      else if (e.key === 'Enter') onSelect(items[idx]);
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [idx, brands, onSelect, onClose]);
+  }, [idx, items, onSelect, onClose]);
 
-  // translateY so brands[idx] sits in the middle row of the 3-row window
+  // translateY so items[idx] sits in the middle row of the 3-row window
   const translateY = (1 - idx) * WHEEL_ITEM_H + dragDelta;
   const isAnimating = !dragging.current;
 
-  if (brands.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 w-full py-6">
-        <p className="text-sm text-gray-400">No brands in list. Add one below.</p>
+        <p className="text-sm text-gray-400">{emptyMessage}</p>
         <button
           type="button"
           onClick={onClose}
@@ -621,13 +623,13 @@ function BrandWheelPicker({
             willChange: 'transform',
           }}
         >
-          {brands.map((brand, i) => {
+          {items.map((item, i) => {
             const dist = Math.abs(i - effectiveIdx);
             const isCenter = dist < 0.5;
             const opacity = dist > 1.5 ? 0 : dist > 1 ? 0.2 : dist > 0.5 ? 0.45 : 1;
             return (
               <div
-                key={brand}
+                key={item}
                 style={{
                   height: WHEEL_ITEM_H,
                   opacity,
@@ -638,11 +640,11 @@ function BrandWheelPicker({
                 }}
                 className="flex items-center justify-center px-4 text-center leading-tight"
                 onClick={() => {
-                  if (i === idx) { onSelect(brand); }
+                  if (i === idx) { onSelect(item); }
                   else { setIdx(i); setDragDelta(0); }
                 }}
               >
-                {brand}
+                {item}
               </div>
             );
           })}
@@ -660,7 +662,7 @@ function BrandWheelPicker({
         </button>
         <button
           type="button"
-          onClick={() => onSelect(brands[idx])}
+          onClick={() => onSelect(items[idx])}
           className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors"
           style={{ background: 'linear-gradient(135deg, #1a1f44 0%, #2d3561 100%)' }}
         >
@@ -737,6 +739,17 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   });
   const [editingColors, setEditingColors] = useState(false);
   const [newColorInput, setNewColorInput] = useState("");
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [colorFontSize, setColorFontSize] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('wizard-color-font') || '0', 10); } catch { return 0; }
+  });
+  const changeColorFont = (delta: number) => {
+    setColorFontSize(prev => {
+      const next = Math.max(-2, Math.min(6, prev + delta));
+      localStorage.setItem('wizard-color-font', String(next));
+      return next;
+    });
+  };
 
   const saveColors = (colors: string[]) => {
     setQuickColors(colors);
@@ -1146,10 +1159,11 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
                   {/* Wheel */}
                   <div className="px-4 pb-2">
-                    <BrandWheelPicker
-                      brands={quickBrands}
+                    <WheelPicker
+                      items={quickBrands}
                       value={formData.carMake}
                       fontSizeOffset={brandFontSize}
+                      emptyMessage="No brands in list. Add one below."
                       onSelect={(brand) => {
                         setFormData({ ...formData, carMake: brand });
                         setCarMakeSearch(brand);
@@ -1240,81 +1254,141 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <label className="text-sm font-medium text-gray-700">Color</label>
-              {!editingColors && (
-                <button
-                  type="button"
-                  onClick={() => setEditingColors(true)}
-                  className="flex items-center gap-1 text-xs font-medium border border-red-300 bg-red-50 text-red-500 hover:bg-red-100 hover:border-red-400 rounded-md px-2 py-1 transition-colors"
-                >
-                  <Plus size={12} />
-                  Edit
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {quickColors.map((color) => {
-                const colorStyle = COLOR_STYLES[color] || COLOR_STYLES['Other'];
-                const isSelected = formData.carColor === color;
-                return (
-                  <div key={color} className="relative">
-                    {editingColors ? (
-                      <span className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border-2 ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border}`}>
-                        {color}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveColor(color)}
-                          className="ml-0.5 opacity-70 hover:opacity-100 transition-opacity"
-                        >
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, carColor: color })}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${colorStyle.bg} ${colorStyle.text} ${colorStyle.border} ${
-                          isSelected ? "ring-2 ring-regis-gold ring-offset-2 scale-105" : "hover:scale-105"
-                        }`}
-                        data-testid={`color-${color}`}
-                      >
-                        {color}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+              <button
+                type="button"
+                onClick={() => setShowColorPicker(true)}
+                className="flex items-center gap-1 text-xs font-medium text-regis-gold hover:text-yellow-600 border border-regis-gold hover:border-yellow-600 rounded-md px-2 py-1 transition-colors"
+              >
+                <Plus size={12} />
+                Pick Color
+              </button>
             </div>
 
-            {editingColors && (
-              <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newColorInput}
-                    onChange={(e) => setNewColorInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddColor()}
-                    placeholder="Type a color name and press Add"
-                    className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:border-regis-gold"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddColor}
-                    disabled={!newColorInput.trim()}
-                    className="px-3 py-1.5 text-xs font-medium bg-regis-navy text-white rounded-md hover:bg-blue-900 disabled:opacity-40 transition-colors"
-                  >
-                    Add
-                  </button>
+            {/* iOS wheel picker modal for color */}
+            {showColorPicker && (
+              <div
+                className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
+                style={{ background: 'rgba(0,0,0,0.45)' }}
+                onClick={(e) => { if (e.target === e.currentTarget) { setShowColorPicker(false); setEditingColors(false); } }}
+              >
+                <div className="bg-white w-full sm:w-80 sm:rounded-2xl rounded-t-2xl overflow-hidden shadow-2xl">
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 pt-5 pb-2">
+                    <span className="text-base font-semibold text-regis-navy">Select Color</span>
+                    <div className="flex items-center gap-2">
+                      {/* Font size controls */}
+                      <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => changeColorFont(-1)}
+                          disabled={colorFontSize <= -2}
+                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                          title="Smaller text"
+                        >A-</button>
+                        <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">
+                          {colorFontSize > 0 ? `+${colorFontSize}` : colorFontSize}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => changeColorFont(1)}
+                          disabled={colorFontSize >= 6}
+                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                          title="Larger text"
+                        >A+</button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setShowColorPicker(false); setEditingColors(false); setNewColorInput(""); }}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Wheel */}
+                  <div className="px-4 pb-2">
+                    <WheelPicker
+                      items={quickColors}
+                      value={formData.carColor}
+                      fontSizeOffset={colorFontSize}
+                      emptyMessage="No colors in list. Add one below."
+                      onSelect={(color) => {
+                        setFormData({ ...formData, carColor: color });
+                        setShowColorPicker(false);
+                        setEditingColors(false);
+                      }}
+                      onClose={() => { setShowColorPicker(false); setEditingColors(false); }}
+                    />
+                  </div>
+
+                  {/* Edit list section */}
+                  <div className="border-t border-gray-100 mx-4 pt-3 pb-4">
+                    {!editingColors ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingColors(true)}
+                        className="w-full text-xs text-gray-400 hover:text-red-500 transition-colors py-1"
+                      >
+                        Edit color list
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {quickColors.map((color) => (
+                            <span
+                              key={color}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                            >
+                              {color}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveColor(color)}
+                                className="text-red-400 hover:text-red-600 transition-colors"
+                              >
+                                <X size={10} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <input
+                            type="text"
+                            value={newColorInput}
+                            onChange={(e) => setNewColorInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddColor()}
+                            placeholder="Add new color…"
+                            className="flex-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:border-regis-gold"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddColor}
+                            disabled={!newColorInput.trim()}
+                            className="px-3 py-1.5 text-xs font-medium bg-regis-navy text-white rounded-lg hover:bg-blue-900 disabled:opacity-40 transition-colors"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setEditingColors(false); setNewColorInput(""); }}
+                          className="w-full text-xs font-medium text-regis-gold hover:text-yellow-600 py-1 transition-colors"
+                        >
+                          Done Editing
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setEditingColors(false); setNewColorInput(""); }}
-                  className="w-full text-xs font-medium text-regis-gold hover:text-yellow-600 py-1 transition-colors"
-                >
-                  Done Editing
-                </button>
               </div>
+            )}
+
+            {formData.carColor && (
+              <p className="mt-1 text-xs text-gray-500">
+                Selected: <span className="font-medium text-regis-navy">{formData.carColor}</span>
+              </p>
             )}
           </div>
         </div>
