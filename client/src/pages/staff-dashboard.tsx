@@ -5721,7 +5721,7 @@ export default function StaffDashboard() {
                     <div className="mt-4">
                       <p className="text-xs text-gray-500 mb-2">Registration Photo</p>
                       <img 
-                        src={viewTicket.platePhotoUrl} 
+                        src={viewTicket.platePhotoUrl.startsWith('data:') ? viewTicket.platePhotoUrl : `/api/backup/photo?path=${encodeURIComponent(viewTicket.platePhotoUrl)}`}
                         alt="License plate" 
                         className="w-full max-w-xs h-32 object-cover rounded border"
                       />
@@ -5731,7 +5731,7 @@ export default function StaffDashboard() {
                     <div className="mt-4">
                       <p className="text-xs text-gray-500 mb-2">Car Photo</p>
                       <img
-                        src={viewTicket.carPhoto}
+                        src={viewTicket.carPhoto.startsWith('data:') ? viewTicket.carPhoto : `/api/backup/photo?path=${encodeURIComponent(viewTicket.carPhoto)}`}
                         alt="Car"
                         className="w-full max-w-xs h-40 object-cover rounded border"
                       />
