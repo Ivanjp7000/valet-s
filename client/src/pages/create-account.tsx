@@ -5,13 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Loader2, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
 
-function generateCaptcha() {
-  const a = Math.floor(Math.random() * 9) + 1;
-  const b = Math.floor(Math.random() * 9) + 1;
-  const useAdd = Math.random() < 0.5;
-  const answer = useAdd ? a + b : Math.max(a, b) - Math.min(a, b);
-  const display = useAdd ? `${a} + ${b}` : `${Math.max(a, b)} − ${Math.min(a, b)}`;
-  return { display, answer };
+interface CaptchaChallenge {
+  display: string;
+  token: string;
 }
 
 export default function CreateAccount() {
@@ -19,15 +15,27 @@ export default function CreateAccount() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
-  const [captcha, setCaptcha] = useState(generateCaptcha());
+  const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
+  const [captchaLoading, setCaptchaLoading] = useState(true);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState<{ message: string; isStRegis: boolean } | null>(null);
 
-  const refreshCaptcha = () => {
-    setCaptcha(generateCaptcha());
+  const fetchCaptcha = async () => {
+    setCaptchaLoading(true);
     setCaptchaAnswer("");
+    try {
+      const res = await fetch("/api/auth/captcha");
+      const data: CaptchaChallenge = await res.json();
+      setCaptcha(data);
+    } catch {
+      setCaptcha(null);
+    } finally {
+      setCaptchaLoading(false);
+    }
   };
+
+  useEffect(() => { fetchCaptcha(); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +46,7 @@ export default function CreateAccount() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) { setError("Please enter a valid email address"); return; }
     if (!captchaAnswer.trim()) { setError("Please answer the verification question"); return; }
+    if (!captcha?.token) { setError("Verification unavailable — please refresh the question"); return; }
 
     setIsLoading(true);
     try {
@@ -49,21 +58,21 @@ export default function CreateAccount() {
           fullName: fullName.trim(),
           email: email.trim(),
           captchaAnswer: Number(captchaAnswer),
-          captchaExpected: captcha.answer,
+          captchaToken: captcha.token,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Registration failed. Please try again.");
         if (data.message?.toLowerCase().includes("answer") || data.message?.toLowerCase().includes("verification")) {
-          refreshCaptcha();
+          fetchCaptcha();
         }
         return;
       }
       setSuccess({ message: data.message, isStRegis: data.isStRegis });
     } catch (err: any) {
       setError("Registration failed. Please try again.");
-      refreshCaptcha();
+      fetchCaptcha();
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +167,12 @@ export default function CreateAccount() {
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Verification — What is <span className="font-bold text-regis-navy">{captcha.display}</span> ?
+                Verification —{" "}
+                {captchaLoading || !captcha ? (
+                  <span className="text-gray-400">Loading…</span>
+                ) : (
+                  <>What is <span className="font-bold text-regis-navy">{captcha.display}</span>?</>
+                )}
               </label>
               <div className="flex gap-2">
                 <Input
@@ -167,14 +181,16 @@ export default function CreateAccount() {
                   value={captchaAnswer}
                   onChange={(e) => setCaptchaAnswer(e.target.value)}
                   className="focus:border-regis-gold"
+                  disabled={captchaLoading || !captcha}
                 />
                 <button
                   type="button"
-                  onClick={refreshCaptcha}
+                  onClick={fetchCaptcha}
                   className="text-gray-400 hover:text-gray-600 px-2"
                   title="New question"
+                  disabled={captchaLoading}
                 >
-                  <RefreshCw size={14} />
+                  <RefreshCw size={14} className={captchaLoading ? 'animate-spin' : ''} />
                 </button>
               </div>
             </div>
@@ -188,7 +204,7 @@ export default function CreateAccount() {
             <Button
               type="submit"
               className="w-full bg-regis-navy hover:bg-blue-900 text-white font-medium"
-              disabled={isLoading}
+              disabled={isLoading || captchaLoading || !captcha}
             >
               {isLoading ? (
                 <><Loader2 size={15} className="mr-2 animate-spin" />Submitting…</>

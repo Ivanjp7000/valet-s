@@ -323,6 +323,32 @@ function sanitizeUser<T extends { password?: string | null }>(user: T): Omit<T, 
 // In-memory rate limiter for public ticket endpoints
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
 
+// CAPTCHA helpers — server-side signed challenges prevent clients from supplying their own expected answer
+const CAPTCHA_WINDOW_MS = 5 * 60 * 1000; // 5-minute validity window
+function _captchaHmac(answer: number, windowIndex: number): string {
+  const secret = process.env.SESSION_SECRET || 'captcha-fallback-secret';
+  return crypto.createHmac('sha256', secret)
+    .update(`captcha:${answer}:${windowIndex}`)
+    .digest('hex');
+}
+function generateCaptchaToken(answer: number): string {
+  const wi = Math.floor(Date.now() / CAPTCHA_WINDOW_MS);
+  return _captchaHmac(answer, wi);
+}
+function verifyCaptchaToken(answerStr: string, token: string): boolean {
+  if (!token || token.length !== 64) return false;
+  const answer = parseInt(answerStr, 10);
+  if (isNaN(answer)) return false;
+  const wi = Math.floor(Date.now() / CAPTCHA_WINDOW_MS);
+  for (const w of [wi, wi - 1]) {
+    const expected = _captchaHmac(answer, w);
+    try {
+      if (crypto.timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'))) return true;
+    } catch { /* length mismatch */ }
+  }
+  return false;
+}
+
 function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
@@ -534,16 +560,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public: issue a server-signed CAPTCHA challenge for the self-registration form
+  app.get('/api/auth/captcha', (_req, res) => {
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    const useAdd = Math.random() < 0.5;
+    const answer = useAdd ? a + b : Math.max(a, b) - Math.min(a, b);
+    const display = useAdd ? `${a} + ${b}` : `${Math.max(a, b)} − ${Math.min(a, b)}`;
+    const token = generateCaptchaToken(answer);
+    res.json({ display, token });
+  });
+
   // Self-registration — Step 1: submit name + email
   app.post('/api/auth/register', async (req: any, res) => {
     try {
-      const { fullName, email, captchaAnswer, captchaExpected } = req.body;
+      const clientIp = req.socket?.remoteAddress || 'unknown';
+      if (!checkRateLimit(`register-ip:${clientIp}`, 5, 60 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many registration attempts. Please try again later." });
+      }
+
+      const { fullName, email, captchaAnswer, captchaToken } = req.body;
       if (!fullName || !email) return res.status(400).json({ message: "Full name and email are required" });
       const emailLower = email.trim().toLowerCase();
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(emailLower)) return res.status(400).json({ message: "Please enter a valid email address" });
-      if (captchaAnswer === undefined || captchaExpected === undefined) return res.status(400).json({ message: "Please complete the verification" });
-      if (String(captchaAnswer).trim() !== String(captchaExpected).trim()) return res.status(400).json({ message: "Incorrect answer — please try again" });
+
+      if (!checkRateLimit(`register-email:${emailLower}`, 3, 60 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many registration attempts for this email. Please try again later." });
+      }
+
+      if (captchaAnswer === undefined || !captchaToken) return res.status(400).json({ message: "Please complete the verification" });
+      if (!verifyCaptchaToken(String(captchaAnswer), String(captchaToken))) return res.status(400).json({ message: "Incorrect answer — please try again" });
 
       const nameParts = fullName.trim().split(/\s+/);
       const firstName = nameParts[0];
@@ -741,17 +788,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      // Verify identity:
-      // - If PIN supplied AND ticket has a stored PIN → PIN must match (name is irrelevant)
-      // - If PIN supplied but ticket has no stored PIN → fall back to name match
-      // - If no PIN supplied → require name match
+      // Verify identity: PIN is required for all public ticket access.
+      // Tickets without a stored PIN are inaccessible via public endpoints.
       let verified = false;
-      if (!ticket) {
+      if (!ticket || !ticket.guestPin) {
         verified = false;
-      } else if (pinParam && ticket.guestPin) {
-        verified = pinParam === ticket.guestPin.toUpperCase();
       } else {
-        verified = !!nameParam && namesMatch(nameParam, ticket.guestName);
+        verified = !!pinParam && pinParam === ticket.guestPin.toUpperCase();
       }
 
       // Return the same 404 whether the ticket doesn't exist or verification fails
@@ -801,17 +844,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
 
-      // Verify identity (same authoritative-PIN logic as the GET lookup):
-      // - PIN supplied AND ticket has stored PIN → PIN must match (name is irrelevant)
-      // - PIN supplied but ticket has no stored PIN → fall back to name match
-      // - No PIN supplied → require name match
+      // PIN is required for all public ticket mutations.
       let retrievalVerified = false;
-      if (!ticket) {
+      if (!ticket || !ticket.guestPin) {
         retrievalVerified = false;
-      } else if (pinParam && ticket.guestPin) {
-        retrievalVerified = pinParam === ticket.guestPin.toUpperCase();
       } else {
-        retrievalVerified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+        retrievalVerified = !!pinParam && pinParam === ticket.guestPin.toUpperCase();
       }
       if (!ticket || !retrievalVerified) {
         return res.status(404).json({ message: "Ticket not found" });
@@ -858,12 +896,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const ticket = await storage.getValetTicket(ticketNumber);
       let cancelVerified = false;
-      if (!ticket) {
+      if (!ticket || !ticket.guestPin) {
         cancelVerified = false;
-      } else if (pinParam && ticket.guestPin) {
-        cancelVerified = pinParam === ticket.guestPin.toUpperCase();
       } else {
-        cancelVerified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+        cancelVerified = !!pinParam && pinParam === ticket.guestPin.toUpperCase();
       }
       if (!ticket || !cancelVerified) {
         return res.status(404).json({ message: 'Ticket not found' });
@@ -928,14 +964,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
       let verified = false;
-      if (!ticket) {
+      if (!ticket || !ticket.guestPin) {
         verified = false;
-      } else if (pinParam && ticket.guestPin) {
-        verified = pinParam === ticket.guestPin.toUpperCase();
       } else {
-        verified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+        verified = !!pinParam && pinParam === ticket.guestPin.toUpperCase();
       }
-      // Return the same 404 for both not-found and verification-failure — eliminates oracle
       if (!ticket || !verified) {
         return res.status(404).json({ message: "Ticket not found" });
       }
@@ -998,12 +1031,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ticket = await storage.getValetTicket(ticketNumber);
       let verified = false;
-      if (!ticket) {
+      if (!ticket || !ticket.guestPin) {
         verified = false;
-      } else if (pinParam && ticket.guestPin) {
-        verified = pinParam === ticket.guestPin.toUpperCase();
       } else {
-        verified = !!guestName?.trim() && namesMatch(guestName, ticket.guestName);
+        verified = !!pinParam && pinParam === ticket.guestPin.toUpperCase();
       }
       if (!ticket || !verified) {
         return res.status(404).json({ message: "Ticket not found" });
