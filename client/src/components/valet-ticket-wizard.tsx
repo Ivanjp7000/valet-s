@@ -18,6 +18,39 @@ import {
 } from "@shared/schema";
 import type { User as UserType } from "@shared/schema";
 
+// Maps a colour name to actual CSS background / text / border values for pills
+function getColorStyle(name: string): { bg: string; text: string; border: string } {
+  const key = name.toLowerCase().trim();
+  const map: Record<string, { bg: string; text: string; border: string }> = {
+    black:       { bg: '#1a1a1a', text: '#ffffff', border: '#000000' },
+    silver:      { bg: '#c0c0c0', text: '#1a1a1a', border: '#a0a0a0' },
+    white:       { bg: '#ffffff', text: '#1a1a1a', border: '#d0d0d0' },
+    grey:        { bg: '#808080', text: '#ffffff', border: '#606060' },
+    gray:        { bg: '#808080', text: '#ffffff', border: '#606060' },
+    red:         { bg: '#dc2626', text: '#ffffff', border: '#b91c1c' },
+    blue:        { bg: '#2563eb', text: '#ffffff', border: '#1d4ed8' },
+    navy:        { bg: '#1e3a5f', text: '#ffffff', border: '#1a1f44' },
+    green:       { bg: '#16a34a', text: '#ffffff', border: '#15803d' },
+    brown:       { bg: '#92400e', text: '#ffffff', border: '#78350f' },
+    gold:        { bg: '#d97706', text: '#ffffff', border: '#b45309' },
+    yellow:      { bg: '#fbbf24', text: '#1a1a1a', border: '#f59e0b' },
+    orange:      { bg: '#ea580c', text: '#ffffff', border: '#c2410c' },
+    purple:      { bg: '#7c3aed', text: '#ffffff', border: '#6d28d9' },
+    pink:        { bg: '#ec4899', text: '#ffffff', border: '#db2777' },
+    beige:       { bg: '#f5f0e8', text: '#1a1a1a', border: '#d6c9a8' },
+    cream:       { bg: '#fffdd0', text: '#1a1a1a', border: '#e8e0a0' },
+    maroon:      { bg: '#7f1d1d', text: '#ffffff', border: '#6b1212' },
+    'dark green':{ bg: '#14532d', text: '#ffffff', border: '#0f3d20' },
+    'light blue':{ bg: '#7dd3fc', text: '#0c4a6e', border: '#38bdf8' },
+    champagne:   { bg: '#f7e7ce', text: '#1a1a1a', border: '#e5c99a' },
+    bronze:      { bg: '#cd7f32', text: '#ffffff', border: '#a0622a' },
+    cyan:        { bg: '#06b6d4', text: '#ffffff', border: '#0891b2' },
+    turquoise:   { bg: '#0d9488', text: '#ffffff', border: '#0f766e' },
+    khaki:       { bg: '#c3b386', text: '#1a1a1a', border: '#a89768' },
+  };
+  return map[key] ?? { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' };
+}
+
 const stripHonorifics = (name: string) =>
   name.replace(/^(Mr\.|Mrs\.|Ms\.|Mx\.|Dr\.|Miss|Sir|Lord)\s*/i, '').trim();
 const fmtGuest = (name: string | null | undefined) =>
@@ -1354,22 +1387,45 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                       </button>
                     ) : (
                       <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1.5">
-                          {quickColors.map((color) => (
-                            <span
-                              key={color}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                        {/* Sort controls */}
+                        <div className="flex items-center gap-1.5 pb-1">
+                          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mr-0.5">Sort</span>
+                          {[
+                            { label: 'A → Z', action: () => saveColors([...quickColors].sort((a, b) => a.localeCompare(b))) },
+                            { label: 'Z → A', action: () => saveColors([...quickColors].sort((a, b) => b.localeCompare(a))) },
+                            { label: 'Default', action: () => saveColors([...DEFAULT_COLORS.filter(c => quickColors.includes(c)), ...quickColors.filter(c => !DEFAULT_COLORS.includes(c))]) },
+                          ].map(({ label, action }) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={action}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-gray-300 bg-white text-gray-600 hover:border-regis-navy hover:text-regis-navy transition-colors"
                             >
-                              {color}
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveColor(color)}
-                                className="text-red-400 hover:text-red-600 transition-colors"
-                              >
-                                <X size={10} />
-                              </button>
-                            </span>
+                              {label}
+                            </button>
                           ))}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {quickColors.map((color) => {
+                            const cs = getColorStyle(color);
+                            return (
+                              <span
+                                key={color}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border"
+                                style={{ background: cs.bg, color: cs.text, borderColor: cs.border }}
+                              >
+                                {color}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveColor(color)}
+                                  style={{ color: cs.text, opacity: 0.7 }}
+                                  className="hover:opacity-100 transition-opacity"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            );
+                          })}
                         </div>
                         <div className="flex gap-2 pt-1">
                           <input
