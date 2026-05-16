@@ -506,6 +506,7 @@ function WheelPicker({
   value,
   fontSizeOffset = 0,
   emptyMessage = 'No items in list. Add one below.',
+  getItemDotColor,
   onSelect,
   onClose,
 }: {
@@ -513,6 +514,7 @@ function WheelPicker({
   value: string;
   fontSizeOffset?: number;
   emptyMessage?: string;
+  getItemDotColor?: (item: string) => string | undefined;
   onSelect: (item: string) => void;
   onClose: () => void;
 }) {
@@ -671,12 +673,29 @@ function WheelPicker({
                   color: isCenter ? '#1a1f44' : '#9ca3af',
                   transition: isAnimating ? 'opacity 0.2s, font-size 0.2s, color 0.2s' : 'none',
                 }}
-                className="flex items-center justify-center px-4 text-center leading-tight"
+                className="flex items-center justify-center gap-2 px-4 text-center leading-tight"
                 onClick={() => {
                   if (i === idx) { onSelect(item); }
                   else { setIdx(i); setDragDelta(0); }
                 }}
               >
+                {getItemDotColor && (() => {
+                  const dotColor = getItemDotColor(item);
+                  return dotColor ? (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: isCenter ? 18 : 12,
+                        height: isCenter ? 18 : 12,
+                        borderRadius: '50%',
+                        backgroundColor: dotColor,
+                        border: dotColor === '#ffffff' ? '1.5px solid #d0d0d0' : '1.5px solid rgba(0,0,0,0.15)',
+                        flexShrink: 0,
+                        transition: isAnimating ? 'width 0.2s, height 0.2s' : 'none',
+                      }}
+                    />
+                  ) : null;
+                })()}
                 {item}
               </div>
             );
@@ -1366,6 +1385,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                       value={formData.carColor}
                       fontSizeOffset={colorFontSize}
                       emptyMessage="No colors in list. Add one below."
+                      getItemDotColor={(c) => getColorStyle(c).bg}
                       onSelect={(color) => {
                         setFormData({ ...formData, carColor: color });
                         setShowColorPicker(false);
@@ -1411,8 +1431,8 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                             return (
                               <span
                                 key={color}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border"
-                                style={{ background: cs.bg, color: cs.text, borderColor: cs.border }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
+                                style={{ backgroundColor: cs.bg, color: cs.text, border: `1px solid ${cs.border}` }}
                               >
                                 {color}
                                 <button
