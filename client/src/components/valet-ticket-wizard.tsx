@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { 
   Car, Camera, User, ChevronRight, ChevronLeft, Check, 
-  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, ChevronUp, Printer, RefreshCw
+  Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, Printer, RefreshCw
 } from "lucide-react";
 import qrCodeUrl from "@/assets/qr-valet-s.jpg";
 import { apiRequest } from "@/lib/queryClient";
@@ -486,6 +486,12 @@ function BrandWheelPicker({
   const dragging = useRef(false);
   const startClientY = useRef(0);
 
+  // Clamp idx whenever brands list changes (e.g. after deleting a brand)
+  useEffect(() => {
+    if (brands.length === 0) return;
+    setIdx(prev => Math.min(prev, brands.length - 1));
+  }, [brands.length]);
+
   const effectiveIdx = idx - dragDelta / WHEEL_ITEM_H;
 
   const commit = (raw: number) => {
@@ -559,6 +565,21 @@ function BrandWheelPicker({
   // translateY so brands[idx] sits in the middle row of the 3-row window
   const translateY = (1 - idx) * WHEEL_ITEM_H + dragDelta;
   const isAnimating = !dragging.current;
+
+  if (brands.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 w-full py-6">
+        <p className="text-sm text-gray-400">No brands in list. Add one below.</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-6 py-2.5 rounded-xl border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-4 w-full">
