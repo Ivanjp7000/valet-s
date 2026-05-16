@@ -141,7 +141,7 @@ async function lookupGeo(ip: string): Promise<{ country: string; city: string }>
   if (!ip || localPrefixes.some(p => ip.startsWith(p))) return { country: 'Local', city: 'Dev' };
   if (geoCache.has(ip)) return geoCache.get(ip)!;
   try {
-    const resp = await fetch(`http://ip-api.com/json/${ip}?fields=country,city`, { signal: AbortSignal.timeout(3000) });
+    const resp = await fetch(`https://ip-api.com/json/${ip}?fields=country,city`, { signal: AbortSignal.timeout(3000) });
     const data: any = await resp.json();
     const result = { country: data.country || 'Unknown', city: data.city || '' };
     geoCache.set(ip, result);
@@ -158,8 +158,7 @@ async function trackSession(req: any): Promise<void> {
     if (!userId || !req.sessionID) return;
     const user = await (await import('./storage')).storage.getUser(userId);
     if (!user) return;
-    const rawIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
-    const ip = rawIp.replace('::ffff:', '');
+    const ip = (req.ip || '').replace('::ffff:', '');
     const ua = req.headers['user-agent'] || '';
     const { deviceType, os, browser } = parseUserAgent(ua);
     const geo = await lookupGeo(ip);
