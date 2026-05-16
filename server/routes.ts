@@ -2541,7 +2541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/car-photos/:photoPath(*)', isAuthenticated, requireReadAccess, async (req: any, res) => {
     try {
-      const photoPath = `/${req.params.photoPath}`;
+      const photoPath = `/car-photos/${req.params.photoPath}`;
       const currentUser = req.currentUser;
 
       // Verify this photo belongs to a ticket the caller may access (OU + location scope)
