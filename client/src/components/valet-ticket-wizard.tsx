@@ -471,11 +471,13 @@ const WHEEL_ITEM_H = 56;
 function BrandWheelPicker({
   brands,
   value,
+  fontSizeOffset = 0,
   onSelect,
   onClose,
 }: {
   brands: string[];
   value: string;
+  fontSizeOffset?: number;
   onSelect: (brand: string) => void;
   onClose: () => void;
 }) {
@@ -540,11 +542,13 @@ function BrandWheelPicker({
     setIdx(prev => Math.max(0, Math.min(brands.length - 1, prev + (e.deltaY > 0 ? 1 : -1))));
   };
 
-  // Keyboard
+  // Keyboard — skip when focus is on an input/textarea (e.g. "Add new brand" field)
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') setIdx(p => Math.min(brands.length - 1, p + 1));
-      else if (e.key === 'ArrowUp') setIdx(p => Math.max(0, p - 1));
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setIdx(p => Math.min(brands.length - 1, p + 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setIdx(p => Math.max(0, p - 1)); }
       else if (e.key === 'Enter') onSelect(brands[idx]);
       else if (e.key === 'Escape') onClose();
     };
@@ -606,13 +610,16 @@ function BrandWheelPicker({
                 style={{
                   height: WHEEL_ITEM_H,
                   opacity,
-                  fontSize: isCenter ? 22 : 15,
+                  fontSize: isCenter ? 22 + fontSizeOffset * 2 : 15 + fontSizeOffset,
                   fontWeight: isCenter ? 700 : 400,
                   color: isCenter ? '#1a1f44' : '#9ca3af',
                   transition: isAnimating ? 'opacity 0.2s, font-size 0.2s, color 0.2s' : 'none',
                 }}
                 className="flex items-center justify-center px-4 text-center leading-tight"
-                onClick={() => { setIdx(i); setDragDelta(0); }}
+                onClick={() => {
+                  if (i === idx) { onSelect(brand); }
+                  else { setIdx(i); setDragDelta(0); }
+                }}
               >
                 {brand}
               </div>
@@ -654,6 +661,16 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [editingBrands, setEditingBrands] = useState(false);
   const [newBrandInput, setNewBrandInput] = useState("");
+  const [brandFontSize, setBrandFontSize] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('wizard-brand-font') || '0', 10); } catch { return 0; }
+  });
+  const changeBrandFont = (delta: number) => {
+    setBrandFontSize(prev => {
+      const next = Math.max(-2, Math.min(6, prev + delta));
+      localStorage.setItem('wizard-brand-font', String(next));
+      return next;
+    });
+  };
   const DEFAULT_BRANDS = [
     'Toyota', 'Lexus', 'Honda', 'Nissan', 'Mazda', 'Subaru',
     'Mitsubishi', 'Suzuki', 'Daihatsu', 'Mercedes-Benz', 'BMW', 'Audi',
@@ -1075,13 +1092,35 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                   {/* Header */}
                   <div className="flex items-center justify-between px-5 pt-5 pb-2">
                     <span className="text-base font-semibold text-regis-navy">Select Brand</span>
-                    <button
-                      type="button"
-                      onClick={() => { setShowBrandPicker(false); setEditingBrands(false); setNewBrandInput(""); }}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* Font size controls */}
+                      <div className="flex items-center gap-1 border border-gray-200 rounded-md overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => changeBrandFont(-1)}
+                          disabled={brandFontSize <= -2}
+                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                          title="Smaller text"
+                        >A-</button>
+                        <span className="px-1 text-[10px] text-gray-400 select-none border-x border-gray-200">
+                          {brandFontSize > 0 ? `+${brandFontSize}` : brandFontSize}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => changeBrandFont(1)}
+                          disabled={brandFontSize >= 6}
+                          className="px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                          title="Larger text"
+                        >A+</button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setShowBrandPicker(false); setEditingBrands(false); setNewBrandInput(""); }}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Wheel */}
@@ -1089,6 +1128,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                     <BrandWheelPicker
                       brands={quickBrands}
                       value={formData.carMake}
+                      fontSizeOffset={brandFontSize}
                       onSelect={(brand) => {
                         setFormData({ ...formData, carMake: brand });
                         setCarMakeSearch(brand);
