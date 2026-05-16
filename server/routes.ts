@@ -877,11 +877,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateValetTicket(ticketNumber, { scheduledRetrievalAt: null });
       broadcastToOU(updated!.ouId, {
         type: 'retrieval_cancelled',
-        data: { ticketNumber },
+        data: { ticketNumber, locationId: updated!.locationId },
       });
       broadcastToOU(updated!.ouId, {
         type: 'ticket_scheduled',
-        data: { ticketNumber, scheduledAt: null, scheduledBy: 'guest' },
+        data: { ticketNumber, scheduledAt: null, scheduledBy: 'guest', locationId: updated!.locationId },
       });
       res.json({ message: 'Retrieval request cancelled' });
     } catch (err: any) {
@@ -959,6 +959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           scheduledAt: scheduledDate.toISOString(),
           scheduledBy: 'guest',
           ouId: ticket.ouId,
+          locationId: ticket.locationId,
         },
       });
       // Also push a status update so the customer tracker refreshes
@@ -1113,6 +1114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           scheduledAt: scheduledDate.toISOString(),
           scheduledBy: 'staff',
           ouId: ticket.ouId,
+          locationId: ticket.locationId,
         },
       });
       broadcastToOU(ticket.ouId, {
@@ -1142,7 +1144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       broadcastToOU(ticket.ouId, {
         type: 'ticket_scheduled',
-        data: { ticketNumber: ticket.ticketNumber, scheduledAt: null, scheduledBy: 'staff', ouId: ticket.ouId },
+        data: { ticketNumber: ticket.ticketNumber, scheduledAt: null, scheduledBy: 'staff', ouId: ticket.ouId, locationId: ticket.locationId },
       });
       broadcastToOU(ticket.ouId, {
         type: 'ticket_status_updated',
@@ -1332,6 +1334,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const autoRosterCategory = (visitorType === 'restaurant' || visitorType === 'event' || visitorType === 'others') ? 'events' : 'arriving';
 
       const { guestPin } = req.body;
+
+      // Validate that supplied photo paths are server-issued internal paths
+      if (carPhoto) {
+        const normalizedCarPhoto = carPhoto.startsWith('https://storage.googleapis.com/')
+          ? new ObjectStorageService().normalizeCarPhotoPath(carPhoto)
+          : carPhoto;
+        if (!normalizedCarPhoto.startsWith('/car-photos/') || !isServerIssuedPhotoPath(normalizedCarPhoto)) {
+          return res.status(400).json({ message: "Invalid car photo path" });
+        }
+      }
+      if (platePhotoUrl) {
+        const normalizedPlatePhoto = platePhotoUrl.startsWith('https://storage.googleapis.com/')
+          ? new ObjectStorageService().normalizeCarPhotoPath(platePhotoUrl)
+          : platePhotoUrl;
+        if (!normalizedPlatePhoto.startsWith('/car-photos/') || !isServerIssuedPhotoPath(normalizedPlatePhoto)) {
+          return res.status(400).json({ message: "Invalid plate photo path" });
+        }
+      }
 
       const ticket = await storage.createValetTicket({
         ticketNumber,
@@ -2425,7 +2445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Broadcast deletion scoped to the ticket's OU
       broadcastToOU(ticketForBroadcast?.ouId ?? null, {
         type: 'ticket_deleted',
-        data: { ticketNumber },
+        data: { ticketNumber, locationId: ticketForBroadcast?.locationId ?? null },
       });
 
       res.json({ success: true, message: "Ticket deleted successfully" });
@@ -2460,10 +2480,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Car Photo Management Routes
+  // Server-side registry of legitimately issued photo paths.
+  // Paths are added when an upload URL is minted and expire after 30 minutes.
+  // Write endpoints only accept paths present in this registry (or already stored on the ticket).
+  const issuedPhotoPaths = new Map<string, number>(); // path → expiry timestamp ms
+  const PHOTO_PATH_TTL_MS = 30 * 60 * 1000;
+  setInterval(() => {
+    const now = Date.now();
+    issuedPhotoPaths.forEach((exp, path) => { if (now > exp) issuedPhotoPaths.delete(path); });
+  }, 5 * 60 * 1000);
+
+  function isServerIssuedPhotoPath(path: string): boolean {
+    const exp = issuedPhotoPaths.get(path);
+    if (exp === undefined) return false;
+    if (Date.now() > exp) { issuedPhotoPaths.delete(path); return false; }
+    return true;
+  }
+
   app.post('/api/car-photos/upload', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getCarPhotoUploadURL();
+      const { uploadURL, issuedPath } = await objectStorageService.getCarPhotoUploadURL();
+      issuedPhotoPaths.set(issuedPath, Date.now() + PHOTO_PATH_TTL_MS);
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error generating car photo upload URL:", error);
@@ -2476,12 +2514,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const photoPath = `/${req.params.photoPath}`;
       const currentUser = req.currentUser;
 
-      // Verify this photo belongs to a ticket in the caller's OU
+      // Verify this photo belongs to a ticket the caller may access (OU + location scope)
       const owningTicket = await storage.getTicketByPhotoPath(photoPath);
       if (!owningTicket) {
         return res.status(404).json({ message: "Photo not found" });
       }
-      if (currentUser.role !== 'superadmin' && owningTicket.ouId !== currentUser.ouId) {
+      if (!await isTicketInScope(owningTicket, currentUser)) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -2630,6 +2668,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         normalizedPhotoPath = objectStorageService.normalizeCarPhotoPath(carPhoto);
       }
 
+      // Reject photo paths that are not legitimate internal paths
+      if (normalizedPhotoPath && !normalizedPhotoPath.startsWith('/car-photos/')) {
+        return res.status(400).json({ message: "Invalid car photo path" });
+      }
+
+      // Only accept paths that are either already on this ticket, or were server-issued
+      if (normalizedPhotoPath && normalizedPhotoPath !== existing.carPhoto) {
+        if (!isServerIssuedPhotoPath(normalizedPhotoPath)) {
+          return res.status(400).json({ message: "Invalid car photo path" });
+        }
+      }
+
       const updatedTicket = await storage.updateValetTicketDetails(ticketNumber, {
         licensePlate,
         parkingLocation,
@@ -2659,7 +2709,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  interface ClientInfo { ouId: string | null; role: string; }
+  // scopedLocationIds: undefined = no location restriction; string[] = restricted to those locations (may be empty)
+  interface ClientInfo { ouId: string | null; role: string; scopedLocationIds?: string[]; }
   const clients = new Map<WebSocket, ClientInfo>();
   const sessionParser = getSession();
 
@@ -2682,7 +2733,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      clients.set(ws, { ouId: user.ouId ?? null, role: user.role });
+      // Load location restrictions so broadcastToOU can filter ticket events
+      const scopedLocationIds = await getUserScopedLocationIds(user) ?? undefined;
+      clients.set(ws, { ouId: user.ouId ?? null, role: user.role, scopedLocationIds });
       console.log('Authenticated client connected to WebSocket');
 
       ws.on('close', () => {
@@ -2783,13 +2836,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (includeUsers === 'true') {
-        const users = await storage.getScopedUsers(user);
-        result.users = users.map(({ password, ...u }) => u);
+        let exportedUsers;
+        if (scopedLocationIds !== undefined) {
+          // Location-restricted: only export users assigned to caller's locations
+          exportedUsers = scopedLocationIds.length > 0
+            ? await storage.getUsersScopedToLocations(user.ouId!, scopedLocationIds)
+            : [];
+        } else {
+          exportedUsers = await storage.getScopedUsers(user);
+        }
+        result.users = exportedUsers.map(({ password, ...u }) => u);
       }
 
       if (includeLocations === 'true') {
         const locations = await storage.getScopedLocations(user);
-        result.locations = locations;
+        // Location-restricted users may only export their assigned locations
+        result.locations = scopedLocationIds !== undefined
+          ? locations.filter(l => scopedLocationIds.includes(l.id))
+          : locations;
       }
 
       res.json(result);
@@ -2823,13 +2887,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Not found' });
       }
 
-      // Verify this photo belongs to a ticket in the caller's OU
+      // Verify this photo belongs to a ticket the caller may access (OU + location scope)
       const currentUser = req.currentUser;
       const owningTicket = await storage.getTicketByPhotoPath(normalizedPath);
       if (!owningTicket) {
         return res.status(404).json({ message: 'Photo not found' });
       }
-      if (currentUser.role !== 'superadmin' && owningTicket.ouId !== currentUser.ouId) {
+      if (!await isTicketInScope(owningTicket, currentUser)) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -3066,6 +3130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             guestName: ticket.guestName,
             scheduledAt: isoTime,
             ouId: ticket.ouId,
+            locationId: ticket.locationId,
           },
         });
         console.log(`[Schedule Alert] Fired 15-min pre-alert for ticket ${ticket.ticketNumber}`);
@@ -3075,18 +3140,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 30 * 1000);
 
+  // Event types that carry ticket data and must respect per-location restrictions.
+  // Any event whose payload includes `ticketNumber` is also treated as ticket-related
+  // even if its type is not listed here (payload-shape fallback, fail-closed).
+  const TICKET_EVENT_TYPES = new Set([
+    'ticket_created', 'retrieval_requested', 'retrieval_accepted', 'retrieval_cancelled',
+    'ticket_status_updated', 'ticket_updated', 'ticket_details_updated',
+    'ticket_scheduled', 'ticket_deleted', 'ticket_archived', 'schedule_alert',
+  ]);
+
   // Broadcast to authenticated clients in the same OU (super admins receive all broadcasts).
   // Unauthenticated (customer) connections are rejected at handshake time; they rely on
   // HTTP polling for status updates instead.
+  // When the message carries a ticket, its locationId is used to enforce per-location restrictions
+  // for clients whose scopedLocationIds are set. The rule is fail-closed: ticket-related events
+  // without a locationId are dropped for location-restricted clients.
   function broadcastToOU(ouId: string | null | undefined, message: any) {
     const messageStr = JSON.stringify(message);
+    const eventType: string = message?.type ?? '';
+    // Treat as ticket event if the type is in the known set, OR if payload contains ticketNumber
+    const isTicketEvent = TICKET_EVENT_TYPES.has(eventType) || ('ticketNumber' in (message?.data ?? {}));
+    // locationId present in data (may be null for un-located tickets)
+    const dataHasLocation = message?.data !== undefined && 'locationId' in (message.data ?? {});
+    const ticketLocationId: string | null = dataHasLocation ? (message.data.locationId ?? null) : null;
+
     clients.forEach((info, client) => {
       if (client.readyState !== WebSocket.OPEN) return;
       if (info.role === 'superadmin') {
         client.send(messageStr);
-      } else if (ouId && info.ouId === ouId) {
-        client.send(messageStr);
+        return;
       }
+      if (!ouId || info.ouId !== ouId) return;
+      // Apply location scope filtering for restricted clients
+      if (info.scopedLocationIds !== undefined) {
+        // Empty array = standard_user with no scopes assigned — receives nothing
+        if (info.scopedLocationIds.length === 0) return;
+        if (isTicketEvent) {
+          // Fail closed: if no locationId in the payload, drop for restricted clients
+          if (!dataHasLocation) return;
+          // Drop if ticket has no location or location is not in the client's scope
+          if (!ticketLocationId || !info.scopedLocationIds.includes(ticketLocationId)) return;
+        }
+      }
+      client.send(messageStr);
     });
   }
 

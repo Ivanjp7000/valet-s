@@ -45,20 +45,24 @@ export class ObjectStorageService {
     return dir;
   }
 
-  // Gets the upload URL for a car photo
-  async getCarPhotoUploadURL(): Promise<string> {
+  // Gets the upload URL for a car photo.
+  // Returns both the signed PUT URL and the normalized internal path (/car-photos/<uuid>)
+  // so the caller can register the path in the server-side issued-paths registry.
+  async getCarPhotoUploadURL(): Promise<{ uploadURL: string; issuedPath: string }> {
     const privateObjectDir = this.getPrivateObjectDir();
     const photoId = randomUUID();
     const fullPath = `${privateObjectDir}/car-photos/${photoId}`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
-    return signObjectURL({
+    const uploadURL = await signObjectURL({
       bucketName,
       objectName,
       method: "PUT",
       ttlSec: 900, // 15 minutes
     });
+
+    return { uploadURL, issuedPath: `/car-photos/${photoId}` };
   }
 
   // Gets the car photo file from the object path

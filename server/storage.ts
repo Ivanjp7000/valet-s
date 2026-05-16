@@ -102,6 +102,7 @@ export interface IStorage {
   addUserLocationScope(scope: InsertUserLocationScope): Promise<UserLocationScope>;
   removeUserLocationScope(userId: string, locationId: string): Promise<void>;
   getUsersWithLocationScopes(ouId: string): Promise<{user: User, scopes: UserLocationScope[]}[]>;
+  getUsersScopedToLocations(ouId: string, locationIds: string[]): Promise<User[]>;
   
   // Scoped data access methods (for role-based filtering)
   getScopedTickets(user: User, scopedLocationIds?: string[]): Promise<ValetTicket[]>;
@@ -670,6 +671,22 @@ export class DatabaseStorage implements IStorage {
         eq(userLocationScopes.userId, userId),
         eq(userLocationScopes.locationId, locationId)
       ));
+  }
+
+  async getUsersScopedToLocations(ouId: string, locationIds: string[]): Promise<User[]> {
+    if (locationIds.length === 0) return [];
+    const rows = await db
+      .selectDistinct({ user: users })
+      .from(users)
+      .innerJoin(userLocationScopes, eq(userLocationScopes.userId, users.id))
+      .where(and(
+        eq(users.ouId, ouId),
+        eq(users.isActive, true),
+        eq(users.accountStatus, 'active'),
+        eq(users.isHidden, false),
+        inArray(userLocationScopes.locationId, locationIds)
+      ));
+    return rows.map(r => r.user);
   }
 
   async getUsersWithLocationScopes(ouId: string): Promise<{user: User, scopes: UserLocationScope[]}[]> {
