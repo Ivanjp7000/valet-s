@@ -695,8 +695,10 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
-    // If user has specific location scopes, filter by those locations
-    if (scopedLocationIds && scopedLocationIds.length > 0) {
+    // scopedLocationIds === undefined  → no location restriction, see full OU
+    // scopedLocationIds is an array    → restricted; empty array means access to nothing
+    if (scopedLocationIds !== undefined) {
+      if (scopedLocationIds.length === 0) return [];
       return await this.getTicketsByLocations(scopedLocationIds);
     }
 

@@ -355,6 +355,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Username or email is required" });
       }
 
+      // Per-IP rate limit on login attempts to slow credential stuffing and OTP issuance floods
+      const clientIp = req.socket?.remoteAddress || 'unknown';
+      if (!checkRateLimit(`auth-local-ip:${clientIp}`, 30, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many login attempts. Please try again later." });
+      }
+
       // Look up by username first, then by email (for self-registered accounts)
       let user = await storage.getUserByUsername(username);
       if (!user && username.includes('@')) {
@@ -468,6 +474,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, code } = req.body;
       if (!userId || !code) return res.status(400).json({ message: "userId and code required" });
+
+      // Per-IP rate limit: cap guesses from a single IP regardless of which userId is targeted
+      const clientIp = req.socket?.remoteAddress || 'unknown';
+      if (!checkRateLimit(`otp-verify-ip:${clientIp}`, 20, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many verification attempts. Please try again later." });
+      }
 
       // Session binding: only the browser that started the login flow may verify
       const sessionPending = (req.session as any).pendingOtpUserId;
@@ -1158,10 +1170,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Helper to get user's scoped location IDs (for Standard Admins/Users with location restrictions)
+  // Returns undefined  → no location restriction, caller sees full OU
+  // Returns string[]   → caller is restricted to those location IDs (empty = sees nothing)
   const getUserScopedLocationIds = async (user: any): Promise<string[] | undefined> => {
     if (!['standard_admin', 'standard_user'].includes(user.role)) return undefined;
     const scopes = await storage.getUserLocationScopes(user.id);
-    if (scopes.length === 0) return undefined; // No restrictions, see full OU
+    if (scopes.length === 0) {
+      // standard_user (auto-provisioned) must have explicit location scopes before seeing any data.
+      // standard_admin without scopes retains full OU visibility (operational default).
+      if (user.role === 'standard_user') return []; // restricted to nothing until scoped
+      return undefined; // standard_admin: no restriction, sees full OU
+    }
     return scopes.map(s => s.locationId);
   };
 
@@ -2735,8 +2754,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Backup export endpoint
-  app.get('/api/backup/export', isAuthenticated, requireReadAccess, async (req: any, res) => {
+  // Backup export endpoint — standard_user role is intentionally excluded
+  app.get('/api/backup/export', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const user = req.currentUser;
       const { range, includeTickets, includeUsers, includeLocations } = req.query;
@@ -2782,7 +2801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Proxy endpoint: fetches a car/plate photo from object storage and streams it to the client.
   // Handles both full GCS signed URLs and normalized /car-photos/ paths stored in the DB.
-  app.get('/api/backup/photo', isAuthenticated, requireReadAccess, async (req: any, res) => {
+  app.get('/api/backup/photo', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
     try {
       const raw = req.query.path as string;
       if (!raw) return res.status(400).json({ message: 'path required' });
