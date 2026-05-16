@@ -1187,6 +1187,24 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
                       </button>
                     ) : (
                       <div className="space-y-2">
+                        {/* Sort controls */}
+                        <div className="flex items-center gap-1.5 pb-1">
+                          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mr-0.5">Sort</span>
+                          {[
+                            { label: 'A → Z', action: () => saveBrands([...quickBrands].sort((a, b) => a.localeCompare(b))) },
+                            { label: 'Z → A', action: () => saveBrands([...quickBrands].sort((a, b) => b.localeCompare(a))) },
+                            { label: 'Default', action: () => saveBrands([...DEFAULT_BRANDS.filter(b => quickBrands.includes(b)), ...quickBrands.filter(b => !DEFAULT_BRANDS.includes(b))]) },
+                          ].map(({ label, action }) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={action}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-gray-300 bg-white text-gray-600 hover:border-regis-navy hover:text-regis-navy transition-colors"
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
                         <div className="flex flex-wrap gap-1.5">
                           {quickBrands.map((brand) => (
                             <span
