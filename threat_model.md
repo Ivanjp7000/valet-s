@@ -6,6 +6,12 @@ This project is a multi-tenant valet management SaaS for hotel and venue staff. 
 
 The main production security concerns are tenant isolation between organizational units and locations, protection of guest and vehicle data, safe handling of low-entropy customer ticket identifiers, protecting passwordless OTP-based staff login, and preventing staff users from seeing or changing data outside their assigned scope. A special St. Regis Osaka onboarding path can auto-provision `standard_user` accounts from `@stregis.com` email addresses, so that onboarding path is part of the production attack surface.
 
+## Assumptions
+
+- Production analysis excludes dev-only tooling such as `server/vite.ts`, local build helpers, and mockup sandbox behavior unless production reachability is shown.
+- Platform-managed TLS protects browser-to-server traffic in production; certificate lifecycle is out of scope for application findings.
+- `NODE_ENV` is assumed to be `production` in deployed environments.
+
 ## Assets
 
 - **Guest and vehicle records** — guest names, room numbers, ticket numbers, vehicle details, parking locations, photos, and trip history. Exposure affects guest privacy and hotel operations.
@@ -21,14 +27,14 @@ The main production security concerns are tenant isolation between organizationa
 - **Authenticated user to tenant boundary** — every read and write must be limited to the caller's OU and, where applicable, assigned locations.
 - **HTTP session to WebSocket boundary** — the WebSocket channel must authenticate clients and avoid sending cross-tenant data to connected staff.
 - **Server to PostgreSQL** — the backend has broad database access, so route-layer authorization failures can become full record exposure or tampering.
-- **Server to external services** — Google Vision, object storage, OIDC, and SMTP calls cross out of the application trust boundary and must not expose secrets or excessive user data.
+- **Server to external services** — Google Vision, object storage, OIDC, SMTP, and session-audit geolocation calls cross out of the application trust boundary and must not expose secrets or excessive user data.
 
 ## Scan Anchors
 
 - **Production entry points**: `server/index.ts`, `server/routes.ts`, `server/replitAuth.ts`
-- **Highest-risk code areas**: public ticket routes in `server/routes.ts`, local auth and OTP routes in `server/routes.ts`, staff/admin mutation routes in `server/routes.ts`, scoped data access in `server/storage.ts`, WebSocket broadcast logic in `server/routes.ts`, user schemas in `shared/schema.ts`
+- **Highest-risk code areas**: public ticket routes in `server/routes.ts`, local auth and OTP routes in `server/routes.ts`, staff/admin mutation routes in `server/routes.ts`, scoped data access in `server/storage.ts`, WebSocket broadcast logic in `server/routes.ts`, backup/photo proxy routes in `server/routes.ts`, and user schemas in `shared/schema.ts`
 - **Public surfaces**: `/api/tickets/:ticketNumber`, `/api/faqs`, public photo route `/car-photos/:photoPath(*)`
-- **Authenticated/admin surfaces**: `/api/staff/*`, `/api/admin/*`, `/api/users*`, `/api/locations*`, `/ws`, `/api/backup/*`, `/api/ocr/plate`
+- **Authenticated/admin surfaces**: `/api/staff/*`, `/api/admin/*`, `/api/users*`, `/api/locations*`, `/ws`, `/api/backup/*`, `/api/ocr/plate`, `/api/gs/*`, `/api/calendar/*`, `/api/audit/*`
 - **Authentication and onboarding surfaces**: `/api/auth/local`, `/api/auth/verify-otp`, `/api/auth/register`, `/sro`, `standard_user` auto-provisioning in `server/routes.ts`
 - **Usually dev-only and low priority unless reachability changes**: `server/vite.ts`, build tooling, scripts, and local development helpers
 
@@ -40,11 +46,11 @@ The application relies on Replit OIDC and local session-based authentication. Pr
 
 ### Tampering
 
-Public customers can trigger ticket actions using only a short ticket number, while staff can update ticket state and metadata. The system MUST treat ticket numbers as low-trust identifiers, validate every state-changing request server-side, and enforce OU/location ownership checks before any read or write. Customer-controlled values like retrieval schedules and OCR uploads MUST be bounded to prevent abuse.
+Public customers can trigger ticket actions using only a short ticket number, while staff can update ticket state and metadata. The system MUST treat ticket numbers as low-trust identifiers, validate every state-changing request server-side, and enforce OU/location ownership checks before any read or write. Customer-controlled values like retrieval schedules, photo paths, and OCR uploads MUST be bounded to prevent abuse.
 
 ### Information Disclosure
 
-The system stores guest identity, room numbers, vehicle details, car photos, and staff account data. Public APIs, authenticated APIs, logs, and WebSocket messages MUST expose only the minimum fields needed for that caller. Password hashes, private photo paths, and one tenant's live ticket data MUST never be disclosed to another tenant or to unauthenticated users.
+The system stores guest identity, room numbers, vehicle details, car photos, and staff account data. Public APIs, authenticated APIs, exports, logs, and WebSocket messages MUST expose only the minimum fields needed for that caller. Password hashes, private photo paths, and one tenant's live ticket data MUST never be disclosed to another tenant or to unauthenticated users.
 
 ### Denial of Service
 
@@ -52,4 +58,4 @@ Public endpoints accept repeated ticket lookups and retrieval requests, and the 
 
 ### Elevation of Privilege
 
-This is a multi-tenant admin system, so broken object-level authorization is a primary risk. Staff and admins MUST only be able to act on users, tickets, trips, photos, and exports within their authorized OU and location scope. Automatic onboarding by email domain MUST not grant broader production access than the business has explicitly approved. Real-time channels and backup/export features MUST preserve the same tenant boundaries as the REST APIs.
+This is a multi-tenant admin system, so broken object-level authorization is a primary risk. Staff and admins MUST only be able to act on users, tickets, trips, photos, exports, collaboration records, and real-time data within their authorized OU and location scope. Automatic onboarding by email domain MUST not grant broader production access than the business has explicitly approved. Real-time channels and backup/export features MUST preserve the same tenant boundaries as the REST APIs.
