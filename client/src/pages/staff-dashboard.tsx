@@ -1150,9 +1150,15 @@ export default function StaffDashboard() {
       }
     }
     setExpandedPanels(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else { next.add(id); }
-      return next;
+      if (prev.has(id)) {
+        // Already open — close it
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      } else {
+        // Opening — close all others (accordion behaviour)
+        return new Set([id]);
+      }
     });
   };
 

@@ -986,6 +986,15 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const canProceedStep2 = formData.platePhotoUrl.length > 0 && formData.licensePlate.trim().length > 0;
 
+  const dialogContentRef = useRef<HTMLDivElement>(null);
+
+  // Scroll dialog to top whenever the visible step changes
+  useEffect(() => {
+    if (dialogContentRef.current) {
+      dialogContentRef.current.scrollTop = 0;
+    }
+  }, [currentStep, showPreview]);
+
   const handleNext = () => {
     if (currentStep < 2) {
       setCurrentStep(currentStep + 1);
@@ -1978,7 +1987,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
   return (
     <>
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg max-h-[96vh] overflow-y-auto">
+      <DialogContent ref={dialogContentRef} className="max-w-lg max-h-[96vh] overflow-y-auto">
         <DialogHeader className="pb-1">
           <DialogTitle className="flex items-center gap-2">
             <Ticket className="w-5 h-5 text-regis-gold" />
