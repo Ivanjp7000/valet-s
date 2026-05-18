@@ -3126,7 +3126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e) {
       console.error('[Auto-Close] Error processing scheduled departures:', e);
     }
-  }, 60 * 1000);
+  }, 5 * 60 * 1000);
 
   // ── 15-minute pre-alert for scheduled retrievals ─────────────────────────────
   // Maps ticketNumber → ISO scheduledAt string at time of last alert.
@@ -3168,7 +3168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e) {
       console.error('[Schedule Alert] Error checking upcoming retrievals:', e);
     }
-  }, 30 * 1000);
+  }, 2 * 60 * 1000);
 
   // Event types that carry ticket data and must respect per-location restrictions.
   // Any event whose payload includes `ticketNumber` is also treated as ticket-related
