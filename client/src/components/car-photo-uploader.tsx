@@ -21,7 +21,8 @@ export function CarPhotoUploader({ onPhotoUploaded, currentPhoto }: CarPhotoUplo
       setUploading(true);
       
       // Get upload URL from backend
-      const { uploadURL } = await apiRequest("POST", "/api/car-photos/upload");
+      const uploadResult = (await apiRequest("POST", "/api/car-photos/upload")) as any;
+      const uploadURL = uploadResult?.uploadURL;
       
       // Upload file directly to object storage
       const uploadResponse = await fetch(uploadURL, {

@@ -2671,7 +2671,7 @@ export default function StaffDashboard() {
             {/* GS Hub Inline Panel */}
             {showGSHub && (
               <div className="mt-2">
-                <GSHub user={user} />
+                <GSHub />
               </div>
             )}
 
@@ -4809,7 +4809,7 @@ export default function StaffDashboard() {
                               disabled={issueLicenseMutation.isPending || updateLicenseMutation.isPending}
                               onClick={() => {
                                 if (editLicenseId) {
-                                  updateLicenseMutation.mutate({ id: editLicenseId, data: { orgName: licenseForm.orgName, address: licenseForm.address, contactNumber: licenseForm.contactNumber, version: licenseForm.version, notes: licenseForm.notes, validTo: licenseForm.validTo || null } });
+                                  updateLicenseMutation.mutate({ id: editLicenseId, data: { orgName: licenseForm.orgName, address: licenseForm.address, contactNumber: licenseForm.contactNumber, version: licenseForm.version, notes: licenseForm.notes, validTo: licenseForm.validTo || undefined } });
                                 } else {
                                   issueLicenseMutation.mutate(licenseForm);
                                 }
@@ -5630,7 +5630,7 @@ export default function StaffDashboard() {
         <ValetTicketWizard 
           isOpen={showTicketWizard}
           onClose={() => setShowTicketWizard(false)}
-          user={user}
+          user={user as any}
         />
 
         {/* View Ticket Modal */}
@@ -6158,7 +6158,7 @@ export default function StaffDashboard() {
                       })()}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setEditTicketData({ ...editTicketData, createdAt: val ? new Date(val).toISOString() : editTicketData.createdAt });
+                        setEditTicketData({ ...editTicketData, createdAt: val ? new Date(val).toISOString() : (editTicketData.createdAt ?? null) as any });
                       }}
                     />
                   </div>

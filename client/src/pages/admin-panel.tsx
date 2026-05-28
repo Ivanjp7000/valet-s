@@ -348,12 +348,12 @@ export default function AdminPanel() {
     username: "", password: "", email: "", firstName: "", lastName: "", 
     role: "standard_admin", ouId: "", locationId: "" 
   });
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<SafeUser | null>(null);
   const [editUserPassword, setEditUserPassword] = useState("");
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showTicketWizard, setShowTicketWizard] = useState(false);
-  const [managingUserScopes, setManagingUserScopes] = useState<User | null>(null);
+  const [managingUserScopes, setManagingUserScopes] = useState<SafeUser | null>(null);
   const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'storage'>('day');
   const [reportOuId, setReportOuId] = useState('');
   const [reportLocationId, setReportLocationId] = useState('');
@@ -678,7 +678,7 @@ export default function AdminPanel() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ userData, password }: { userData: User; password?: string }) => {
+    mutationFn: async ({ userData, password }: { userData: SafeUser; password?: string }) => {
       const updatePayload: any = {
         username: userData.username,
         email: userData.email,
@@ -1233,7 +1233,7 @@ export default function AdminPanel() {
                               <div>
                                 <p className="font-medium text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none flex items-center gap-1">
                                   {u.firstName} {u.lastName}
-                                  {(u as any).isHidden && <EyeOff size={11} className="text-gray-400 shrink-0" title="Hidden account" />}
+                                  {(u as any).isHidden && <EyeOff size={11} className="text-gray-400 shrink-0" data-tooltip="Hidden account" />}
                                 </p>
                                 <p className="text-xs text-gray-500 truncate max-w-[100px] sm:max-w-none">{u.email}</p>
                               </div>
@@ -2441,7 +2441,7 @@ export default function AdminPanel() {
       <ValetTicketWizard 
         isOpen={showTicketWizard}
         onClose={() => setShowTicketWizard(false)}
-        user={user}
+        user={user as any}
       />
     </div>
   );

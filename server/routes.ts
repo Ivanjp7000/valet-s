@@ -559,6 +559,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check for Railway
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+  });
+
   // Public: issue a server-signed CAPTCHA challenge for the self-registration form
   app.get('/api/auth/captcha', (_req, res) => {
     const a = Math.floor(Math.random() * 9) + 1;
@@ -1742,9 +1747,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== ORGANIZATIONAL UNIT ROUTES (Super Admin Only) =====
-  app.get('/api/ous', isAuthenticated, async (req, res) => {
+  app.get('/api/ous', isAuthenticated, async (req: any, res) => {
     try {
-      const sessionUser = req.user as any;
+      const sessionUser = req.user;
       const userId = sessionUser?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -2402,6 +2407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `${parkingSector}${parkingLocation}` : undefined;
 
       const newTicket = await storage.createValetTicket({
+        ...req.body,
         ticketNumber,
         licensePlate,
         parkingLocation: parkingLocationFormatted,
@@ -3067,7 +3073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Prune entries that are no longer in the upcoming window (ticket retrieved,
       // schedule cleared, past due, or status changed to non-active).
-      for (const tn of scheduleAlertedMap.keys()) {
+      for (const tn of [...scheduleAlertedMap.keys()]) {
         if (!upcomingNumbers.has(tn)) scheduleAlertedMap.delete(tn);
       }
 
