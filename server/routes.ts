@@ -3,8 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import crypto from "crypto";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, getSession } from "./replitAuth";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { setupAuth, isAuthenticated } from "./auth";
 import { insertValetTicketSchema, updateValetTicketStatusSchema, insertFaqSchema, insertOUSchema, insertPhysicalLocationSchema, insertUserSchema, type User, insertOULicenseSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -255,7 +254,7 @@ async function sendVerificationEmail(toEmail: string, verifyUrl: string, fullNam
 async function sendWelcomeEmail(toEmail: string, fullName: string): Promise<void> {
   const transporter = getMailTransporter();
   const fromEmail = process.env.GMAIL_USER!;
-  const loginUrl = process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 'http://localhost:5000';
+  const loginUrl = process.env.APP_URL || 'http://localhost:5000';
   await transporter.sendMail({
     from: `"St. Regis Osaka Valet" <${fromEmail}>`,
     to: toEmail,
@@ -304,7 +303,7 @@ async function sendApprovalEmail(toEmail: string, fullName: string): Promise<voi
           <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 16px">Dear ${fullName},</p>
           <p style="color:#555;font-size:15px;line-height:1.7;margin:0 0 28px">Your account has been approved. You can now log in using your email address. A one-time verification code will be sent to your email each time you log in.</p>
           <div style="text-align:center;margin-bottom:28px">
-            <a href="${process.env.REPLIT_DOMAINS ? 'https://' + process.env.REPLIT_DOMAINS.split(',')[0] : ''}" style="background:#1a2744;color:#fff;text-decoration:none;padding:14px 32px;border-radius:4px;font-size:15px;display:inline-block">Log In Now</a>
+            <a href="${process.env.APP_URL || ''}" style="background:#1a2744;color:#fff;text-decoration:none;padding:14px 32px;border-radius:4px;font-size:15px;display:inline-block">Log In Now</a>
           </div>
         </div>
         <div style="background:#f4f2ee;padding:16px 36px;text-align:center">
@@ -597,8 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lastName = nameParts.slice(1).join(' ') || '';
       const isStRegis = emailLower.endsWith('@stregis.com');
       const ST_REGIS_OSAKA_OU_ID = 'dd16ee22-1d40-4db2-8cde-6a726673451a';
-      const domain = (process.env.REPLIT_DOMAINS || '').split(',')[0]?.trim();
-      const baseUrl = domain ? `https://${domain}` : 'http://localhost:5000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:5000';
 
       // Single lookup — getUserByUsername finds ALL records regardless of isActive
       const existingUser = await storage.getUserByUsername(emailLower);
@@ -1368,7 +1366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate that supplied photo paths are server-issued internal paths
       if (carPhoto) {
         const normalizedCarPhoto = carPhoto.startsWith('https://storage.googleapis.com/')
-          ? new ObjectStorageService().normalizeCarPhotoPath(carPhoto)
+          ? carPhoto
           : carPhoto;
         if (!normalizedCarPhoto.startsWith('/car-photos/') || !isServerIssuedPhotoPath(normalizedCarPhoto)) {
           return res.status(400).json({ message: "Invalid car photo path" });
@@ -1376,7 +1374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (platePhotoUrl) {
         const normalizedPlatePhoto = platePhotoUrl.startsWith('https://storage.googleapis.com/')
-          ? new ObjectStorageService().normalizeCarPhotoPath(platePhotoUrl)
+          ? platePhotoUrl
           : platePhotoUrl;
         if (!normalizedPlatePhoto.startsWith('/car-photos/') || !isServerIssuedPhotoPath(normalizedPlatePhoto)) {
           return res.status(400).json({ message: "Invalid plate photo path" });
@@ -2527,42 +2525,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return true;
   }
 
+  // Photo uploads DISABLED during migration (Replit Object Storage removed)
   app.post('/api/car-photos/upload', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
-    try {
-      const objectStorageService = new ObjectStorageService();
-      const { uploadURL, issuedPath } = await objectStorageService.getCarPhotoUploadURL();
-      issuedPhotoPaths.set(issuedPath, Date.now() + PHOTO_PATH_TTL_MS);
-      res.json({ uploadURL, issuedPath });
-    } catch (error) {
-      console.error("Error generating car photo upload URL:", error);
-      res.status(500).json({ message: "Failed to generate upload URL" });
-    }
+    res.status(503).json({ message: "Photo uploads temporarily disabled" });
   });
 
+  // Photo access DISABLED during migration (Replit Object Storage removed)
   app.get('/car-photos/:photoPath(*)', isAuthenticated, requireReadAccess, async (req: any, res) => {
-    try {
-      const photoPath = `/car-photos/${req.params.photoPath}`;
-      const currentUser = req.currentUser;
-
-      // Verify this photo belongs to a ticket the caller may access (OU + location scope)
-      const owningTicket = await storage.getTicketByPhotoPath(photoPath);
-      if (!owningTicket) {
-        return res.status(404).json({ message: "Photo not found" });
-      }
-      if (!await isTicketInScope(owningTicket, currentUser)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const objectStorageService = new ObjectStorageService();
-      const photoFile = await objectStorageService.getCarPhotoFile(photoPath);
-      objectStorageService.downloadCarPhoto(photoFile, res);
-    } catch (error) {
-      console.error("Error serving car photo:", error);
-      if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ message: "Photo not found" });
-      }
-      return res.status(500).json({ message: "Error serving photo" });
-    }
+    res.status(503).json({ message: "Photo access temporarily disabled" });
   });
 
   // Staff endpoint for editing ticket details (accessible by standard admin)
@@ -2690,15 +2660,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const objectStorageService = new ObjectStorageService();
+      // Photo uploads temporarily disabled during migration
       let normalizedPhotoPath = carPhoto;
-      
-      // Normalize car photo URL if it's an object storage URL
       if (carPhoto && carPhoto.startsWith("https://storage.googleapis.com/")) {
-        normalizedPhotoPath = objectStorageService.normalizeCarPhotoPath(carPhoto);
+        return res.status(400).json({ message: "Photo uploads temporarily disabled" });
       }
-
-      // Reject photo paths that are not legitimate internal paths
       if (normalizedPhotoPath && !normalizedPhotoPath.startsWith('/car-photos/')) {
         return res.status(400).json({ message: "Invalid car photo path" });
       }
@@ -2742,7 +2708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // scopedLocationIds: undefined = no location restriction; string[] = restricted to those locations (may be empty)
   interface ClientInfo { ouId: string | null; role: string; scopedLocationIds?: string[]; }
   const clients = new Map<WebSocket, ClientInfo>();
-  const sessionParser = getSession();
+  const sessionParser = (await import('./auth')).getSession();
 
   wss.on('connection', (ws, request: any) => {
     // Validate session before accepting the WebSocket connection
@@ -2893,49 +2859,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Proxy endpoint: fetches a car/plate photo from object storage and streams it to the client.
-  // Handles both full GCS signed URLs and normalized /car-photos/ paths stored in the DB.
+    // Photo backup proxy DISABLED during migration (Replit Object Storage removed)
   app.get('/api/backup/photo', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
-    try {
-      const raw = req.query.path as string;
-      if (!raw) return res.status(400).json({ message: 'path required' });
-
-      const objectStorageService = new ObjectStorageService();
-      let normalizedPath = raw;
-
-      // Full signed GCS URL → normalize to internal path
-      if (raw.startsWith('https://storage.googleapis.com/')) {
-        normalizedPath = objectStorageService.normalizeCarPhotoPath(raw);
-      }
-
-      // Strip any leftover query string (signed URL params)
-      if (normalizedPath.includes('?')) {
-        normalizedPath = normalizedPath.split('?')[0];
-      }
-
-      if (!normalizedPath.startsWith('/car-photos/')) {
-        return res.status(404).json({ message: 'Not found' });
-      }
-
-      // Verify this photo belongs to a ticket the caller may access (OU + location scope)
-      const currentUser = req.currentUser;
-      const owningTicket = await storage.getTicketByPhotoPath(normalizedPath);
-      if (!owningTicket) {
-        return res.status(404).json({ message: 'Photo not found' });
-      }
-      if (!await isTicketInScope(owningTicket, currentUser)) {
-        return res.status(403).json({ message: 'Access denied' });
-      }
-
-      const photoFile = await objectStorageService.getCarPhotoFile(normalizedPath);
-      await objectStorageService.downloadCarPhoto(photoFile, res);
-    } catch (error) {
-      if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ message: 'Photo not found' });
-      }
-      console.error('Error proxying backup photo:', error);
-      res.status(500).json({ message: 'Error serving photo' });
-    }
+    res.status(503).json({ message: "Photo access temporarily disabled" });
   });
 
   // Immediately close a ticket as departed (guest left without retrieval process)
