@@ -13,6 +13,7 @@ import CreateAccount from "@/pages/create-account";
 import VerifyEmail from "@/pages/verify-email";
 import SroLogin from "@/pages/sro-login";
 import NotFound from "@/pages/not-found";
+import ViewPage from "@/pages/view";
 
 // Version is derived from the build date — updates automatically on every deploy
 function buildVersion() {
@@ -40,6 +41,7 @@ function Router() {
   return (
     <Switch>
       {/* Public routes — always accessible */}
+      <Route path="/view" component={ViewPage} />
       <Route path="/create-account" component={CreateAccount} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/sro" component={SroLogin} />
