@@ -16,6 +16,7 @@ import NotFound from "@/pages/not-found";
 import ViewPage from "@/pages/view";
 
 // Version is derived from the build date — updates automatically on every deploy
+// Updated 2026-05-30
 function buildVersion() {
   const d = new Date();
   return `Release ${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
