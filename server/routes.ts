@@ -564,6 +564,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ ok: true, uptime: process.uptime() });
   });
 
+  function clearSessionCookie(res: any) {
+    res.clearCookie('connect.sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+  }
+
+  function destroySession(req: any, res: any, done: (error?: Error) => void) {
+    if (!req.session) {
+      clearSessionCookie(res);
+      return done();
+    }
+
+    req.session.destroy((error: Error | null) => {
+      clearSessionCookie(res);
+      done(error || undefined);
+    });
+  }
+
+  // Browser-friendly logout for existing anchor links.
+  app.get('/api/logout', (req: any, res) => {
+    destroySession(req, res, (error) => {
+      if (error) {
+        console.error("Error during logout:", error);
+      }
+      res.redirect('/sro');
+    });
+  });
+
+  // JSON logout for client-side callers.
+  app.post('/api/logout', (req: any, res) => {
+    destroySession(req, res, (error) => {
+      if (error) {
+        console.error("Error during logout:", error);
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ success: true });
+    });
+  });
+
   // Public: issue a server-signed CAPTCHA challenge for the self-registration form
   app.get('/api/auth/captcha', (_req, res) => {
     const a = Math.floor(Math.random() * 9) + 1;
