@@ -591,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error) {
         console.error("Error during logout:", error);
       }
-      res.redirect('/sro');
+      res.redirect('/');
     });
   });
 
