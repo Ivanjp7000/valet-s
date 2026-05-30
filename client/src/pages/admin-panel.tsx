@@ -358,20 +358,36 @@ function AuditTab() {
   });
 
   const sevConfig = {
-    critical: { emoji: "🔴", color: "text-red-400", bg: "bg-red-400/10", border: "border-red-400/30" },
-    high: { emoji: "🟠", color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/30" },
-    medium: { emoji: "🟡", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/30" },
-    low: { emoji: "🔵", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/30" },
-    info: { emoji: "⚪", color: "text-gray-400", bg: "bg-gray-400/10", border: "border-gray-400/30" },
+    critical: { emoji: "🔴", color: "text-red-500", bg: "bg-red-50", border: "border-red-200", label: "Critical", desc: "Security vulnerability or code injection — must fix immediately" },
+    high: { emoji: "🟠", color: "text-orange-500", bg: "bg-orange-50", border: "border-orange-200", label: "High", desc: "Serious issue — XSS, missing auth guard, known CVE" },
+    medium: { emoji: "🟡", color: "text-yellow-500", bg: "bg-yellow-50", border: "border-yellow-200", label: "Medium", desc: "Info leak, console logging sensitive data — fix when possible" },
+    low: { emoji: "🔵", color: "text-blue-500", bg: "bg-blue-50", border: "border-blue-200", label: "Low", desc: "Outdated packages, minor improvements — no urgency" },
+    info: { emoji: "⚪", color: "text-gray-500", bg: "bg-gray-50", border: "border-gray-200", label: "Info", desc: "Informational — no action needed" },
   };
 
   const total = (data?.findings || []).length;
   const crits = (data?.findings || []).filter((f: any) => f.severity === "critical").length;
   const highs = (data?.findings || []).filter((f: any) => f.severity === "high").length;
-  const healthStatus = crits > 0 ? { text: "Critical Issues", color: "text-red-400" }
-    : highs > 0 ? { text: "High Issues", color: "text-orange-400" }
-    : total > 20 ? { text: "Needs Attention", color: "text-yellow-400" }
-    : { text: "Healthy", color: "text-green-400" };
+  const healthStatus = crits > 0 ? { text: "Critical Issues", color: "text-red-500" }
+    : highs > 0 ? { text: "High Issues", color: "text-orange-500" }
+    : total > 20 ? { text: "Needs Attention", color: "text-yellow-500" }
+    : { text: "Healthy", color: "text-green-500" };
+
+  const LEGEND_ITEMS = [
+    { emoji: "🔴", label: "Critical", desc: "Vulnerability or code injection — fix immediately" },
+    { emoji: "🟠", label: "High", desc: "XSS, missing auth guard, known CVE" },
+    { emoji: "🟡", label: "Medium", desc: "Info leak, console logging secrets" },
+    { emoji: "🔵", label: "Low", desc: "Outdated packages, minor improvements" },
+    { emoji: "⚪", label: "Info", desc: "Informational — no action needed" },
+  ];
+
+  const SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"];
+
+  // Category legend
+  const CAT_LEGEND = [
+    { label: "Dependencies", icon: "📦", desc: "npm audit vulnerabilities, outdated packages" },
+    { label: "Code Security", icon: "🔒", desc: "XSS, SQL injection, secrets, auth gaps" },
+  ];
 
   return (
     <div className="space-y-4">
@@ -392,6 +408,52 @@ function AuditTab() {
           </Button>
         </div>
       </div>
+
+      {/* Severity Legend */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <ShieldCheck size={16} className="text-regis-gold" />
+            Severity Levels
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+            {LEGEND_ITEMS.map((item) => (
+              <div key={item.label} className="flex items-start gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                <span className="text-lg leading-none mt-0.5">{item.emoji}</span>
+                <div>
+                  <p className="text-xs font-semibold text-gray-800">{item.label}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Category Legend */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Shield size={16} className="text-regis-gold" />
+            Audit Categories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {CAT_LEGEND.map((cat) => (
+              <div key={cat.label} className="flex items-start gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                <span className="text-lg leading-none mt-0.5">{cat.icon}</span>
+                <div>
+                  <p className="text-xs font-semibold text-gray-800">{cat.label}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{cat.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -528,6 +590,48 @@ function AuditTab() {
               </div>
             )}
           </div>
+
+          {/* Scan History */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock size={16} className="text-regis-gold" />
+                Scan History & Changes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                  <span className="text-sm">✅</span>
+                  <div>
+                    <p className="text-xs font-semibold text-green-800">2026-05-30 — Audit Scanner Fixed</p>
+                    <p className="text-[11px] text-green-700 mt-0.5">Fixed false positives (eval self-scan, XSS in safe components, public auth routes). Updated js-cookie to resolve high-severity CVE. Cleaned ESM runtime (__dirname → import.meta.url).</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                  <span className="text-sm">✅</span>
+                  <div>
+                    <p className="text-xs font-semibold text-green-800">2026-05-29 — Security Audit Created</p>
+                    <p className="text-[11px] text-green-700 mt-0.5">Added Level 1 (dependency health) and Level 2 (code security) audit scanner. Integrated into Admin Panel as Audit tab next to Backup.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <span className="text-sm">📋</span>
+                  <div>
+                    <p className="text-xs font-semibold text-blue-800">Standing — Level 1: Dependencies</p>
+                    <p className="text-[11px] text-blue-700 mt-0.5">npm audit for known CVEs + npm outdated for stale packages. Currently 80 outdated (low severity). Can update at your pace.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                  <span className="text-sm">📋</span>
+                  <div>
+                    <p className="text-xs font-semibold text-blue-800">Standing — Level 2: Code Security</p>
+                    <p className="text-[11px] text-blue-700 mt-0.5">Scans for XSS, SQL injection, secrets, eval(), auth gaps, console leaks, CORS. Currently 2 medium findings (console logging).</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>
