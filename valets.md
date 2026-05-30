@@ -1,6 +1,52 @@
 # valets.md — Migration Log & Plan
 
-## Status: In Progress
+## Status: Live on Railway ✅
+
+## Development & Deployment Workflow
+
+### How Changes Get to Production
+
+```
+Oscar edits code locally → npm run build → git commit → git push origin main → railway up → Railway builds & deploys → https://valet-s-production.up.railway.app
+```
+
+### Step by Step
+
+| Step | Action | Command |
+|------|--------|---------|
+| 1. Edit | Code changes in `client/`, `server/`, `shared/` | Oscar via `edit` tool |
+| 2. Build | Verify it compiles | `npm run build` |
+| 3. Commit | Save to local git | `git add -A && git commit -m "..."` |
+| 4. Push | Send to GitHub | `git push origin main` |
+| 5. Deploy | Upload + rebuild on Railway | `railway up` |
+| 6. Verify | Check logs, test endpoints | `railway logs`, `curl /api/health` |
+
+### Key Rules
+
+- **Single branch:** `main` only (migration/railway merged and deleted 2026-05-30)
+- **No auto-deploy from GitHub push** — Railway deploys via `railway up` from local machine only
+- **Railway builds fresh each time** — runs `npm install && npm run build`, then `npm start`
+- **No staging environment** — direct to production
+- **Railway project linked** — `railway link --workspace "Ivan Dimitrov's Projects" --project valet-s`
+- **Railway project ID:** `7dcb739a-99dd-44c1-afa4-679b82681bb3`
+
+### File Structure
+
+```
+/Users/oscarmolt/Projects/valet-s/
+├── client/src/          ← React frontend (Vite)
+├── server/routes.ts     ← Express API + audit endpoint
+├── server/index.ts      ← Server entry point
+├── shared/schema.ts     ← Database schema (Drizzle)
+├── scripts/audit.ts     ← Local audit CLI tool
+├── railway.json         ← Railway build/deploy config
+└── package.json
+```
+
+### Lessons Learned
+
+- `railway redeploy` only **restarts** the existing container — it does NOT rebuild from source. Use `railway up` to force a fresh build.
+- ESM runtime (`--format=esm`) doesn't define `__dirname` — use `fileURLToPath(new URL('.', import.meta.url))` instead.
 
 ## Checkpoint (2026-05-29 11:10 JST)
 
