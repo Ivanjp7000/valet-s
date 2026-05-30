@@ -322,6 +322,218 @@ function PendingRegistrationsTab() {
   );
 }
 
+// ── Audit Tab ─────────────────────────────────────────────────
+function AuditTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterLevel, setFilterLevel] = useState<"all" | 1 | 2>("all");
+  const [filterSeverity, setFilterSeverity] = useState<"all" | "critical" | "high" | "medium" | "low" | "info">("all");
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const fetchAudit = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/audit");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setData(json);
+      setExpanded(new Set());
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAudit();
+  }, [fetchAudit]);
+
+  const filtered = (data?.findings || []).filter((f: any) => {
+    if (filterLevel !== "all" && f.level !== filterLevel) return false;
+    if (filterSeverity !== "all" && f.severity !== filterSeverity) return false;
+    return true;
+  });
+
+  const sevConfig = {
+    critical: { emoji: "🔴", color: "text-red-400", bg: "bg-red-400/10", border: "border-red-400/30" },
+    high: { emoji: "🟠", color: "text-orange-400", bg: "bg-orange-400/10", border: "border-orange-400/30" },
+    medium: { emoji: "🟡", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/30" },
+    low: { emoji: "🔵", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/30" },
+    info: { emoji: "⚪", color: "text-gray-400", bg: "bg-gray-400/10", border: "border-gray-400/30" },
+  };
+
+  const total = (data?.findings || []).length;
+  const crits = (data?.findings || []).filter((f: any) => f.severity === "critical").length;
+  const highs = (data?.findings || []).filter((f: any) => f.severity === "high").length;
+  const healthStatus = crits > 0 ? { text: "Critical Issues", color: "text-red-400" }
+    : highs > 0 ? { text: "High Issues", color: "text-orange-400" }
+    : total > 20 ? { text: "Needs Attention", color: "text-yellow-400" }
+    : { text: "Healthy", color: "text-green-400" };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg sm:text-2xl font-bold text-regis-navy">Security Audit</h2>
+          <p className="text-sm text-gray-500">Dependency health & code security analysis</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {data && (
+            <span className={`text-sm font-semibold ${healthStatus.color}`}>
+              {healthStatus.text}
+            </span>
+          )}
+          <Button onClick={fetchAudit} disabled={loading} variant="outline" size="sm">
+            {loading ? "⏳ Scanning..." : "↻ Re-scan"}
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600">Error: {error}</p>
+          <button onClick={fetchAudit} className="text-sm text-red-600 underline mt-2 inline-block">Try again</button>
+        </div>
+      )}
+
+      {loading && !data && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="text-4xl mb-4 animate-pulse">🔍</div>
+            <p className="text-gray-400">Scanning dependencies and code security...</p>
+          </div>
+        </div>
+      )}
+
+      {data && !loading && (
+        <>
+          {/* Timestamp */}
+          <div className="text-xs text-gray-400">Last scan: {new Date(data.timestamp).toLocaleString()}</div>
+
+          {/* Severity summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[1, 2].map((level) => {
+              const counts = level === 1 ? data.level1Count : data.level2Count;
+              return (
+                <div key={level} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <h3 className="text-xs font-semibold text-gray-500 mb-2">Level {level} — {level === 1 ? "Dependencies" : "Code Security"}</h3>
+                  <div className="grid grid-cols-5 gap-1">
+                    {["critical", "high", "medium", "low", "info"].map((sev) => {
+                      const cfg = sevConfig[sev as keyof typeof sevConfig];
+                      const count = counts[sev] || 0;
+                      return (
+                        <div key={sev} className="text-center py-1 rounded">
+                          <div className="text-sm">{cfg.emoji}</div>
+                          <div className={`text-lg font-bold ${cfg.color}`}>{count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm text-gray-500">Filter:</span>
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {["all", 1, 2].map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setFilterLevel(l as any)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    filterLevel === l ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {l === "all" ? "All Levels" : `Level ${l}`}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {["all", "critical", "high", "medium", "low", "info"].map((sev) => {
+                const cfg = sevConfig[sev as keyof typeof sevConfig];
+                return (
+                  <button
+                    key={sev}
+                    onClick={() => setFilterSeverity(sev as any)}
+                    className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                      filterSeverity === sev ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {sev === "all" ? "All" : `${cfg.emoji}`}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-xs text-gray-400">{filtered.length} findings</span>
+          </div>
+
+          {/* Findings list */}
+          <div className="space-y-2">
+            {filtered.map((f: any, i: number) => {
+              const cfg = sevConfig[f.severity as keyof typeof sevConfig] || sevConfig.info;
+              const isExpanded = expanded.has(i);
+              return (
+                <div key={i} className={`border rounded-lg p-3 ${cfg.border} ${cfg.bg}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">L{f.level}</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${cfg.color} bg-white/50`}>{cfg.emoji} {f.severity.toUpperCase()}</span>
+                        <span className="text-[10px] text-gray-400">{f.category}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setExpanded((prev) => {
+                            const next = new Set(prev);
+                            isExpanded ? next.delete(i) : next.add(i);
+                            return next;
+                          });
+                        }}
+                        className="text-sm font-medium text-gray-800 hover:text-regis-navy text-left"
+                      >
+                        {f.title}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-0.5">{f.description}</p>
+                      {f.file && (
+                        <p className="text-xs text-gray-400 mt-1 font-mono">📁 {f.file}{f.line ? `:${f.line}` : ""}</p>
+                      )}
+                    </div>
+                    <button onClick={() => {
+                      setExpanded((prev) => {
+                        const next = new Set(prev);
+                        isExpanded ? next.delete(i) : next.add(i);
+                        return next;
+                      });
+                    }} className="text-gray-400 hover:text-gray-600 text-xs mt-1">
+                      {isExpanded ? "▲" : "▼"}
+                    </button>
+                  </div>
+                  {isExpanded && f.fix && (
+                    <div className="mt-2 pt-2 border-t border-gray-200/50">
+                      <p className="text-xs text-green-600">💡 {f.fix}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="text-center py-10 text-gray-400">
+                <p>No findings match your filters.</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -909,7 +1121,7 @@ export default function AdminPanel() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-7' : 'sm:grid-cols-4'}`}>
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-8' : 'sm:grid-cols-5'}`}>
               {isSuperAdmin && (
                 <TabsTrigger value="ous" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-ous">
                   <Building size={14} />
@@ -948,6 +1160,10 @@ export default function AdminPanel() {
               <TabsTrigger value="backup" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-backup">
                 <Database size={14} />
                 <span>Backup</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-audit">
+                <ShieldCheck size={14} />
+                <span>Audit</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1923,6 +2139,11 @@ export default function AdminPanel() {
             </Card>
 
             </>)}
+          </TabsContent>
+
+          {/* Audit Tab */}
+          <TabsContent value="audit" className="space-y-6">
+            <AuditTab />
           </TabsContent>
 
           {/* Pending Registrations Tab */}

@@ -2,13 +2,34 @@
 
 ## Status: In Progress
 
-## Checkpoint (2026-05-29 06:00 JST)
+## Checkpoint (2026-05-29 11:10 JST)
+
+- **Railway project:** `valet-s`
+- **Railway project ID:** `7dcb739a-99dd-44c1-afa4-679b82681bb3`
+- **Railway production URL:** `https://valet-s-production.up.railway.app`
+- **Deployment status:** Online
+- **Health check:** `/api/health` returned `{"ok":true}` after deploy
+- **Branch:** `migration/railway`
+- **Latest known deploy commit:** `8f9a0b8 Fix all TypeScript errors, add railway.json + /api/health endpoint`
+- **Important fixes for Railway:**
+  - Added `engines.node >=20.0.0` so Nixpacks uses Node 20
+  - Removed `reusePort: true` from `server/index.ts` because it crashed under Node 18 during early deploy attempts
+- **Deployment lesson:** first attempts failed because Railway/Nixpacks selected Node 18 and the server crashed before healthcheck; after Node 20/runtime fix, service came online.
+- **Qwen session health:** `qwen36-local` session `1a1bbff3-7174-4d5c-a1ee-9c3352b569a5` hung after the successful deploy summary and failed to write this checkpoint. Transcript shows `LLM idle timeout (120s)` followed by `503 Loading model`. Direct llama.cpp probe later returned `QWEN_OK_1109`, so backend recovered but the session should be treated as dirty.
+
+### Next Migration Steps
+1. Smoke test Railway URL: auth, OTP email, staff dashboard, ticket creation, guest lookup, WebSocket updates
+2. Decide whether to update DNS for `valet-s.com` after smoke tests
+3. Re-enable/rebuild photo upload routes later; they are currently disabled with `503`
+4. Keep using fresh sessions if `qwen36-local` hits idle timeout or `503 Loading model`
+
+## Checkpoint (2026-05-29 06:55 JST)
 
 - **Branch:** `migration/railway`
-- **Latest commit:** `b1abc78 Remove Replit auth, object storage, photo routes; add clean auth module`
+- **Latest commit:** `8f9a0b8 Fix all TypeScript errors, add railway.json + /api/health endpoint`
 - **Build:** `npm run build` passes (2.56s, dist/index.js 184.5kb)
 - **Type check:** `npm run check` has existing TypeScript errors (client/admin/staff + server types) — not yet clean
-- **OpenClaw version:** 2026.5.26 (stable — do NOT update until Jane crash on 2026.5.27 is understood)
+- **OpenClaw version:** 2026.5.26 (Jane recovered — WebUI token issue, not update crash — safe to update now)
 - **Model:** `qwen36-local` for implementation, `gpt-5.5` for review
 
 ### What's Done
@@ -18,6 +39,11 @@
 - Photo upload/access routes temporarily disabled with `503` responses
 - Clean auth module added
 - Build verified passing
+- **All TypeScript errors fixed** (13 errors → 0) — commit `8f9a0b8`
+- `railway.json` added (Nixpacks build + `/api/health` healthcheck)
+- `/api/health` endpoint added to server
+- `tsconfig.json` updated with `target: ES2020` to fix MapIterator iteration
+- `npx tsc --noEmit` clean, `npm run build` passes (2.40s)
 
 ### Remaining Work
 1. ~~Update `valets.md` with checkpoint~~ ✅
