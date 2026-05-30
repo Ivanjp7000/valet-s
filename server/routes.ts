@@ -3228,6 +3228,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   });
 
+  // GET /api/audit — run security audit scan (Level 1: deps, Level 2: code)
+  app.get('/api/audit', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
+    try {
+      const { spawn } = await import('child_process');
+      const { resolve, dirname } = await import('path');
+      const { fileURLToPath } = await import('url');
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      const scriptPath = resolve(__dirname, '..', 'scripts', 'audit.ts');
+      
+      return new Promise<void>((resolve) => {
+        const child = spawn('npx', ['tsx', scriptPath, '--json'], {
+          cwd: resolve(__dirname, '..'),
+          shell: true,
+          timeout: 60000,
+        });
+        let output = '';
+        child.stdout.on('data', (d: Buffer) => output += d.toString());
+        child.stderr.on('data', (d: Buffer) => {}); // suppress stderr
+        child.on('close', (code: number) => {
+          if (code !== 0 || !output.trim()) {
+            res.status(500).json({ message: 'Audit script failed' });
+            return;
+          }
+          try {
+            const result = JSON.parse(output);
+            res.json(result);
+          } catch {
+            res.status(500).json({ message: 'Failed to parse audit output' });
+          }
+          resolve();
+        });
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // GET /api/audit/sessions — active sessions (last 30 min), scoped to caller's OU
   app.get('/api/audit/sessions', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
     try {
