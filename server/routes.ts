@@ -3235,7 +3235,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { readFileSync, readdirSync, existsSync, statSync } = await import('fs');
       const { join, resolve } = await import('path');
 
-      const PROJECT_ROOT = resolve(__dirname, '..');
+      const { fileURLToPath } = await import('url');
+      const _dirname = fileURLToPath(new URL('.', import.meta.url));
+      const PROJECT_ROOT = resolve(_dirname, '..');
       const CODE_DIRS = ['server', 'client', 'shared'];
       const findings: any[] = [];
 
