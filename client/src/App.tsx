@@ -14,7 +14,6 @@ import VerifyEmail from "@/pages/verify-email";
 import SroLogin from "@/pages/sro-login";
 import NotFound from "@/pages/not-found";
 import ViewPage from "@/pages/view";
-import AuditDashboard from "@/pages/audit-dashboard";
 
 // Version is derived from the build date — updates automatically on every deploy
 // Updated 2026-05-30
@@ -56,10 +55,7 @@ function Router() {
           <Route path="/staff" component={StaffDashboard} />
           <Route path="/docs" component={Docs} />
           {(user?.role === 'superadmin' || user?.role === 'privilege_admin') && (
-            <>
-              <Route path="/admin" component={AdminPanel} />
-              <Route path="/admin/audit" component={AuditDashboard} />
-            </>
+            <Route path="/admin" component={AdminPanel} />
           )}
         </>
       )}

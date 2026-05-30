@@ -3232,35 +3232,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/audit', isAuthenticated, requirePrivilegeAdmin, async (req: any, res) => {
     try {
       const { spawn } = await import('child_process');
-      const { resolve, dirname } = await import('path');
-      const { fileURLToPath } = await import('url');
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = dirname(__filename);
-      const scriptPath = resolve(__dirname, '..', 'scripts', 'audit.ts');
-      
-      return new Promise<void>((resolve) => {
-        const child = spawn('npx', ['tsx', scriptPath, '--json'], {
-          cwd: resolve(__dirname, '..'),
-          shell: true,
-          timeout: 60000,
-        });
-        let output = '';
-        child.stdout.on('data', (d: Buffer) => output += d.toString());
-        child.stderr.on('data', (d: Buffer) => {}); // suppress stderr
-        child.on('close', (code: number) => {
-          if (code !== 0 || !output.trim()) {
-            res.status(500).json({ message: 'Audit script failed' });
-            return;
-          }
-          try {
-            const result = JSON.parse(output);
-            res.json(result);
-          } catch {
-            res.status(500).json({ message: 'Failed to parse audit output' });
-          }
-          resolve();
-        });
+      const { readFileSync, readdirSync, existsSync, statSync } = await import('fs');
+      const { join, resolve } = await import('path');
+
+      const PROJECT_ROOT = resolve(__dirname, '..');
+      const CODE_DIRS = ['server', 'client', 'shared'];
+      const findings: any[] = [];
+
+      // ── Level 1: Dependencies ──
+      const runCmd = (cmd: string, args: string[]) => new Promise<string>((resolveR) => {
+        const child = spawn(cmd, args, { cwd: PROJECT_ROOT, shell: process.platform === 'win32' });
+        let out = '';
+        child.stdout.on('data', (d: Buffer) => out += d.toString());
+        child.stderr.on('data', () => {});
+        child.on('close', () => resolveR(out));
       });
+
+      // npm audit
+      try {
+        const auditOut = await runCmd('npm', ['audit', '--json']);
+        const auditData = JSON.parse(auditOut);
+        if (auditData.vulnerabilities) {
+          for (const [pkg, info] of Object.entries(auditData.vulnerabilities) as [string, any][]) {
+            const severity = info.severity || 'info';
+            const via = info.via;
+            const fixVer = Array.isArray(via) ? via.join(', ') : (typeof via === 'string' ? via : 'latest');
+            findings.push({
+              level: 1, category: 'CVE', severity,
+              title: `Vulnerability in ${pkg}`,
+              description: info.title || info.description || 'Known vulnerability',
+              fix: info.fixAvailable ? `Update to ${fixVer}` : 'No automatic fix available',
+            });
+          }
+        }
+      } catch {}
+
+      // npm outdated
+      try {
+        const outOut = await runCmd('npm', ['outdated', '--json']);
+        const outdated = JSON.parse(outOut) as Record<string, any>;
+        for (const [pkg, info] of Object.entries(outdated)) {
+          const current = info.current;
+          const latest = info.latest;
+          if (current && current !== latest) {
+            const age = info.datePublished
+              ? Math.floor((Date.now() - new Date(info.datePublished).getTime()) / 86400000)
+              : 0;
+            findings.push({
+              level: 1, category: 'Outdated',
+              severity: age > 365 ? 'high' : age > 180 ? 'medium' : 'low',
+              title: `${pkg} is outdated`,
+              description: `Current: ${current}, Latest: ${latest}`,
+              fix: `npm install ${pkg}@${latest}`,
+            });
+          }
+        }
+      } catch {}
+
+      // ── Level 2: Code Security ──
+      const allFiles: string[] = [];
+      for (const dir of CODE_DIRS) {
+        const dirPath = join(PROJECT_ROOT, dir);
+        if (!existsSync(dirPath)) continue;
+        const walk = (d: string) => {
+          for (const entry of readdirSync(d)) {
+            const fp = join(d, entry);
+            if (entry.startsWith('.') || entry === 'node_modules' || entry === 'dist' || entry === 'public') continue;
+            const s = statSync(fp);
+            if (s.isDirectory()) walk(fp);
+            else if (/\.(ts|tsx|js|jsx)$/.test(entry)) allFiles.push(fp);
+          }
+        };
+        walk(dirPath);
+      }
+
+      for (const fp of allFiles) {
+        let content: string;
+        try { content = readFileSync(fp, 'utf-8'); } catch { continue; }
+        const relPath = fp.replace(PROJECT_ROOT + '/', '');
+        const lines = content.split('\n');
+
+        // XSS
+        let m;
+        const xr = /dangerouslySetInnerHTML/g;
+        while ((m = xr.exec(content))) {
+          const ln = content.substring(0, m.index).split('\n').length;
+          findings.push({ level: 2, category: 'XSS', severity: 'high', title: 'XSS via dangerouslySetInnerHTML', description: 'Direct HTML injection', file: relPath, line: ln, fix: 'Use DOMPurify or React fragments' });
+        }
+
+        // SQL injection
+        const sr = /(?:query|execute|raw)\s*\(\s*['"`]SELECT\s.*?\sFROM\s/gi;
+        while ((m = sr.exec(content))) {
+          const ln = content.substring(0, m.index).split('\n').length;
+          findings.push({ level: 2, category: 'SQL Injection', severity: 'critical', title: 'Potential SQL injection', description: 'Raw SQL query', file: relPath, line: ln, fix: 'Use parameterized queries' });
+        }
+
+        // eval()
+        const er = /\beval\s*\(/g;
+        while ((er.exec(content))) {
+          const ln = content.substring(0, er.lastIndex).split('\n').length;
+          findings.push({ level: 2, category: 'Code Injection', severity: 'critical', title: 'eval() usage', description: 'Arbitrary code execution', file: relPath, line: ln, fix: 'Remove eval()' });
+        }
+
+        // Console sensitive data
+        const cr = /console\.(log|info|warn)\s*\([^)]*(password|secret|token|key|credential)/gi;
+        while ((cr.exec(content))) {
+          const ln = content.substring(0, cr.lastIndex).split('\n').length;
+          findings.push({ level: 2, category: 'Info Leak', severity: 'medium', title: 'Sensitive data in console', description: 'May expose secrets in production', file: relPath, line: ln, fix: 'Remove from console output' });
+        }
+
+        // Auth gaps on routes
+        if (relPath.includes('routes') && relPath.includes('server')) {
+          const rr = /app\.(get|post|put|patch|delete)\s*\(\s*['"`]\/api\/(?!auth|health|faqs|logout|audit)/gi;
+          while ((m = rr.exec(content))) {
+            const ln = content.substring(0, m.index).split('\n').length;
+            const ctx = lines.slice(ln - 1, ln + 5).join(' ');
+            if (!ctx.includes('isAuthenticated') && !ctx.includes('require')) {
+              findings.push({ level: 2, category: 'Auth Gap', severity: 'high', title: 'Route without auth guard', description: 'May be accessible without authentication', file: relPath, line: ln, fix: 'Add isAuthenticated middleware' });
+            }
+          }
+        }
+      }
+
+      const level1Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      const level2Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      for (const f of findings) {
+        if (f.level === 1) level1Count[f.severity]++;
+        else level2Count[f.severity]++;
+      }
+
+      res.json({ timestamp: new Date().toISOString(), level1Count, level2Count, findings });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

@@ -2,8 +2,7 @@
 // Level 1: Dependency health (CVEs, outdated packages, licenses)
 // Level 2: Code security (XSS, SQL injection, secrets, auth gaps)
 //
-// Usage: npx tsx scripts/audit.ts
-// Web: GET /admin/audit
+// Usage: npx tsx scripts/audit.ts  (dev only)
 
 import { spawn } from "child_process";
 import { readFileSync, readdirSync, existsSync, statSync } from "fs";
@@ -96,9 +95,7 @@ async function auditDependencies(): Promise<AuditResult[]> {
         });
       }
     }
-  } catch (e) {
-    // npm audit might fail on fresh installs
-  }
+  } catch {}
 
   // npm outdated
   try {
@@ -107,17 +104,18 @@ async function auditDependencies(): Promise<AuditResult[]> {
 
     for (const [pkg, info] of Object.entries(outdated)) {
       const current = info.current;
-      const wanted = info.wanted;
       const latest = info.latest;
-
-      if (current !== latest) {
-        const age = Math.floor((Date.now() - new Date(info.datePublished || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
+      if (current && current !== latest) {
+        const publishedDate = info.datePublished;
+        const age = publishedDate
+          ? Math.floor((Date.now() - new Date(publishedDate).getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
         findings.push({
           level: 1,
           category: "Outdated",
           severity: age > 365 ? "high" : age > 180 ? "medium" : "low",
           title: `${pkg} is outdated`,
-          description: `Current: ${current}, Wanted: ${wanted}, Latest: ${latest}`,
+          description: `Current: ${current}, Latest: ${latest}`,
           fix: `npm install ${pkg}@${latest}`,
         });
       }
@@ -153,18 +151,14 @@ function auditCodeSecurity(): AuditResult[] {
         category: "XSS",
         severity: "high",
         title: "Potential XSS via dangerouslySetInnerHTML",
-        description: `Direct HTML injection detected`,
+        description: "Direct HTML injection detected",
         file: relativePath,
         line: lineNum,
         fix: "Sanitize HTML with DOMPurify or use React fragments instead",
       });
     }
 
-    // 2. XSS: unescaped template literals in JSX-like contexts
-    const unescapedRegex = /\{[^}]*\+[^}]*\}/g;
-    // This is too noisy, skip for now
-
-    // 3. SQL Injection: raw SQL strings (not using Drizzle)
+    // 2. SQL Injection: raw SQL strings
     const rawSqlRegex = /(?:query|execute|raw)\s*\(\s*['"`]*SELECT\s.*?\s*FROM\s/gi;
     while ((match = rawSqlRegex.exec(content)) !== null) {
       const lineNum = content.substring(0, match.index).split("\n").length;
@@ -176,11 +170,11 @@ function auditCodeSecurity(): AuditResult[] {
         description: "Raw SQL query with possible string interpolation",
         file: relativePath,
         line: lineNum,
-        fix: "Use Drizzle ORM parameterized queries instead of raw SQL",
+        fix: "Use Drizzle ORM parameterized queries",
       });
     }
 
-    // 4. Secret leaks: hardcoded API keys, passwords
+    // 3. Secret leaks
     const secretPatterns = [
       { regex: /(?:api[_-]?key|apikey)\s*=\s*['"][A-Za-z0-9]{20,}['"]/gi, label: "API key" },
       { regex: /password\s*=\s*['"][^'\s]{8,}['"]/gi, label: "Password" },
@@ -190,12 +184,11 @@ function auditCodeSecurity(): AuditResult[] {
     ];
 
     for (const pattern of secretPatterns) {
+      pattern.regex.lastIndex = 0;
       while ((match = pattern.regex.exec(content)) !== null) {
         const lineNum = content.substring(0, match.index).split("\n").length;
-        // Skip if it's clearly a placeholder or env var reference
         const lineContent = lines[lineNum - 1]?.trim();
         if (lineContent?.includes("process.env") || lineContent?.includes("YOUR_") || lineContent?.includes("CHANGE_ME")) continue;
-
         findings.push({
           level: 2,
           category: "Secret Leak",
@@ -209,12 +202,11 @@ function auditCodeSecurity(): AuditResult[] {
       }
     }
 
-    // 5. Missing auth guards: routes without isAuthenticated
+    // 4. Missing auth guards on routes
     if (relativePath.includes("routes") && relativePath.includes("server")) {
-      const routeRegex = /app\.(get|post|put|patch|delete)\s*\(\s*['"`]\/api\/(?!auth|health|faqs|logout)/gi;
+      const routeRegex = /app\.(get|post|put|patch|delete)\s*\(\s*['"`]\/api\/(?!auth|health|faqs|logout|audit)/gi;
       while ((match = routeRegex.exec(content)) !== null) {
         const lineNum = content.substring(0, match.index).split("\n").length;
-        // Check next 5 lines for auth middleware
         const context = lines.slice(lineNum - 1, lineNum + 5).join(" ");
         if (!context.includes("isAuthenticated") && !context.includes("require")) {
           findings.push({
@@ -222,7 +214,7 @@ function auditCodeSecurity(): AuditResult[] {
             category: "Auth Gap",
             severity: "high",
             title: "Route without authentication guard",
-            description: `API route may be accessible without authentication`,
+            description: "API route may be accessible without authentication",
             file: relativePath,
             line: lineNum,
             fix: "Add isAuthenticated middleware to this route",
@@ -231,7 +223,7 @@ function auditCodeSecurity(): AuditResult[] {
       }
     }
 
-    // 6. eval() usage
+    // 5. eval() usage
     const evalRegex = /\beval\s*\(/g;
     while ((evalRegex.exec(content)) !== null) {
       const lineNum = content.substring(0, evalRegex.lastIndex).split("\n").length;
@@ -247,7 +239,7 @@ function auditCodeSecurity(): AuditResult[] {
       });
     }
 
-    // 7. console.log with sensitive data
+    // 6. Console logging sensitive data
     const consoleSecretRegex = /console\.(log|info|warn)\s*\([^)]*(password|secret|token|key|credential)/gi;
     while ((consoleSecretRegex.exec(content)) !== null) {
       const lineNum = content.substring(0, consoleSecretRegex.lastIndex).split("\n").length;
@@ -263,7 +255,7 @@ function auditCodeSecurity(): AuditResult[] {
       });
     }
 
-    // 8. Wildcard CORS
+    // 7. Wildcard CORS
     const corsRegex = /Access-Control-Allow-Origin.*\*|cors\s*\(\s*\{\s*origin:\s*['"]\*['"]\s*\}/gi;
     while ((corsRegex.exec(content)) !== null) {
       const lineNum = content.substring(0, corsRegex.lastIndex).split("\n").length;
@@ -289,19 +281,16 @@ async function runAudit(): Promise<AuditSummary> {
 
   console.log("🔍 Running Valet-s Security Audit...\n");
 
-  // Level 1: Dependencies
   console.log("📦 Level 1: Scanning dependencies...");
   const depFindings = await auditDependencies();
   findings.push(...depFindings);
   console.log(`   Found ${depFindings.length} issues\n`);
 
-  // Level 2: Code Security
   console.log("🔒 Level 2: Scanning code security...");
   const codeFindings = auditCodeSecurity();
   findings.push(...codeFindings);
   console.log(`   Found ${codeFindings.length} issues\n`);
 
-  // Summary
   const level1Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
   const level2Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
 
@@ -332,7 +321,6 @@ async function runAudit(): Promise<AuditSummary> {
       console.log(`    ${emoji} ${sev.toUpperCase()}: ${level1Count[sev]}`);
     }
   }
-
   console.log("");
   console.log("  Level 2 (Code Security):");
   for (const sev of ["critical", "high", "medium", "low", "info"]) {
@@ -341,10 +329,8 @@ async function runAudit(): Promise<AuditSummary> {
       console.log(`    ${emoji} ${sev.toUpperCase()}: ${level2Count[sev]}`);
     }
   }
-
   console.log("");
 
-  // Detail report
   if (findings.length > 0) {
     console.log("  ─── FINDINGS ───────────────────────────────────────────────────────");
     for (const f of findings) {
@@ -358,13 +344,12 @@ async function runAudit(): Promise<AuditSummary> {
   } else {
     console.log("  ✅ All clear! No issues found.");
   }
-
   console.log("═".repeat(60));
 
   return summary;
 }
 
-// Export for web dashboard
+// Export for inline use in server
 export { runAudit, auditDependencies, auditCodeSecurity };
 export type { AuditSummary, AuditResult };
 
