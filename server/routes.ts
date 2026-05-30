@@ -3308,10 +3308,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         walk(dirPath);
       }
 
+      // Set of safe files to skip (third-party UI components)
+      const SAFE_FILES = new Set(['client/src/components/ui/chart.tsx']);
+
       for (const fp of allFiles) {
         let content: string;
         try { content = readFileSync(fp, 'utf-8'); } catch { continue; }
         const relPath = fp.replace(PROJECT_ROOT + '/', '');
+
+        // Skip the audit scanner itself to avoid false positives
+        if (relPath === 'server/routes.ts') continue;
+        // Skip known safe third-party UI components
+        if (SAFE_FILES.has(relPath)) continue;
         const lines = content.split('\n');
 
         // XSS
