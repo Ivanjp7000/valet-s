@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Faq } from "@shared/schema";
 import { VISITOR_TYPES } from "@shared/schema";
 import { format, addDays, startOfToday } from "date-fns";
+import { useContent } from "@/content";
 
 interface TicketPreview {
   ticketNumber: string;
@@ -27,6 +28,8 @@ interface TicketPreview {
 }
 
 export default function Landing() {
+  const { content } = useContent();
+  const t = content.landing;
   const [ticketNumber, setTicketNumber] = useState("");
   const [showStatus, setShowStatus] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -52,11 +55,7 @@ export default function Landing() {
 
   const handleTicketSubmit = async () => {
     if (ticketNumber.length !== 5) {
-      toast({
-        title: "Invalid Ticket",
-        description: "Please enter your 5-character ticket number",
-        variant: "destructive",
-      });
+      toast({ title: t.errors.invalidTicket, description: t.errors.invalidTicketDesc, variant: "destructive" });
       return;
     }
 
@@ -76,31 +75,45 @@ export default function Landing() {
       if (!response.ok) {
         if (response.status === 429) {
           toast({
-            title: "Too Many Attempts",
-            description: "Please wait a moment before trying again.",
+            title: t.errors.tooManyAttempts,
+            description: t.errors.tooManyAttemptsDesc,
             variant: "destructive",
           });
         } else {
-          setNameError("Ticket not found, or the name does not match. Please check and try again.");
+          toast({ title: t.errors.lookupError, description: t.errors.lookupErrorDesc, variant: "destructive" });
         }
         return;
       }
-      const data: TicketPreview = await response.json();
-      setTicketPreview(data);
-      setSubmittedTicket(ticketNumber);
-      setTicketNumber("");
-      // If ticket already has an active schedule, go directly to the tracker
-      if (data.scheduledRetrievalAt && ['active', 'pending'].includes(data.status)) {
-        setShowStatus(true);
-      } else {
+
+      const data = await response.json();
+      if (data.success) {
+        setTicketPreview(data.ticket);
         setShowConfirmation(true);
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to look up ticket. Please try again.",
-        variant: "destructive",
-      });
+    } catch (err: any) {
+      toast({ title: t.errors.connectionError, description: t.errors.connectionErrorDesc, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmRetrieval = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/tickets/${ticketNumber}/queue`, { method: "POST" });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        toast({
+          title: t.errors.requestFailed,
+          description: err.message || t.errors.requestFailedDesc,
+          variant: "destructive",
+        });
+        return;
+      }
+      setShowStatus(true);
+      setSubmittedTicket(ticketNumber);
+    } catch (err: any) {
+      toast({ title: t.errors.connectionError, description: t.errors.connectionErrorDesc, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -109,192 +122,135 @@ export default function Landing() {
   const handleCancelConfirmation = () => {
     setShowConfirmation(false);
     setTicketPreview(null);
-    setSubmittedTicket("");
-    setShowSchedule(false);
-    setScheduleConfirmed(false);
-    setScheduleDate("");
-    setScheduleTime("");
-    setScheduleEmail("");
+    setTicketNumber("");
     setGuestNameInput("");
     setGuestPinInput("");
-    setNameError("");
   };
 
   const handleScheduleSubmit = async () => {
     if (!scheduleDate || !scheduleTime) {
-      toast({ title: "Please select a date and time", variant: "destructive" });
+      toast({ title: t.errors.noDate, variant: "destructive" });
       return;
     }
     setScheduleLoading(true);
     try {
-      const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`).toISOString();
-      const pinVal = guestPinInput.trim().toUpperCase();
-      const response = await fetch(`/api/tickets/${submittedTicket}/schedule-retrieval`, {
+      const response = await fetch(`/api/tickets/${ticketNumber}/schedule`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduledAt, guestName: guestNameInput.trim(), guestPin: pinVal || undefined, reminderEmail: scheduleEmail.trim() || undefined }),
+        body: JSON.stringify({ date: scheduleDate, time: scheduleTime, email: scheduleEmail }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        toast({ title: "Scheduling Failed", description: err.message || "Please try again.", variant: "destructive" });
+        toast({ title: t.errors.scheduleFailed, description: err.message || t.errors.scheduleFailedDesc, variant: "destructive" });
         return;
       }
       setScheduleConfirmed(true);
-    } catch {
-      toast({ title: "Connection Error", description: "Please try again.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: t.errors.connectionError, description: t.errors.connectionErrorDesc, variant: "destructive" });
     } finally {
       setScheduleLoading(false);
     }
   };
 
-  const handleConfirmRetrieval = async () => {
-    try {
-      const response = await fetch(`/api/tickets/${submittedTicket}/request-retrieval`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guestName: guestNameInput.trim(), guestPin: guestPinInput.trim().toUpperCase() || undefined }),
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        toast({
-          title: "Request Failed",
-          description: err.message || "Could not add to queue. Please ask a staff member.",
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch {
-      toast({
-        title: "Connection Error",
-        description: "Please try again or ask a staff member.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setShowConfirmation(false);
-    setShowStatus(true);
-  };
-
+  // Status Tracking Screen
   if (showStatus) {
-    return <StatusTracker ticketNumber={submittedTicket} guestName={guestNameInput.trim()} guestPin={guestPinInput.trim().toUpperCase() || undefined} onBack={() => setShowStatus(false)} />;
+    return (
+      <div className="min-h-screen bg-soft-gray">
+        <StatusTracker ticketNumber={submittedTicket} />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowSystemLogin(true)}
+          className="fixed bottom-4 left-4 w-8 h-8 bg-gray-300 hover:bg-gray-400 opacity-30 hover:opacity-60 transition-all duration-300"
+        >
+          <Settings size={12} className="text-gray-600" />
+        </Button>
+        {showSystemLogin && <SystemLoginModal onClose={() => setShowSystemLogin(false)} />}
+      </div>
+    );
   }
 
   // Schedule Screen
-  if (showConfirmation && showSchedule && ticketPreview) {
-    const today = format(startOfToday(), "yyyy-MM-dd");
-    const maxDay = format(addDays(startOfToday(), 7), "yyyy-MM-dd");
+  if (showSchedule && ticketPreview) {
+    const minDate = format(startOfToday(), "yyyy-MM-dd");
+    const maxDate = format(addDays(startOfToday(), 7), "yyyy-MM-dd");
 
-    if (scheduleConfirmed) {
-      const confirmedDate = new Date(`${scheduleDate}T${scheduleTime}`);
-      return (
-        <div className="min-h-screen bg-soft-gray flex flex-col">
-          <div className="bg-regis-navy text-white px-6 py-8 text-center">
-            <div className="w-16 h-16 bg-regis-gold rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="text-white" size={28} />
-            </div>
-            <h1 className="text-2xl font-semibold mb-1">Retrieval Scheduled</h1>
-            <p className="text-blue-200 text-sm">Ticket #{ticketPreview.ticketNumber}</p>
-          </div>
-          <div className="max-w-md mx-auto px-6 py-10 w-full flex-1 flex flex-col justify-center">
-            <Card className="shadow-lg border-0">
-              <CardContent className="p-8 text-center">
-                <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
-                  <Calendar className="text-green-600" size={24} />
-                </div>
-                <h2 className="text-xl font-bold text-regis-navy mb-1">Your retrieval is confirmed</h2>
-                <p className="text-gray-500 text-sm mb-6">Our team will have your vehicle ready at the scheduled time.</p>
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 mb-6 text-left space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="text-regis-gold flex-shrink-0" size={16} />
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">Date</p>
-                      <p className="font-semibold text-regis-navy">{format(confirmedDate, "EEEE, MMMM d, yyyy")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Clock className="text-regis-gold flex-shrink-0" size={16} />
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide">Time</p>
-                      <p className="font-semibold text-regis-navy">{format(confirmedDate, "h:mm a")}</p>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 mb-6">To change your time, scan your ticket again and select a new schedule.</p>
-                <Button onClick={handleCancelConfirmation} variant="outline" className="w-full">
-                  <ChevronLeft className="mr-2" size={15} />
-                  Back to Home
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      );
+    // Build time options: every 15 min from 08:00 to 23:45
+    const timeOptions: string[] = [];
+    for (let h = 8; h <= 23; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        timeOptions.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+      }
     }
 
     return (
       <div className="min-h-screen bg-soft-gray flex flex-col">
-        <div className="bg-white shadow-sm">
-          <div className="max-w-md mx-auto px-6 py-6 flex items-center gap-3">
-            <button onClick={() => setShowSchedule(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-              <ChevronLeft size={22} />
-            </button>
-            <div>
-              <h1 className="text-xl font-semibold text-regis-navy leading-tight">Schedule Retrieval</h1>
-              <p className="text-gray-500 text-xs">Ticket #{ticketPreview.ticketNumber}</p>
-            </div>
-          </div>
-        </div>
-
         <div className="max-w-md mx-auto px-6 py-8 w-full flex-1 flex flex-col justify-center">
-          <Card className="shadow-xl border-0">
+          {/* Schedule Card */}
+          <Card className="shadow-xl border-2 border-regis-gold/20 mb-6">
             <CardContent className="p-8">
+              <div className="flex items-center gap-3 mb-5">
+                <Button variant="ghost" size="icon" onClick={() => setShowSchedule(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <ChevronLeft size={20} />
+                </Button>
+                <div className="flex-1 text-left">
+                  <h1 className="text-xl font-semibold text-regis-navy leading-tight">{t.schedule.heading}</h1>
+                  <p className="text-gray-500 text-xs">{t.scheduled.ticketPrefix}{ticketPreview.ticketNumber}</p>
+                </div>
+              </div>
+
               <div className="text-center mb-7">
-                <div className="w-16 h-16 bg-regis-navy/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Calendar className="text-regis-navy" size={26} />
                 </div>
-                <h2 className="text-xl font-bold text-regis-navy mb-1">Choose a Date & Time</h2>
+                <h2 className="text-xl font-bold text-regis-navy mb-1">{t.schedule.subheading}</h2>
                 <p className="text-gray-500 text-sm">We'll have your vehicle ready at the entrance.</p>
               </div>
 
               <div className="space-y-5">
                 {/* Date */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Date</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t.schedule.dateLabel}</label>
                   <input
                     type="date"
-                    min={today}
-                    max={maxDay}
+                    min={minDate}
+                    max={maxDate}
                     value={scheduleDate}
                     onChange={e => setScheduleDate(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
                   />
-                  <p className="text-xs text-gray-400 mt-1">Up to 7 days in advance</p>
+                  <p className="text-xs text-gray-400 mt-1">{t.schedule.dateHint}</p>
                 </div>
 
                 {/* Time */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Time</label>
-                  <input
-                    type="time"
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t.schedule.timeLabel}</label>
+                  <select
                     value={scheduleTime}
                     onChange={e => setScheduleTime(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
-                  />
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white appearance-none"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239CA3AF' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center" }}
+                  >
+                    <option value="">Select a time</option>
+                    {timeOptions.map(time => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Email reminder — optional */}
+                {/* Email reminder */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    Email Reminder <span className="text-gray-400 font-normal normal-case">(optional)</span>
+                    {t.schedule.emailLabel} <span className="text-gray-400 font-normal normal-case">{t.schedule.emailOptional}</span>
                   </label>
                   <input
                     type="email"
-                    placeholder="your@email.com"
+                    placeholder={t.schedule.emailPlaceholder}
                     value={scheduleEmail}
                     onChange={e => setScheduleEmail(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white"
                   />
-                  <p className="text-xs text-gray-400 mt-1">You'll receive a confirmation now, and another when your car is ready.</p>
+                  <p className="text-xs text-gray-400 mt-1">{t.schedule.emailHint}</p>
                 </div>
 
               </div>
@@ -306,7 +262,7 @@ export default function Landing() {
                   className="w-full bg-regis-navy hover:bg-regis-navy/90 text-white font-semibold py-4 h-auto text-base"
                 >
                   <Calendar className="mr-2" size={18} />
-                  {scheduleLoading ? "Confirming…" : "Confirm Schedule"}
+                  {scheduleLoading ? t.schedule.confirming : t.schedule.confirm}
                 </Button>
                 <Button
                   onClick={() => setShowSchedule(false)}
@@ -314,7 +270,7 @@ export default function Landing() {
                   className="w-full py-2 h-auto text-gray-400 hover:text-gray-600"
                 >
                   <ChevronLeft className="mr-1" size={15} />
-                  Back
+                  {t.schedule.back}
                 </Button>
               </div>
             </CardContent>
@@ -343,8 +299,8 @@ export default function Landing() {
       <div className="min-h-screen bg-soft-gray flex flex-col">
         <div className="bg-white shadow-sm">
           <div className="max-w-md mx-auto px-6 py-8 text-center">
-            <h1 className="text-3xl font-semibold text-regis-navy mb-2">Valet Service</h1>
-            <p className="text-gray-600 text-sm">Vehicle Retrieval</p>
+            <h1 className="text-3xl font-semibold text-regis-navy mb-2">{t.confirmation.pageTitle}</h1>
+            <p className="text-gray-600 text-sm">{t.confirmation.pageSubtitle}</p>
           </div>
         </div>
 
@@ -357,55 +313,44 @@ export default function Landing() {
                 <div className="w-20 h-20 bg-regis-gold/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Car className="text-regis-gold" size={36} />
                 </div>
-                <h2 className="text-2xl font-bold text-regis-navy mb-1">Ticket Found</h2>
-                <p className="text-gray-500 text-sm">Please confirm your identity to proceed.</p>
+                <h2 className="text-2xl font-bold text-regis-navy mb-1">{t.confirmation.ticketFound}</h2>
+                <p className="text-gray-500 text-sm">{t.confirmation.confirmIdentity}</p>
               </div>
 
               {/* Divider */}
               <div className="border-t border-gray-100 my-5" />
 
-              {/* Ticket Info — compact grid */}
+              {/* Ticket Info */}
               <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100 mb-6 text-sm">
-
-                {/* Ticket # */}
                 <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Ticket size={11} />Ticket</span>
+                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Ticket size={11} />{t.ticketInfo.ticket}</span>
                   <span className="font-bold text-regis-navy">#{ticketPreview.ticketNumber}</span>
                 </div>
-
-                {/* Guest Name */}
                 {ticketPreview.guestName && (
                   <div className="flex items-center justify-between px-3 py-2">
-                    <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><User size={11} />Guest</span>
+                    <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><User size={11} />{t.ticketInfo.guest}</span>
                     <span className="font-semibold text-gray-800 text-right">{ticketPreview.guestName}</span>
                   </div>
                 )}
-
-                {/* Car */}
                 {(ticketPreview.carMake || ticketPreview.carModel || ticketPreview.carColor) && (
                   <div className="flex items-center justify-between px-3 py-2">
-                    <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Car size={11} />Vehicle</span>
+                    <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Car size={11} />{t.ticketInfo.vehicle}</span>
                     <span className="font-semibold text-gray-800 text-right">
                       {[ticketPreview.carColor, ticketPreview.carMake, ticketPreview.carModel].filter(Boolean).join(' ')}
                     </span>
                   </div>
                 )}
-
-                {/* Visit type */}
                 <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Building2 size={11} />Visit</span>
+                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Building2 size={11} />{t.ticketInfo.visit}</span>
                   <span className="font-semibold text-gray-800 text-right">
                     {visitorLabel}
                     {ticketPreview.visitorSubType && <span className="text-gray-400 font-normal"> · {ticketPreview.visitorSubType.replace(/_/g, ' ')}</span>}
                   </span>
                 </div>
-
-                {/* Arrived */}
                 <div className="flex items-center justify-between px-3 py-2">
-                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Calendar size={11} />Arrived</span>
+                  <span className="text-xs text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><Calendar size={11} />{t.ticketInfo.arrived}</span>
                   <span className="font-semibold text-gray-800">{format(arrivedAt, "dd MMM yyyy")} <span className="text-gray-400 font-normal text-xs">{format(arrivedAt, "hh:mm a")}</span></span>
                 </div>
-
               </div>
 
               {/* Divider */}
@@ -418,14 +363,14 @@ export default function Landing() {
                   className="w-full bg-regis-gold hover:bg-yellow-600 text-regis-navy font-bold py-4 h-auto text-base"
                 >
                   <Car className="mr-2" size={20} />
-                  Retrieve My Car Now
+                  {t.confirmation.retrieveNow}
                 </Button>
                 <Button
                   onClick={() => setShowSchedule(true)}
                   className="w-full py-3 h-auto bg-blue-600 hover:bg-blue-700 text-white font-medium"
                 >
                   <Calendar className="mr-2" size={16} />
-                  Schedule a Retrieval Time
+                  {t.confirmation.scheduleTime}
                 </Button>
                 <Button
                   onClick={handleCancelConfirmation}
@@ -433,7 +378,7 @@ export default function Landing() {
                   className="w-full py-2 h-auto text-gray-400 hover:text-gray-600"
                 >
                   <X className="mr-2" size={15} />
-                  Cancel
+                  {t.confirmation.cancel}
                 </Button>
               </div>
             </CardContent>
@@ -453,8 +398,65 @@ export default function Landing() {
     );
   }
 
+  // Scheduled Confirmation
+  if (scheduleConfirmed) {
+    const confirmedDate = new Date(`${scheduleDate}T${scheduleTime}`);
+
+    return (
+      <div className="min-h-screen bg-soft-gray">
+        <div className="max-w-md mx-auto px-6 py-8 w-full flex-1 flex flex-col justify-center">
+          <Card className="shadow-xl border-2 border-regis-gold/20 mb-6">
+            <CardContent className="p-8 text-center">
+              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="text-white" size={28} />
+              </div>
+              <h1 className="text-2xl font-semibold mb-1">{t.scheduled.header}</h1>
+              <p className="text-blue-200 text-sm">{t.scheduled.ticketPrefix}{submittedTicket}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardContent className="p-8 text-center">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Calendar className="text-green-600" size={24} />
+              </div>
+              <h2 className="text-xl font-bold text-regis-navy mb-1">{t.scheduled.confirmedTitle}</h2>
+              <p className="text-gray-500 text-sm mb-6">{t.scheduled.confirmedSub}</p>
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 mb-6 text-left space-y-3">
+                <div className="flex items-center gap-3">
+                  <Calendar className="text-regis-gold flex-shrink-0" size={16} />
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">{t.scheduled.dateLabel}</p>
+                    <p className="font-semibold text-regis-navy">{format(confirmedDate, "EEEE, MMMM d, yyyy")}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Clock className="text-regis-gold flex-shrink-0" size={16} />
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Time</p>
+                    <p className="font-semibold text-regis-navy">{format(confirmedDate, "h:mm a")}</p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mb-6">{t.scheduled.changeHint}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowSystemLogin(true)}
+          className="fixed bottom-4 left-4 w-8 h-8 bg-gray-300 hover:bg-gray-400 opacity-30 hover:opacity-60 transition-all duration-300"
+        >
+          <Settings size={12} className="text-gray-600" />
+        </Button>
+        {showSystemLogin && <SystemLoginModal onClose={() => setShowSystemLogin(false)} />}
+      </div>
+    );
+  }
+
   const handleDigitChange = (index: number, value: string) => {
-    // Box 0 accepts a letter or digit; boxes 1-4 accept digits only
     const char = index === 0
       ? value.replace(/[^A-Za-z0-9]/g, '').slice(-1).toUpperCase()
       : value.replace(/\D/g, '').slice(-1);
@@ -462,7 +464,6 @@ export default function Landing() {
     digits[index] = char;
     setTicketNumber(digits.join('').trim());
 
-    // Auto-focus next input
     if (char && index < 4) {
       const nextInput = document.getElementById(`digit-${index + 1}`);
       nextInput?.focus();
@@ -478,125 +479,115 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-soft-gray">
-      {/* Main Customer Interface */}
       <div className="max-w-md mx-auto px-6 py-8">
-        {/* Ticket Input Card */}
         <Card className="mb-6 shadow-lg overflow-hidden">
           <CardContent className="p-0">
-            {/* Header inside card */}
             <div className="bg-regis-navy text-center px-6 py-5">
-              <p className="text-[10px] font-semibold tracking-[0.25em] text-regis-gold uppercase mb-1">Exclusive</p>
-              <h1 className="text-2xl font-bold tracking-widest text-white uppercase mb-1">Valet Service</h1>
+              <p className="text-[10px] font-semibold tracking-[0.25em] text-regis-gold uppercase mb-1">{t.header.tagline}</p>
+              <h1 className="text-2xl font-bold tracking-widest text-white uppercase mb-1">{t.header.title}</h1>
               <div className="flex items-center justify-center gap-3 mt-2">
                 <div className="h-px w-10 bg-regis-gold/60" />
-                <p className="text-[11px] tracking-[0.18em] text-white/60 uppercase">Retrieve your vehicle</p>
+                <p className="text-[11px] tracking-[0.18em] text-white/60 uppercase">{t.header.subtitle}</p>
                 <div className="h-px w-10 bg-regis-gold/60" />
               </div>
             </div>
 
             <div className="p-8">
-            {/* Luxury car hero image */}
-            <div className="flex justify-center mb-6">
-              <div
-                className="overflow-hidden"
-                style={{
-                  width: '90%',
-                  borderRadius: '14px',
-                  border: '2px solid rgba(220, 230, 245, 0.9)',
-                  boxShadow: '0 0 0 1px rgba(180,200,230,0.4), 0 4px 24px rgba(160,190,220,0.25), inset 0 1px 0 rgba(255,255,255,0.8)',
-                }}
-              >
-                <img
-                  src={luxuryCarImg}
-                  alt="Luxury valet car"
-                  className="w-full object-cover"
-                  style={{ height: '160px', objectPosition: 'center 55%' }}
-                />
-              </div>
-            </div>
-
-            <h2 className="text-xl font-semibold text-regis-navy mb-5 text-center">Enter Your Ticket Number</h2>
-
-            {/* 5 Digit Boxes */}
-            <div className="flex flex-col items-center mb-6">
-              <div className="flex justify-center gap-2">
-                {[0, 1, 2, 3, 4].map((index) => (
-                  <input
-                    key={index}
-                    id={`digit-${index}`}
-                    type="text"
-                    inputMode={index === 0 ? "text" : "numeric"}
-                    maxLength={1}
-                    value={ticketNumber[index] || ''}
-                    onChange={(e) => handleDigitChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(index, e)}
-                    className="w-12 h-14 text-center text-2xl font-mono font-bold border-2 border-gray-300 rounded-lg focus:border-regis-gold focus:outline-none focus:ring-2 focus:ring-regis-gold/20"
-                    data-testid={`input-digit-${index}`}
+              <div className="flex justify-center mb-6">
+                <div
+                  className="overflow-hidden"
+                  style={{
+                    width: '90%',
+                    borderRadius: '14px',
+                    border: '2px solid rgba(220, 230, 245, 0.9)',
+                    boxShadow: '0 0 0 1px rgba(180,200,230,0.4), 0 4px 24px rgba(160,190,220,0.25), inset 0 1px 0 rgba(255,255,255,0.8)',
+                  }}
+                >
+                  <img
+                    src={luxuryCarImg}
+                    alt="Luxury valet car"
+                    className="w-full object-cover"
+                    style={{ height: '160px', objectPosition: 'center 55%' }}
                   />
-                ))}
-              </div>
-              {/* Start-here indicator under the first box */}
-              <div className="flex justify-start w-full pl-[calc(50%-130px)] mt-1.5">
-                <div className="flex flex-col items-center gap-0.5 w-12">
-                  <svg width="10" height="8" viewBox="0 0 10 8" className="text-regis-gold fill-current">
-                    <polygon points="5,0 10,8 0,8" />
-                  </svg>
-                  <span className="text-[10px] font-semibold text-regis-gold uppercase tracking-wide leading-none whitespace-nowrap">Start here</span>
                 </div>
               </div>
-            </div>
 
-            {/* PIN Input */}
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                PIN (from label)
-              </label>
-              <input
-                type="text"
-                value={guestPinInput}
-                onChange={e => { setGuestPinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)); setNameError(""); }}
-                onKeyDown={e => { if (e.key === 'Enter') handleTicketSubmit(); }}
-                placeholder="e.g. AC36"
-                maxLength={4}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white uppercase"
-              />
-              <p className="text-[11px] text-gray-400 mt-1">4-character code printed on your label</p>
-              {nameError && (
-                <p className="text-red-500 text-xs mt-1">{nameError}</p>
-              )}
-            </div>
+              <h2 className="text-xl font-semibold text-regis-navy mb-5 text-center">{t.input.heading}</h2>
 
-            {/* Submit Button */}
-            <Button 
-              onClick={handleTicketSubmit}
-              disabled={isLoading}
-              className="w-full bg-regis-navy hover:bg-blue-900 text-white font-medium py-4 h-auto"
-              data-testid="button-submit"
-            >
-              {isLoading ? "Looking up…" : "Submit"}
-            </Button>
+              <div className="flex flex-col items-center mb-6">
+                <div className="flex justify-center gap-2">
+                  {[0, 1, 2, 3, 4].map((index) => (
+                    <input
+                      key={index}
+                      id={`digit-${index}`}
+                      type="text"
+                      inputMode={index === 0 ? "text" : "numeric"}
+                      maxLength={1}
+                      value={ticketNumber[index] || ''}
+                      onChange={(e) => handleDigitChange(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(index, e)}
+                      className="w-12 h-14 text-center text-2xl font-mono font-bold border-2 border-gray-300 rounded-lg focus:border-regis-gold focus:outline-none focus:ring-2 focus:ring-regis-gold/20"
+                      data-testid={`input-digit-${index}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-start w-full pl-[calc(50%-130px)] mt-1.5">
+                  <div className="flex flex-col items-center gap-0.5 w-12">
+                    <svg width="10" height="8" viewBox="0 0 10 8" className="text-regis-gold fill-current">
+                      <polygon points="5,0 10,8 0,8" />
+                    </svg>
+                    <span className="text-[10px] font-semibold text-regis-gold uppercase tracking-wide leading-none whitespace-nowrap">{t.input.startHere}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  {t.input.pinLabel}
+                </label>
+                <input
+                  type="text"
+                  value={guestPinInput}
+                  onChange={e => { setGuestPinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)); setNameError(""); }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleTicketSubmit(); }}
+                  placeholder={t.input.pinPlaceholder}
+                  maxLength={4}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-regis-navy text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-regis-gold/40 focus:border-regis-gold bg-white uppercase"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">{t.input.pinHint}</p>
+                {nameError && (
+                  <p className="text-red-500 text-xs mt-1">{nameError}</p>
+                )}
+              </div>
+
+              <Button 
+                onClick={handleTicketSubmit}
+                disabled={isLoading}
+                className="w-full bg-regis-navy hover:bg-blue-900 text-white font-medium py-4 h-auto"
+                data-testid="button-submit"
+              >
+                {isLoading ? t.input.searching : t.input.submit}
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Quick FAQ Preview */}
         <Card className="shadow-sm">
           <CardContent className="p-6">
             <h3 className="font-medium text-regis-navy mb-3 flex items-center">
               <HelpCircle className="mr-2 text-regis-gold" size={18} />
-              Quick Help
+              {t.faq.sectionTitle}
             </h3>
             <button 
               onClick={() => setShowFAQModal(true)}
               className="text-regis-gold text-sm font-medium hover:underline"
             >
-              View all FAQs →
+              {t.faq.viewAll}
             </button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Discrete System Login Button */}
       <Button
         variant="ghost"
         size="icon"
@@ -607,12 +598,10 @@ export default function Landing() {
         <Settings size={12} className="text-gray-600" />
       </Button>
 
-      {/* System Login Modal */}
       {showSystemLogin && (
         <SystemLoginModal onClose={() => setShowSystemLogin(false)} />
       )}
 
-      {/* FAQ Modal */}
       <FAQModal 
         isOpen={showFAQModal} 
         onClose={() => setShowFAQModal(false)} 

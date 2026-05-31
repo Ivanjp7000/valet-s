@@ -3688,5 +3688,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+
+  // ── Edit API — file read/write/list for /view editor ──
+  // ESM-safe: dynamic imports, PROJECT_ROOT resolved from import.meta.url
+  const { resolve: rslv, join: jn, dirname: dname, extname: xtn, relative: rel } = await import('path');
+  const { readFileSync: _rfs, readdirSync: _rds, existsSync: _exs, statSync: _sts } = await import('fs');
+  const { readFile: efsReadFile, writeFile: efsWriteFile, mkdir: efsMkdir, readdir: efsReaddir, stat: efsStat, rename: efsRename } = await import('fs/promises');
+  const { exec: eExecCb } = await import('child_process');
+  const { promisify: _promisify } = await import('util');
+  const eExec = _promisify(eExecCb);
+
+  // Resolve PROJECT_ROOT (server/ is one level down from project root)
+  const { fileURLToPath: _f2p } = await import('url');
+  const _editDirname = _f2p(new URL('.', import.meta.url));
+  const EDIT_PROJECT_ROOT = rslv(_editDirname, '..');
+  const EDIT_CLIENT_SRC = jn(EDIT_PROJECT_ROOT, 'client', 'src');
+  const EDIT_SHARED_DIR = jn(EDIT_PROJECT_ROOT, 'shared');
+  const EDIT_ALLOWED = [EDIT_CLIENT_SRC, EDIT_SHARED_DIR];
+
+  function sanitizeEditPath(reqPath: string): string | null {
+    const base = EDIT_CLIENT_SRC;
+    const full = rslv(base, reqPath);
+    if (EDIT_ALLOWED.some(d => full.startsWith(d) || full === d)) return full;
+    return null;
+  }
+
+  async function buildFileTree(dir: string, relPath = ''): Promise<any[]> {
+    const entries = await efsReaddir(dir, { withFileTypes: true });
+    const nodes: any[] = [];
+    for (const e of entries) {
+      if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === 'dist' || e.name === '__pycache__' || e.name === '.vite' || e.name === 'assets') continue;
+      const fp = jn(dir, e.name);
+      const rp = relPath ? `${relPath}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        const children = await buildFileTree(fp, rp);
+        if (children.length > 0) nodes.push({ name: e.name, path: rp, type: 'directory', children });
+      } else {
+        nodes.push({ name: e.name, path: rp, type: 'file', ext: xtn(e.name) });
+      }
+    }
+    nodes.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    return nodes;
+  }
+
+  // File tree
+  app.get('/api/edit/tree', async (req: any, res) => {
+    try {
+      const tree = await buildFileTree(EDIT_CLIENT_SRC);
+      res.json({ ok: true, tree });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // File read
+  app.get('/api/edit/file/:filePath(.*)', async (req: any, res) => {
+    try {
+      const full = sanitizeEditPath(req.params.filePath);
+      if (!full) return res.status(403).json({ ok: false, error: 'Access denied' });
+      const content = await efsReadFile(full, 'utf-8');
+      const st = await efsStat(full);
+      res.json({ ok: true, content, path: req.params.filePath, size: st.size, modified: st.mtime.toISOString() });
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return res.status(404).json({ ok: false, error: 'File not found' });
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // File write
+  app.post('/api/edit/file/:filePath(.*)', async (req: any, res) => {
+    try {
+      const full = sanitizeEditPath(req.params.filePath);
+      if (!full) return res.status(403).json({ ok: false, error: 'Access denied' });
+      const body: any = req.body;
+      if (typeof body.content !== 'string') return res.status(400).json({ ok: false, error: 'content required' });
+      await efsMkdir(dname(full), { recursive: true });
+      const tmp = `${full}.tmp.${Date.now()}`;
+      await efsWriteFile(tmp, body.content, 'utf-8');
+      await efsRename(tmp, full);
+      const st = await efsStat(full);
+      res.json({ ok: true, path: req.params.filePath, size: st.size, modified: st.mtime.toISOString() });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Git status
+  app.get('/api/edit/git/status', async (req: any, res) => {
+    try {
+      const { stdout } = await eExec('git status --porcelain=v1', { cwd: EDIT_PROJECT_ROOT });
+      const lines = stdout.trim().split('\n').filter(l => l.trim());
+      const changedFiles = lines.map(line => ({
+        status: line.substring(0, 2) === 'A ' ? 'added' : line.substring(0, 2) === 'M ' ? 'modified' : line.substring(0, 2) === 'D ' ? 'deleted' : 'unknown',
+        file: line.substring(3),
+      }));
+      res.json({ ok: true, changedFiles, count: changedFiles.length });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Git diff for one file
+  app.get('/api/edit/git/diff/:filePath(.*)', async (req: any, res) => {
+    try {
+      const { stdout } = await eExec(`git diff HEAD -- ${req.params.filePath}`, { cwd: EDIT_PROJECT_ROOT });
+      res.json({ ok: true, diff: stdout, path: req.params.filePath });
+    } catch (err: any) {
+      res.json({ ok: true, diff: '(no diff)', path: req.params.filePath });
+    }
+  });
+
+  // Git stage
+  app.post('/api/edit/git/stage', async (req: any, res) => {
+    try {
+      const files = (req.body as any).files;
+      const arg = files && files.length > 0 ? files.join(' ') : '.';
+      await eExec(`git add ${arg}`, { cwd: EDIT_PROJECT_ROOT });
+      res.json({ ok: true, staged: arg });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Git commit
+  app.post('/api/edit/git/commit', async (req: any, res) => {
+    try {
+      const msg = (req.body as any).message;
+      if (!msg || typeof msg !== 'string') return res.status(400).json({ ok: false, error: 'message required' });
+      const escaped = msg.replace(/"/g, '\\"');
+      await eExec(`git commit -m "${escaped}"`, { cwd: EDIT_PROJECT_ROOT });
+      res.json({ ok: true, message: msg });
+    } catch (err: any) {
+      if (err.message.includes('nothing to commit')) return res.json({ ok: true, note: 'Nothing to commit' });
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Git push
+  app.post('/api/edit/git/push', async (req: any, res) => {
+    try {
+      const { stdout, stderr } = await eExec('git push origin main', { cwd: EDIT_PROJECT_ROOT });
+      res.json({ ok: true, output: stdout + stderr });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Build check
+  app.post('/api/edit/build-check', async (req: any, res) => {
+    try {
+      const { stdout, stderr } = await eExec('npm run build', { cwd: EDIT_PROJECT_ROOT, timeout: 60000 });
+      const hasErrors = stderr.includes('error') || stderr.includes('Error');
+      res.json({ ok: !hasErrors, output: stdout + stderr, errors: hasErrors ? 'Build had errors' : null });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Railway deploy
+  app.post('/api/edit/deploy', async (req: any, res) => {
+    try {
+      const { stdout, stderr } = await eExec('railway up', { cwd: EDIT_PROJECT_ROOT, timeout: 120000 });
+      res.json({ ok: true, output: stdout + stderr });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   return httpServer;
 }
