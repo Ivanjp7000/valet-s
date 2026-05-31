@@ -2,6 +2,20 @@
 
 ## Status: Live on Railway ✅
 
+## Checkpoint (2026-06-01 07:42 JST)
+
+- **Database migration completed:** moved production data from Neon to Railway PostgreSQL.
+- **Railway database service:** `Postgres`
+- **Data migration:** 243 rows copied and verified with matching counts for every table.
+- **Runtime driver:** switched from `@neondatabase/serverless`/`drizzle-orm/neon-serverless` to standard `pg`/`drizzle-orm/node-postgres`.
+- **Dependency cleanup:** removed `@neondatabase/serverless`; added direct `pg` and `@types/pg`.
+- **Utility cleanup:** `scripts/add-valid-to.mjs` now uses `pg`.
+- **Production variables:** app service `DATABASE_URL` and PG variables now reference Railway Postgres internals.
+- **Commit:** `795653c Migrate database driver to Railway Postgres`
+- **Deploy:** Railway deployment `33670876-3e36-4134-8a99-b9eefe9f24b2` succeeded.
+- **Verification:** `/api/health` returned OK, `/api/faqs` returned 5 database rows, and `/api/auth/user` returned HTTP 401 when unauthenticated as expected.
+- **Remaining:** full authenticated smoke test: login, OTP email, staff dashboard, ticket creation, guest lookup, WebSocket updates.
+
 ## Development & Deployment Workflow
 
 ### How Changes Get to Production
