@@ -1,6 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initGatewayClient } from "./gateway-client";
+
+// Initialize Gateway WebSocket client for NL Command
+initGatewayClient();
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));

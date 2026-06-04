@@ -1,0 +1,105 @@
+rules:
+  - id: eval-usage
+    patterns:
+      - pattern: eval(...)
+      - pattern-not-inside: |
+          // ...
+    message: "eval() detected. Remove or use a safer alternative."
+    metadata:
+      cwe: ["CWE-95"]
+      category: security
+      confidence: HIGH
+    severity: ERROR
+    languages: [ts, js]
+
+  - id: unsanitized-innerhtml
+    patterns:
+      - pattern: "dangerouslySetInnerHTML={{ __html: $HTML }}"
+      - pattern-not: "dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(...) }}"
+    message: "dangerouslySetInnerHTML used without DOMPurify sanitization."
+    metadata:
+      cwe: ["CWE-79"]
+      category: security
+      confidence: MEDIUM
+    severity: WARNING
+    languages: [tsx, js, jsx]
+
+  - id: console-sensitive-data
+    patterns:
+      - pattern: console.($METHOD)(..., $VAR, ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: "^(log|info|warn|debug)$"
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: "(?i)(password|secret|token|api[_-]?key|credential|auth)"
+    message: "Console logging may expose sensitive data in production."
+    metadata:
+      cwe: ["CWE-532"]
+      category: security
+      confidence: MEDIUM
+    severity: WARNING
+    languages: [ts, js, tsx]
+
+  - id: wildcard-cors
+    patterns:
+      - pattern: res.setHeader('Access-Control-Allow-Origin', '*')
+    message: "Wildcard CORS origin allows any domain."
+    metadata:
+      cwe: ["CWE-942"]
+      category: security
+      confidence: HIGH
+    severity: WARNING
+    languages: [ts, js]
+
+  - id: child-process-shell
+    patterns:
+      - pattern: spawn($CMD, $ARGS, $OPTS)
+      - pattern: "$OPTS = { shell: ... }"
+      - pattern-not: "$OPTS = { shell: false }"
+    message: "spawn() called with shell option. Risk of command injection if input is user-controlled."
+    metadata:
+      cwe: ["CWE-78"]
+      category: security
+      confidence: MEDIUM
+    severity: WARNING
+    languages: [ts, js]
+
+  - id: path-traversal-user-input
+    patterns:
+      - pattern-either:
+          - pattern: path.join(..., $REQ.$PROP, ...)
+          - pattern: path.resolve(..., $REQ.$PROP, ...)
+          - pattern: readFile(..., $REQ.$PROP, ...)
+      - metavariable-regex:
+          metavariable: $PROP
+          regex: "^(body|query|params|filename|filePath|path)$"
+    message: "File path from user-controlled input. Validate to prevent traversal."
+    metadata:
+      cwe: ["CWE-22"]
+      category: security
+      confidence: MEDIUM
+    severity: ERROR
+    languages: [ts, js]
+
+  - id: hardcoded-secret-assignment
+    patterns:
+      - pattern: |
+          $NAME = $STRING
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: "(?i)(api[_-]?key|apikey|secret[_-]?key|access[_-]?key|password|auth[_-]?token)"
+      - metavariable-regex:
+          metavariable: $STRING
+          regex: "^[A-Za-z0-9_\\-]{30,}$"
+      - pattern-not: |
+          $NAME = process.env.*
+      - pattern-not: |
+          $NAME = process.env[...]
+    message: "Possible hardcoded secret. Use process.env or secrets manager."
+    metadata:
+      cwe: ["CWE-798"]
+      category: security
+      confidence: MEDIUM
+    severity: ERROR
+    languages: [ts, js]

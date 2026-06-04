@@ -37,6 +37,7 @@ export function NLCommandPanel() {
   const [fontSize, setFontSize] = useState(() => localStorage.getItem('nl-font-size') || '15px');
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem('nl-font-family') || FONT_FAMILIES[0].value);
   const [showSettings, setShowSettings] = useState(false);
+  const [gatewayStatus, setGatewayStatus] = useState<{ connected: boolean; mode: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const fontSizeNum = parseFloat(fontSize);
@@ -45,6 +46,14 @@ export function NLCommandPanel() {
 
   useEffect(() => { localStorage.setItem('nl-font-size', fontSize); }, [fontSize]);
   useEffect(() => { localStorage.setItem('nl-font-family', fontFamily); }, [fontFamily]);
+
+  // Check Gateway status on mount
+  useEffect(() => {
+    fetch('/api/nl-command/status')
+      .then(r => r.json())
+      .then(d => setGatewayStatus({ connected: d.gatewayConnected, mode: d.mode }))
+      .catch(() => setGatewayStatus({ connected: false, mode: 'unknown' }));
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,7 +90,7 @@ export function NLCommandPanel() {
       setChanges(prev =>
         prev.map(c =>
           c.id === entry.id
-            ? { ...c, result: data.ok ? data.summary || "Done" : `Error: ${data.error}`, ok: data.ok, mode: data.mode === "assistant" ? "assistant" : "edit" }
+            ? { ...c, result: data.ok ? data.summary || "Done" : `Error: ${data.error}`, ok: data.ok, mode: data.mode === "assistant" ? "assistant" : (data.mode === "gateway-chat" ? "assistant" : "edit") }
             : c
         )
       );
@@ -109,8 +118,23 @@ export function NLCommandPanel() {
       <div className="px-3 py-2 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-gray-300">Oscar Command</span>
-            <p className="text-[10px] text-gray-600 mt-0.5">Chat normally, or ask for app changes</p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-gray-300">Oscar Command</span>
+              {gatewayStatus && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                  gatewayStatus.connected
+                    ? 'bg-green-900/40 text-green-400 border border-green-800'
+                    : 'bg-yellow-900/40 text-yellow-400 border border-yellow-800'
+                }`}>
+                  {gatewayStatus.connected ? '● Gateway' : '● Fallback'}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-gray-600 mt-0.5">
+              {gatewayStatus?.connected
+                ? 'Full session: tools, memory, context'
+                : 'Chat normally, or ask for app changes'}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button

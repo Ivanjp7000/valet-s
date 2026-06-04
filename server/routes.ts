@@ -3923,6 +3923,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // ── NL Command: Gateway status check ────────────────────────────────────
+  app.get('/api/nl-command/status', isAuthenticated, async (_req: any, res) => {
+    try {
+      const { testGatewayConnection, getGatewayStatus } = require('./gateway-client');
+      const connected = await testGatewayConnection();
+      const status = getGatewayStatus();
+      res.json({
+        ok: true,
+        gatewayConnected: connected,
+        gatewayUrl: status.url,
+        sessionKey: status.sessionKey,
+        mode: connected ? 'gateway-chat' : 'direct-llm',
+        hint: connected
+          ? 'NL Command is routed through Gateway (full session: tools, memory, context)'
+          : 'Gateway not connected — using direct LLM fallback (limited, no tools)',
+      });
+    } catch (err: any) {
+      res.json({
+        ok: false,
+        gatewayConnected: false,
+        error: err.message,
+        mode: 'unknown',
+      });
+    }
+  });
+
   // Railway deploy
   app.post('/api/edit/deploy', async (req: any, res) => {
     try {
@@ -3950,15 +3976,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startedAt = Date.now();
 
       if (!shouldUseEditMode(prompt)) {
-        const chatHistory = Array.isArray(history)
-          ? history
-              .filter((m: any) => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string')
-              .slice(-10)
-              .map((m: any) => ({ role: m.role, content: m.content.slice(0, 2000) }))
-          : [];
-        const summary = await buildNlCommandAssistantReply(prompt, chatHistory, selectedModel);
-        console.log(`[edit/apply] prompt="${prompt.slice(0, 120).replace(/\s+/g, ' ')}" mode=assistant model=${selectedModel} elapsedMs=${Date.now() - startedAt}`);
-        return res.json({ ok: true, summary, edits: 0, mode: 'assistant', elapsedMs: Date.now() - startedAt });
+        // Route through Gateway for full session capabilities (tools, memory, context)
+        const { gatewayChatSend, getGatewayStatus, testGatewayConnection } = await import('./gateway-client');
+        const status = getGatewayStatus();
+
+        // Try Gateway first, fall back to direct LLM if it fails
+        try {
+          const connected = await testGatewayConnection();
+          if (!connected) {
+            throw new Error('Gateway not reachable');
+          }
+          const reply = await gatewayChatSend(status.sessionKey, prompt);
+          console.log(`[edit/apply] prompt="${prompt.slice(0, 120).replace(/\s+/g, ' ')}" mode=gateway-chat session=${status.sessionKey} elapsedMs=${Date.now() - startedAt}`);
+          return res.json({ ok: true, summary: reply || '[No response]', edits: 0, mode: 'gateway-chat', gatewayConnected: true, elapsedMs: Date.now() - startedAt });
+        } catch (gwErr: any) {
+          console.error(`[edit/apply] Gateway chat failed: ${gwErr.message}, falling back to direct LLM`);
+          const chatHistory = Array.isArray(history)
+            ? history
+                .filter((m: any) => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string')
+                .slice(-10)
+                .map((m: any) => ({ role: m.role, content: m.content.slice(0, 2000) }))
+            : [];
+          const summary = await buildNlCommandAssistantReply(prompt, chatHistory, selectedModel);
+          return res.json({ ok: true, summary, edits: 0, mode: 'assistant-fallback', gatewayConnected: false, gatewayError: gwErr.message, elapsedMs: Date.now() - startedAt });
+        }
       }
 
       // Collect client/src file metadata first, then include only the most relevant
