@@ -42,7 +42,9 @@ function Router() {
   return (
     <Switch>
       {/* Public routes — always accessible */}
-      <Route path="/view" component={ViewPage} />
+      {import.meta.env.VITE_ALLOW_VIEW === 'true' && (
+        <Route path="/view" component={ViewPage} />
+      )}
       <Route path="/create-account" component={CreateAccount} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/sro" component={SroLogin} />
