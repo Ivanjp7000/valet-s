@@ -1,19 +1,21 @@
-// Audit — comprehensive security and code quality scanner for Valet-s
-// Level 1: Dependency health (CVEs, outdated packages, licenses)
-// Level 2: Code security (XSS, SQL injection, secrets, auth gaps)
+// Audit — unified security scanner for Valet-s
+// Powered by: semgrep (code security), gitleaks (secret history), npm audit (dependencies)
 //
-// Usage: npx tsx scripts/audit.ts  (dev only)
+// Usage: npx tsx scripts/audit.ts [--json]
 
 import { spawn } from "child_process";
-import { readFileSync, readdirSync, existsSync, statSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { writeFileSync, mkdirSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const PROJECT_ROOT = resolve(__dirname, "..");
 
 // ── Types ──────────────────────────────────────────────────────
-interface AuditResult {
+
+interface AuditFinding {
+  source: "npm" | "semgrep" | "gitleaks";
   level: 1 | 2;
   category: string;
   severity: "critical" | "high" | "medium" | "low" | "info";
@@ -22,82 +24,95 @@ interface AuditResult {
   file?: string;
   line?: number;
   fix?: string;
+  cwe?: string;
+  advisory_url?: string;
 }
 
 interface AuditSummary {
   timestamp: string;
-  level1Count: { critical: number; high: number; medium: number; low: number; info: number };
-  level2Count: { critical: number; high: number; medium: number; low: number; info: number };
-  findings: AuditResult[];
+  npm: { vulnerabilities: number; outdated: number };
+  semgrep: { total: number; errors: number; warnings: number; infos: number };
+  gitleaks: { total: number };
+  findings: AuditFinding[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-const PROJECT_ROOT = resolve(__dirname, "..");
-const CODE_DIRS = ["server", "client", "shared"];
 
-function runCommand(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+function runCommand(
+  cmd: string,
+  args: string[]
+): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd: PROJECT_ROOT, shell: process.platform === "win32" });
+    const child = spawn(cmd, args, { cwd: PROJECT_ROOT });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (d) => (stdout += d.toString()));
-    child.stderr.on("data", (d) => (stderr += d.toString()));
-    child.on("close", () => resolve({ stdout, stderr }));
+    child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
+    child.stderr.on("data", (d: Buffer) => (stderr += d.toString()));
+    child.on("close", (code) => resolve({ stdout, stderr, code: code ?? 1 }));
   });
 }
 
-function getAllSourceFiles(): string[] {
-  const files: string[] = [];
-  for (const dir of CODE_DIRS) {
-    const dirPath = join(PROJECT_ROOT, dir);
-    if (!existsSync(dirPath)) continue;
-    const walk = (d: string) => {
-      for (const entry of readdirSync(d)) {
-        const fullPath = join(d, entry);
-        if (entry.startsWith(".")) continue;
-        if (entry === "node_modules") continue;
-        if (entry === "dist") continue;
-        if (entry === "public") continue;
-        const stat = statSync(fullPath);
-        if (stat.isDirectory()) {
-          walk(fullPath);
-        } else if (/\.(ts|tsx|js|jsx)$/.test(entry)) {
-          files.push(fullPath);
-        }
-      }
-    };
-    walk(dirPath);
-  }
-  return files;
+function severityEmoji(sev: string): string {
+  const map: Record<string, string> = {
+    critical: "🔴",
+    high: "🟠",
+    medium: "🟡",
+    low: "🔵",
+    info: "⚪",
+  };
+  return map[sev] || "⚪";
 }
 
-// ── Level 1: Dependency Health ─────────────────────────────────
-async function auditDependencies(): Promise<AuditResult[]> {
-  const findings: AuditResult[] = [];
+// ── Level 1: Dependency Audit (npm audit + npm outdated) ──────
 
-  // npm audit
+async function auditDependencies(): Promise<AuditFinding[]> {
+  const findings: AuditFinding[] = [];
+
+  // npm audit — CVEs
   try {
     const { stdout } = await runCommand("npm", ["audit", "--json"]);
     const auditData = JSON.parse(stdout);
 
     if (auditData.vulnerabilities) {
       for (const [pkg, info] of Object.entries(auditData.vulnerabilities) as [string, any][]) {
-        const severity = (info.severity || "info") as "critical" | "high" | "medium" | "low" | "info";
-        const via = info.via;
-        const fixVer = Array.isArray(via) ? via.join(", ") : (typeof via === "string" ? via : "latest");
+        const severity = mapSeverity(info.severity || "info");
+        const via: any = info.via;
+        let fixText = "No automatic fix available";
+        let advisoryUrl = "";
+
+        if (info.fixAvailable) {
+          if (Array.isArray(via)) {
+            fixText = via.map((v: any) => v.label || v.name || "latest").join(" or ");
+          } else if (typeof via === "object" && via.label) {
+            fixText = via.label;
+          } else {
+            fixText = "update to latest";
+          }
+        }
+
+        if (Array.isArray(via)) {
+          advisoryUrl = via.map((v: any) => v.url).filter(Boolean)[0] || "";
+        } else if (typeof via === "object" && via.url) {
+          advisoryUrl = via.url;
+        }
+
         findings.push({
+          source: "npm",
           level: 1,
           category: "CVE",
           severity,
           title: `Vulnerability in ${pkg}`,
           description: info.title || info.description || "Known vulnerability",
-          fix: info.fixAvailable ? `Update to ${fixVer}` : "No automatic fix available",
+          fix: fixText,
+          advisory_url: advisoryUrl,
         });
       }
     }
-  } catch {}
+  } catch {
+    // npm audit may fail in orphaned projects; skip gracefully
+  }
 
-  // npm outdated
+  // npm outdated — stale packages
   try {
     const { stdout } = await runCommand("npm", ["outdated", "--json"]);
     const outdated = JSON.parse(stdout) as Record<string, any>;
@@ -111,6 +126,7 @@ async function auditDependencies(): Promise<AuditResult[]> {
           ? Math.floor((Date.now() - new Date(publishedDate).getTime()) / (1000 * 60 * 60 * 24))
           : 0;
         findings.push({
+          source: "npm",
           level: 1,
           category: "Outdated",
           severity: age > 365 ? "high" : age > 180 ? "medium" : "low",
@@ -120,250 +136,193 @@ async function auditDependencies(): Promise<AuditResult[]> {
         });
       }
     }
-  } catch {}
+  } catch {
+    // no outdated packages
+  }
 
   return findings;
 }
 
-// ── Level 2: Code Security ─────────────────────────────────────
-
-/**
- * Returns true when the matched text is inside a non-executable context
- * (comment, JSX text node, or plain string literal) — i.e. a false positive.
- */
-function isNonCodeContext(line: string, pattern: string): boolean {
-  const trimmed = line.trim();
-
-  // 1. Comment lines
-  if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return true;
-
-  // 2. JSX text nodes — the line contains the pattern inside <p>, <span>, <h1-6>, <label>, <li>, <td>, <th> text
-  //    e.g. <p>...eval()...</p>  or  <span className=...>...eval()...</span>
-  const textNodeRegex = new RegExp(
-    `<(?:p|span|h[1-6]|label|li|td|th)[^>]*>.*${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*</\\1>`,
-    "i"
-  );
-  // Simpler heuristic: pattern appears after a > and before a < (JSX text content)
-  const afterTag = line.indexOf(">", line.indexOf(pattern));
-  const beforeClose = line.indexOf("<", line.indexOf(pattern));
-  if (afterTag !== -1 && afterTag < line.indexOf(pattern)) {
-    if (beforeClose === -1 || beforeClose > line.indexOf(pattern)) {
-      // Pattern is after a `>` with no closing `<` after it — JSX text content
-      return true;
-    }
-  }
-
-  // 3. Entire line is a string literal assignment (e.g. const msg = "...eval()...")
-  //    Only skip if the pattern is surrounded by quotes on the same line
-  const patternIdx = line.indexOf(pattern);
-  if (patternIdx !== -1) {
-    const before = line.slice(0, patternIdx);
-    const singleQuotes = (before.match(/'/g) || []).length % 2;
-    const doubleQuotes = (before.match(/"/g) || []).length % 2;
-    // Odd number of quotes before the pattern means we're inside a string literal
-    if (singleQuotes % 2 === 1 || doubleQuotes % 2 === 1) return true;
-  }
-
-  return false;
+function mapSeverity(s: string): "critical" | "high" | "medium" | "low" | "info" {
+  const map: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
+    critical: "critical",
+    high: "high",
+    moderate: "medium",
+    medium: "medium",
+    low: "low",
+    info: "info",
+  };
+  return map[s.toLowerCase()] || "info";
 }
 
-function auditCodeSecurity(): AuditResult[] {
-  const findings: AuditResult[] = [];
-  const files = getAllSourceFiles();
+// ── Level 2a: Code Security (semgrep) ─────────────────────────
 
-  for (const filePath of files) {
-    let content: string;
+async function auditSemgrep(): Promise<AuditFinding[]> {
+  const findings: AuditFinding[] = [];
+
+  // Run semgrep with community rules + custom rules
+  try {
+    const { stdout, stderr } = await runCommand("semgrep", [
+      "scan",
+      "--config", "auto",
+      "--config", ".semgrep/rules.yaml",
+      "--json",
+      "--exclude", "node_modules",
+      "--exclude", "dist",
+      "--error",
+    ]);
+
+    const data = JSON.parse(stdout);
+    const results = data.results || [];
+
+    for (const r of results) {
+      const extra = r.extra || {};
+      const metadata = extra.metadata || {};
+      const sev = mapSemgrepSeverity(extra.severity || "WARNING");
+      const checkId = r.check_id || "unknown";
+      const path = r.path || "";
+      const startLine = (r.start?.line) || 0;
+
+      // Extract CWE
+      let cwe = "";
+      if (metadata.cwe && Array.isArray(metadata.cwe)) {
+        cwe = metadata.cwe[0];
+      } else if (typeof metadata.cwe === "string") {
+        cwe = metadata.cwe;
+      }
+
+      findings.push({
+        source: "semgrep",
+        level: 2,
+        category: extra.vulnerability_class?.[0] || metadata.category || "security",
+        severity: sev,
+        title: extra.message?.split("\n")[0] || checkId,
+        description: extra.message || "",
+        file: path,
+        line: startLine,
+        cwe,
+        advisory_url: metadata.references?.[0] || extra.shortlink || "",
+      });
+    }
+  } catch {
+    // semgrep not installed or failed
+  }
+
+  return findings;
+}
+
+function mapSemgrepSeverity(s: string): "critical" | "high" | "medium" | "low" | "info" {
+  const map: Record<string, "critical" | "high" | "medium" | "low" | "info"> = {
+    ERROR: "high",
+    WARNING: "medium",
+    INFO: "info",
+  };
+  return map[s.toUpperCase()] || "info";
+}
+
+// ── Level 2b: Secret Scanning (gitleaks) ─────────────────────
+
+async function auditGitleaks(): Promise<AuditFinding[]> {
+  const findings: AuditFinding[] = [];
+
+  try {
+    const { stdout, stderr, code } = await runCommand("gitleaks", [
+      "detect",
+      "--source", ".",
+      "--report-format", "json",
+      "-v",
+    ]);
+
+    // gitleaks exits 1 when findings exist; that's normal
+    if (code === 0) return findings; // no findings
+
+    // Parse JSON report from stdout (gitleaks writes report to stdout when no --report-path is writable)
+    let lines = stdout.trim().split("\n");
+    // Filter out log lines, find JSON array or JSONL
+    let jsonLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith("{")) {
+        jsonLines.push(line);
+      }
+    }
+
+    if (jsonLines.length === 0) return findings;
+
+    // Try as JSON array first, then JSONL
+    let entries: any[] = [];
     try {
-      content = readFileSync(filePath, "utf-8");
+      entries = JSON.parse("[" + jsonLines.join(",") + "]");
     } catch {
-      continue;
-    }
-
-    const relativePath = filePath.replace(PROJECT_ROOT + "/", "");
-    const lines = content.split("\n");
-
-    // Skip the audit scanner itself and the inline audit code to avoid self-referencing false positives
-    if (relativePath === 'scripts/audit.ts' || relativePath === 'server/routes.ts') continue;
-    // Skip known safe third-party UI components
-    if (relativePath === 'client/src/components/ui/chart.tsx') continue;
-    // Skip admin dashboard — it only contains static security-description text, not executable patterns
-    if (relativePath === 'client/src/pages/admin-panel.tsx') continue;
-
-    // 1. XSS: dangerouslySetInnerHTML
-    const xssRegex = /dangerouslySetInnerHTML/g;
-    let match;
-    while ((match = xssRegex.exec(content)) !== null) {
-      const lineNum = content.substring(0, match.index).split("\n").length;
-      const lineContent = lines[lineNum - 1];
-      if (lineContent && isNonCodeContext(lineContent, match[0])) continue;
-      findings.push({
-        level: 2,
-        category: "XSS",
-        severity: "high",
-        title: "Potential XSS via dangerouslySetInnerHTML",
-        description: "Direct HTML injection detected",
-        file: relativePath,
-        line: lineNum,
-        fix: "Sanitize HTML with DOMPurify or use React fragments instead",
-      });
-    }
-
-    // 2. SQL Injection: raw SQL strings
-    const rawSqlRegex = /(?:query|execute|raw)\s*\(\s*['"`]*SELECT\s.*?\s*FROM\s/gi;
-    while ((match = rawSqlRegex.exec(content)) !== null) {
-      const lineNum = content.substring(0, match.index).split("\n").length;
-      const lineContent = lines[lineNum - 1];
-      if (lineContent && isNonCodeContext(lineContent, match[0])) continue;
-      findings.push({
-        level: 2,
-        category: "SQL Injection",
-        severity: "critical",
-        title: "Potential SQL injection",
-        description: "Raw SQL query with possible string interpolation",
-        file: relativePath,
-        line: lineNum,
-        fix: "Use Drizzle ORM parameterized queries",
-      });
-    }
-
-    // 3. Secret leaks
-    const secretPatterns = [
-      { regex: /(?:api[_-]?key|apikey)\s*=\s*['"][A-Za-z0-9]{20,}['"]/gi, label: "API key" },
-      { regex: /password\s*=\s*['"][^'\s]{8,}['"]/gi, label: "Password" },
-      { regex: /secret\s*=\s*['"][A-Za-z0-9/+]{20,}['"]/gi, label: "Secret" },
-      { regex: /Bearer\s+[A-Za-z0-9\-._~+/]{20,}/gi, label: "Bearer token" },
-      { regex: /AKIA[0-9A-Z]{16}/gi, label: "AWS access key" },
-    ];
-
-    for (const pattern of secretPatterns) {
-      pattern.regex.lastIndex = 0;
-      while ((match = pattern.regex.exec(content)) !== null) {
-        const lineNum = content.substring(0, match.index).split("\n").length;
-        const lineContent = lines[lineNum - 1]?.trim();
-        if (lineContent?.includes("process.env") || lineContent?.includes("YOUR_") || lineContent?.includes("CHANGE_ME")) continue;
-        const rawLine = lines[lineNum - 1];
-        if (rawLine && isNonCodeContext(rawLine, match[0])) continue;
-        findings.push({
-          level: 2,
-          category: "Secret Leak",
-          severity: "critical",
-          title: `Possible ${pattern.label} in source code`,
-          description: `Hardcoded ${pattern.label.toLowerCase()} detected`,
-          file: relativePath,
-          line: lineNum,
-          fix: "Move to environment variables or secrets.json",
-        });
+      for (const line of jsonLines) {
+        try {
+          entries.push(JSON.parse(line));
+        } catch { /* skip */ }
       }
     }
 
-    // 4. Missing auth guards on routes
-    if (relativePath.includes("routes") && relativePath.includes("server")) {
-      const routeRegex = /app\.(get|post|put|patch|delete)\s*\(\s*['"`]\/api\/(?!auth|health|faqs|logout|audit)/gi;
-      while ((match = routeRegex.exec(content)) !== null) {
-        const lineNum = content.substring(0, match.index).split("\n").length;
-        const context = lines.slice(lineNum - 1, lineNum + 5).join(" ");
-        if (!context.includes("isAuthenticated") && !context.includes("require")) {
-          findings.push({
-            level: 2,
-            category: "Auth Gap",
-            severity: "high",
-            title: "Route without authentication guard",
-            description: "API route may be accessible without authentication",
-            file: relativePath,
-            line: lineNum,
-            fix: "Add isAuthenticated middleware to this route",
-          });
-        }
-      }
-    }
+    for (const e of entries) {
+      const rule = e.RuleID || "unknown";
+      const file = e.File || "";
+      const lineNum = e.LineNumber || 0;
+      const secretPreview = (e.Secret || "").slice(0, 20) + "…";
 
-    // 5. eval() usage
-    const evalRegex = /\beval\s*\(/g;
-    while ((match = evalRegex.exec(content)) !== null) {
-      const lineNum = content.substring(0, match.index).split("\n").length;
-      const lineContent = lines[lineNum - 1];
-      if (lineContent && isNonCodeContext(lineContent, match[0])) continue;
       findings.push({
+        source: "gitleaks",
         level: 2,
-        category: "Code Injection",
+        category: "Secret Leak",
         severity: "critical",
-        title: "eval() usage detected",
-        description: "eval() can execute arbitrary code",
-        file: relativePath,
+        title: `Hardcoded secret detected (${rule})`,
+        description: `Rule: ${rule}. Found in ${file}. Partial: ${secretPreview}`,
+        file,
         line: lineNum,
-        fix: "Remove eval() and use safer alternatives",
+        fix: "Remove secret from source code. Use environment variables or secrets manager.",
       });
     }
-
-    // 6. Console logging sensitive data
-    const consoleSecretRegex = /console\.(log|info|warn)\s*\([^)]*(password|secret|token|key|credential)/gi;
-    while ((match = consoleSecretRegex.exec(content)) !== null) {
-      const lineNum = content.substring(0, match.index).split("\n").length;
-      const lineContent = lines[lineNum - 1];
-      if (lineContent && isNonCodeContext(lineContent, match[0])) continue;
-      findings.push({
-        level: 2,
-        category: "Info Leak",
-        severity: "medium",
-        title: "Sensitive data in console output",
-        description: "Console logging may expose sensitive data in production",
-        file: relativePath,
-        line: lineNum,
-        fix: "Remove sensitive data from console output",
-      });
-    }
-
-    // 7. Wildcard CORS
-    const corsRegex = /Access-Control-Allow-Origin.*\*|cors\s*\(\s*\{\s*origin:\s*['"]\*['"]\s*\}/gi;
-    while ((match = corsRegex.exec(content)) !== null) {
-      const lineNum = content.substring(0, match.index).split("\n").length;
-      const lineContent = lines[lineNum - 1];
-      if (lineContent && isNonCodeContext(lineContent, match[0])) continue;
-      findings.push({
-        level: 2,
-        category: "CORS",
-        severity: "medium",
-        title: "Wildcard CORS origin",
-        description: "Allowing all origins is a security risk",
-        file: relativePath,
-        line: lineNum,
-        fix: "Restrict CORS to specific trusted origins",
-      });
-    }
+  } catch {
+    // gitleaks not installed
   }
 
   return findings;
 }
 
 // ── Main ───────────────────────────────────────────────────────
+
 async function runAudit(): Promise<AuditSummary> {
-  const findings: AuditResult[] = [];
+  const allFindings: AuditFinding[] = [];
 
   console.log("🔍 Running Valet-s Security Audit...\n");
 
+  // Level 1
   console.log("📦 Level 1: Scanning dependencies...");
   const depFindings = await auditDependencies();
-  findings.push(...depFindings);
-  console.log(`   Found ${depFindings.length} issues\n`);
+  allFindings.push(...depFindings);
+  const vulnCount = depFindings.filter(f => f.category === "CVE").length;
+  const outdatedCount = depFindings.filter(f => f.category === "Outdated").length;
+  console.log(`   Found ${vulnCount} vulnerabilities, ${outdatedCount} outdated packages\n`);
 
-  console.log("🔒 Level 2: Scanning code security...");
-  const codeFindings = auditCodeSecurity();
-  findings.push(...codeFindings);
-  console.log(`   Found ${codeFindings.length} issues\n`);
+  // Level 2a
+  console.log("🔒 Level 2a: Scanning code with semgrep...");
+  const semgrepFindings = await auditSemgrep();
+  allFindings.push(...semgrepFindings);
+  console.log(`   Found ${semgrepFindings.length} issues\n`);
 
-  const level1Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  const level2Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  // Level 2b
+  console.log("🔑 Level 2b: Scanning git history with gitleaks...");
+  const gitleaksFindings = await auditGitleaks();
+  allFindings.push(...gitleaksFindings);
+  console.log(`   Found ${gitleaksFindings.length} issues\n`);
 
-  for (const f of findings) {
-    if (f.level === 1) level1Count[f.severity]++;
-    else level2Count[f.severity]++;
-  }
+  // Summary
+  const semgrepErrors = semgrepFindings.filter(f => f.severity === "high").length;
+  const semgrepWarnings = semgrepFindings.filter(f => f.severity === "medium").length;
+  const semgrepInfos = semgrepFindings.filter(f => f.severity === "info").length;
 
   const summary: AuditSummary = {
     timestamp: new Date().toISOString(),
-    level1Count,
-    level2Count,
-    findings,
+    npm: { vulnerabilities: vulnCount, outdated: outdatedCount },
+    semgrep: { total: semgrepFindings.length, errors: semgrepErrors, warnings: semgrepWarnings, infos: semgrepInfos },
+    gitleaks: { total: gitleaksFindings.length },
+    findings: allFindings,
   };
 
   // Terminal report
@@ -371,55 +330,57 @@ async function runAudit(): Promise<AuditSummary> {
   console.log("  AUDIT REPORT");
   console.log("═".repeat(60));
   console.log(`  Timestamp: ${summary.timestamp}`);
-  console.log(`  Total findings: ${findings.length}`);
+  console.log(`  Total findings: ${allFindings.length}`);
   console.log("");
 
-  console.log("  Level 1 (Dependencies):");
-  for (const sev of ["critical", "high", "medium", "low", "info"]) {
-    if (level1Count[sev] > 0) {
-      const emoji = { critical: "🔴", high: "🟠", medium: "🟡", low: "🔵", info: "⚪" }[sev];
-      console.log(`    ${emoji} ${sev.toUpperCase()}: ${level1Count[sev]}`);
-    }
-  }
-  console.log("");
-  console.log("  Level 2 (Code Security):");
-  for (const sev of ["critical", "high", "medium", "low", "info"]) {
-    if (level2Count[sev] > 0) {
-      const emoji = { critical: "🔴", high: "🟠", medium: "🟡", low: "🔵", info: "⚪" }[sev];
-      console.log(`    ${emoji} ${sev.toUpperCase()}: ${level2Count[sev]}`);
-    }
-  }
+  console.log("  Level 1 — Dependencies:");
+  console.log(`    CVE vulnerabilities: ${vulnCount}`);
+  console.log(`    Outdated packages: ${outdatedCount}`);
   console.log("");
 
-  if (findings.length > 0) {
+  console.log("  Level 2 — Code Security:");
+  console.log(`    Semgrep (high): ${semgrepErrors}`);
+  console.log(`    Semgrep (medium): ${semgrepWarnings}`);
+  console.log(`    Semgrep (info): ${semgrepInfos}`);
+  console.log(`    Gitleaks: ${gitleaksFindings.length}`);
+  console.log("");
+
+  // Show critical/high/medium findings with detail
+  const important = allFindings.filter(f =>
+    f.severity === "critical" || f.severity === "high" || f.severity === "medium"
+  );
+
+  if (important.length > 0) {
     console.log("  ─── FINDINGS ───────────────────────────────────────────────────────");
-    for (const f of findings) {
-      const emoji = { critical: "🔴", high: "🟠", medium: "🟡", low: "🔵", info: "⚪" }[f.severity];
-      console.log(`  ${emoji} [${f.level === 1 ? "L1" : "L2"}] ${f.title}`);
-      console.log(`     ${f.description}`);
+    for (const f of important) {
+      const emoji = severityEmoji(f.severity);
+      const sourceTag = f.source.toUpperCase();
+      console.log(`  ${emoji} [${sourceTag}] ${f.title}`);
+      console.log(`     ${f.description.split("\n")[0]}`);
       if (f.file) console.log(`     📁 ${f.file}${f.line ? `:${f.line}` : ""}`);
+      if (f.cwe) console.log(`     CWE: ${f.cwe}`);
       if (f.fix) console.log(`     💡 ${f.fix}`);
       console.log("");
     }
   } else {
-    console.log("  ✅ All clear! No issues found.");
+    console.log("  ✅ No critical/high/medium issues found.");
   }
+
   console.log("═".repeat(60));
 
   return summary;
 }
 
-// Export for inline use in server
-export { runAudit, auditDependencies, auditCodeSecurity };
-export type { AuditSummary, AuditResult };
+// Export for inline server use
+export { runAudit, auditDependencies, auditSemgrep, auditGitleaks };
+export type { AuditSummary, AuditFinding };
 
 // Run if called directly
-import { argv } from "process";
 if (process.argv[1] && (process.argv[1].endsWith("audit.ts") || process.argv[1].endsWith("audit.js"))) {
   const jsonMode = process.argv.includes("--json");
   runAudit().then((result) => {
     if (jsonMode) {
-      console.log(JSON.stringify(result));
+      console.log(JSON.stringify(result, null, 2));
     }
   }).catch(console.error);
 }
