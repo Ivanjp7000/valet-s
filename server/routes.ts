@@ -3689,14 +3689,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // ── Edit API — file read/write/list for /view editor ──
+  // ── Edit API — local-dev only (gated by NODE_ENV) ──
+  // Never ships to Railway; /view and /api/edit/* are local tooling only
+  if (process.env.NODE_ENV !== 'production') {
   // ESM-safe: dynamic imports, PROJECT_ROOT resolved from import.meta.url
   const { resolve: rslv, join: jn, dirname: dname, extname: xtn, relative: rel } = await import('path');
   const { readFileSync: _rfs, readdirSync: _rds, existsSync: _exs, statSync: _sts } = await import('fs');
   const { readFile: efsReadFile, writeFile: efsWriteFile, mkdir: efsMkdir, readdir: efsReaddir, stat: efsStat, rename: efsRename } = await import('fs/promises');
-  const { exec: eExecCb } = await import('child_process');
+  const { exec: eExecCb, spawn: eSpawn } = await import('child_process');
   const { promisify: _promisify } = await import('util');
   const eExec = _promisify(eExecCb);
+
+  // Shell-free spawn helper — avoids shell escaping issues with large/special-char prompts
+  async function eSpawnExec(cmd: string, args: string[], timeoutMs: number): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+      const child = eSpawn(cmd, args, { timeout: timeoutMs });
+      let out = '', err = '';
+      child.stdout?.on('data', (c: Buffer) => { out += c.toString(); });
+      child.stderr?.on('data', (c: Buffer) => { err += c.toString(); });
+      child.on('close', (code) => {
+        if (code === 0) resolve({ stdout: out, stderr: err });
+        else reject(new Error(`exit ${code}: ${err.slice(0, 500)}`));
+      });
+      child.on('error', reject);
+    });
+  }
 
   // Resolve PROJECT_ROOT (server/ is one level down from project root)
   const { fileURLToPath: _f2p } = await import('url');
@@ -3848,6 +3865,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Infer model router: delegates to openclaw infer for remote models ────
+  async function callInferModel(inferModel: string, systemPrompt: string, prompt: string, timeoutMs: number): Promise<Response> {
+    const fullPrompt = `System: ${systemPrompt}\n\nUser request:\n${prompt}`;
+    try {
+      const { stdout } = await eSpawnExec('openclaw', ['infer', 'model', 'run', '--model', inferModel, '--prompt', fullPrompt], timeoutMs);
+      const wrapped: BodyInit = JSON.stringify({ choices: [{ message: { content: stdout.trim() } }] });
+      return new Response(wrapped, { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } catch (err: any) {
+      throw err;
+    }
+  }
+
+  // ── Edit model router: qwen36-local, gpt-5.5, or minimax27 ───────────────
+  type NLCommandModel = 'qwen36-local' | 'gpt-5.5' | 'minimax27';
+
+  async function callEditModel(opts: {
+    model: NLCommandModel;
+    prompt: string;
+    systemPrompt?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeoutMs?: number;
+  }): Promise<Response> {
+    const { model, prompt, systemPrompt = 'You are an expert code editor. Return only valid JSON with file edits.', temperature = 0.2, maxTokens = 8192, timeoutMs = 180_000 } = opts;
+
+    if (model === 'gpt-5.5') {
+      const inferResult = await callInferModel('openai/gpt-5.5', systemPrompt, prompt, timeoutMs);
+      return inferResult;
+    }
+
+    if (model === 'minimax27') {
+      const inferResult = await callInferModel('minimax-portal/MiniMax-M2.7', systemPrompt, prompt, timeoutMs);
+      return inferResult;
+    }
+
+    // Default: local Qwen
+    const llamaBase = process.env.LOCAL_LLM_BASE_URL || 'http://192.168.1.70:8080/v1';
+    const llamaKey = process.env.LOCAL_LLM_API_KEY || 'local';
+    const llamaModel = process.env.LOCAL_LLM_MODEL || 'Qwen_Qwen3.6-27B-Q6_K.gguf';
+    return fetch(`${llamaBase}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${llamaKey}`,
+      },
+      body: JSON.stringify({
+        model: llamaModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  }
+
   // Railway deploy
   app.post('/api/edit/deploy', async (req: any, res) => {
     try {
@@ -3857,6 +3932,405 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ ok: false, error: err.message });
     }
   });
+
+  // ── NL Command: conversational assistant, with edit mode for app changes ───
+  app.post('/api/edit/apply', isAuthenticated, async (req: any, res) => {
+    try {
+      const { prompt, history, model } = req.body;
+      if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ ok: false, error: 'prompt is required' });
+      }
+      const modelMap: Record<string, NLCommandModel> = {
+        'qwen36-local': 'qwen36-local',
+        'gpt-5.5': 'gpt-5.5',
+        'minimax27': 'minimax27',
+      };
+      const selectedModel: NLCommandModel = modelMap[model] || 'qwen36-local';
+
+      const startedAt = Date.now();
+
+      if (!shouldUseEditMode(prompt)) {
+        const chatHistory = Array.isArray(history)
+          ? history
+              .filter((m: any) => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string')
+              .slice(-10)
+              .map((m: any) => ({ role: m.role, content: m.content.slice(0, 2000) }))
+          : [];
+        const summary = await buildNlCommandAssistantReply(prompt, chatHistory, selectedModel);
+        console.log(`[edit/apply] prompt="${prompt.slice(0, 120).replace(/\s+/g, ' ')}" mode=assistant model=${selectedModel} elapsedMs=${Date.now() - startedAt}`);
+        return res.json({ ok: true, summary, edits: 0, mode: 'assistant', elapsedMs: Date.now() - startedAt });
+      }
+
+      // Collect client/src file metadata first, then include only the most relevant
+      // files in the LLM prompt. Sending the whole app made local Qwen time out.
+      const allFiles: Array<{ path: string; fullPath: string; size: number }> = [];
+      const walkDir = async (dir: string, relPrefix: string) => {
+        const entries = await efsReaddir(dir, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+          const fullPath = jn(dir, e.name);
+          const relPath = relPrefix ? jn(relPrefix, e.name) : e.name;
+          if (e.isDirectory()) {
+            await walkDir(fullPath, relPath);
+          } else {
+            const ext = e.name.split('.').pop() || '';
+            if (['tsx', 'ts', 'css', 'json', 'html', 'md', 'jsx', 'js', 'svg'].includes(ext)) {
+              try {
+                const st = await efsStat(fullPath);
+                if (st.size < 32_000) { // skip large files
+                  allFiles.push({ path: relPath, fullPath, size: st.size });
+                }
+              } catch { /* skip unreadable */ }
+            }
+          }
+        }
+      };
+      await walkDir(EDIT_CLIENT_SRC, '');
+
+      // Build file tree outline for context
+      const treeOutline = buildFileTreeText(allFiles.map(f => f.path));
+
+      const selectedFiles = selectEditContextFiles(prompt, allFiles);
+      const filesWithContent = await Promise.all(
+        selectedFiles.map(async f => ({
+          ...f,
+          content: await efsReadFile(f.fullPath, 'utf-8'),
+        })),
+      );
+
+      const fileBlocks = filesWithContent
+        .map(f => `=== FILE: ${f.path} ===\n${f.content}\n`)
+        .join('\n');
+
+      console.log(`[edit/apply] prompt="${prompt.slice(0, 120).replace(/\s+/g, ' ')}" files=${filesWithContent.length}/${allFiles.length} contextBytes=${fileBlocks.length}`);
+
+      const llmPrompt = `
+You are a code editor assistant. The user will describe changes in natural language.
+Below is the file tree for client/src and the most relevant source files.
+
+FILE TREE:\n${treeOutline}
+
+SELECTED FILE CONTENTS:\n${fileBlocks}
+
+USER REQUEST: ${prompt}
+
+Return ONLY a valid JSON object with this exact structure:
+{
+  "edits": [
+    {
+      "file": "relative/path/from/client/src",
+      "oldText": "exact text to find and replace (must match verbatim in the file)",
+      "newText": "replacement text"
+    }
+  ],
+  "summary": "short description of what changed"
+}
+
+Rules:
+- File paths must be relative to client/src, exactly as shown in SELECTED FILE CONTENTS.
+- Only include files that actually need changes.
+- oldText must match EXACTLY (including whitespace and indentation) in the target file.
+- Keep changes minimal — only modify what's necessary.
+- If the needed file is not in SELECTED FILE CONTENTS, return no edits and say which file is needed in summary.
+- If no changes are needed, return { "edits": [], "summary": "No changes needed" }.
+- Return ONLY the JSON object, no markdown, no explanation.
+`;
+
+      // Route to the selected model
+      const llmResp = await callEditModel({
+        model: selectedModel,
+        prompt: llmPrompt,
+        timeoutMs: Number(process.env.LOCAL_LLM_TIMEOUT_MS || 180_000),
+      });
+
+      if (!llmResp.ok) {
+        const errBody = await llmResp.text().catch(() => '');
+        return res.json({ ok: false, error: `LLM request failed: ${llmResp.status} ${errBody.slice(0, 200)}` });
+      }
+
+      const llmData = await llmResp.json();
+      const rawContent = llmData.choices?.[0]?.message?.content || '';
+
+      // Parse JSON from response (strip markdown code fences if present)
+      let editsContent = rawContent.trim();
+      if (editsContent.startsWith('```')) {
+        const lines = editsContent.split('\n');
+        // Remove first and last fence lines
+        if (lines[0].includes('json') || lines[0].includes('```')) lines.shift();
+        if (lines[lines.length - 1] === '```') lines.pop();
+        editsContent = lines.join('\n').trim();
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(editsContent);
+      } catch {
+        // Try to find JSON object within the text
+        const jsonMatch = editsContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
+        }
+        if (!parsed) {
+          return res.json({ ok: false, error: `Failed to parse LLM response. Raw: ${rawContent.slice(0, 300)}` });
+        }
+      }
+
+      const edits = Array.isArray(parsed.edits) ? parsed.edits : [];
+      const summary = parsed.summary || `${edits.length} edit(s) applied`;
+
+      if (edits.length === 0) {
+        return res.json({ ok: true, summary: summary || 'No changes needed', edits: 0 });
+      }
+
+      // Apply edits
+      let appliedCount = 0;
+      let errors: string[] = [];
+      for (const edit of edits) {
+        if (!edit.file || !edit.oldText) {
+          errors.push(`Invalid edit entry: missing file or oldText`);
+          continue;
+        }
+        const editFile = normalizeClientEditPath(String(edit.file));
+        const full = sanitizeEditPath(editFile);
+        if (!full) {
+          errors.push(`Access denied for: ${edit.file}`);
+          continue;
+        }
+        try {
+          const current = await efsReadFile(full, 'utf-8');
+          if (!current.includes(edit.oldText)) {
+            errors.push(`Could not find oldText in ${edit.file} — skipping`);
+            continue;
+          }
+          const newContent = current.replace(edit.oldText, edit.newText);
+          const tmp = `${full}.tmp.${Date.now()}.${appliedCount}`;
+          await efsWriteFile(tmp, newContent, 'utf-8');
+          await efsRename(tmp, full);
+          appliedCount++;
+        } catch (e: any) {
+          errors.push(`Failed to edit ${edit.file}: ${e.message}`);
+        }
+      }
+
+      const resultSummary = `${appliedCount} edit(s) applied — ${summary}`;
+      if (errors.length > 0) {
+        res.json({ ok: true, summary: `${resultSummary} | Warnings: ${errors.join('; ')}`, edits: appliedCount, errors, elapsedMs: Date.now() - startedAt });
+      } else {
+        res.json({ ok: true, summary: resultSummary, edits: appliedCount, elapsedMs: Date.now() - startedAt });
+      }
+    } catch (err: any) {
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        return res.status(504).json({ ok: false, error: 'Local LLM timed out while generating edits. Try a more specific request or include the file name.' });
+      }
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  function normalizeClientEditPath(filePath: string): string {
+    return filePath
+      .replace(/^\.?\//, '')
+      .replace(/^client\/src\//, '');
+  }
+
+  function shouldUseEditMode(promptText: string): boolean {
+    const text = promptText.trim().toLowerCase();
+    if (!text) return false;
+
+    const editVerb = /\b(add|apply|build|change|clean|create|delete|edit|fix|implement|make|modify|move|patch|refactor|remove|rename|replace|restyle|style|update|write)\b/.test(text);
+    const appTarget = /\b(app|button|card|client|code|color|component|css|dashboard|editor|file|font|form|hero|layout|modal|nl command|page|panel|route|screen|section|style|tab|text|ui|view|website)\b/.test(text);
+    const explicitFile = /(?:client\/src\/)?[a-z0-9_\-/.]+\.(?:tsx|ts|css|json|html|md|jsx|js|svg)\b/i.test(promptText);
+    const editPhrase = /\b(can you|please|pls|let'?s|i need you to|we need to)\s+(add|change|create|delete|edit|fix|implement|make|modify|move|patch|refactor|remove|rename|replace|restyle|style|update|write)\b/.test(text);
+
+    return explicitFile || editPhrase || (editVerb && appTarget);
+  }
+
+  async function buildNlCommandAssistantReply(
+    promptText: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    model: NLCommandModel = 'qwen36-local',
+  ): Promise<string> {
+    const text = promptText.trim().toLowerCase();
+    if (/\bwhat can you see|what do you see|status|what is going on|what's going on\b/.test(text)) {
+      let changedSummary = 'I could not read git status just now.';
+      try {
+        const { stdout } = await eExec('git status --porcelain=v1', { cwd: EDIT_PROJECT_ROOT, timeout: 3000 });
+        const changedFiles = stdout.split('\n').filter(Boolean);
+        changedSummary = changedFiles.length === 0
+          ? 'The working tree is clean.'
+          : `I can see ${changedFiles.length} changed file(s) in the working tree.`;
+      } catch { /* keep fallback */ }
+      return `I am connected to the local NL Command backend. I can read and edit the Valet-S source files from here, and the dev server is responding on port 5174. ${changedSummary} I do not have live visual access to your browser from inside this text box, so for visual inspection I need a concrete UI request or a screenshot/browser automation path.`;
+    }
+
+    if (/^(hi|hello|hey|yo|oscar)\b/.test(text) || /\b(do you copy|are you there|can you hear me|ping)\b/.test(text)) {
+      return `Yes, I copy. I'm running on ${model}. Talk to me normally here, or ask for an app change and I'll switch into edit mode.`;
+    }
+
+    if (/^(nice|good|great|ok|okay|thanks|thank you|perfect|cool|awesome|that was fast)\b/.test(text)) {
+      return `That's the one. Chat path is live on ${model}. What do you want to work on?`;
+    }
+
+    const modelNameDisplay = model === 'qwen36-local' ? 'Qwen3.6-27B (local)' : model === 'gpt-5.5' ? 'GPT-5.5' : 'MiniMax-M2.7';
+    const systemText = [
+      `You are Oscar Molt — technical, precise, proactive, calm, trustworthy. You are currently running on ${modelNameDisplay} (${model}).`,
+      'You are inside the local Valet-S Oscar Command panel on localhost:5174.',
+      'Reply conversationally and briefly, like a practical engineering assistant. Be direct. Skip filler.',
+      'If asked what model you are running, say: "I am running on ' + modelNameDisplay + '" — do not guess or hedge.',
+      'Do not claim you changed files unless the user explicitly asked for an app edit.',
+      'If the user wants a UI or code change, tell them you can apply it and ask for any missing detail.',
+      'When you can provide a concrete answer, do. When you cannot, say what you don\'t know plainly.',
+    ].join(' ');
+
+    const chatHistory = history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n');
+    const fullPrompt = chatHistory
+      ? `${systemText}\n\nRecent conversation:\n${chatHistory}\n\nUser: ${promptText}`
+      : `${systemText}\n\nUser: ${promptText}`;
+    const chatTimeout = Number(process.env.LOCAL_LLM_CHAT_TIMEOUT_MS || 120_000);
+
+    try {
+      if (model === 'gpt-5.5') {
+        const inferResult = await callInferModel('openai/gpt-5.5', systemText, promptText, chatTimeout);
+        const data = await inferResult.json();
+        return String(data.choices?.[0]?.message?.content || '').trim() || 'No reply.';
+      }
+
+      if (model === 'minimax27') {
+        const inferResult = await callInferModel('minimax-portal/MiniMax-M2.7', systemText, promptText, chatTimeout);
+        const data = await inferResult.json();
+        return String(data.choices?.[0]?.message?.content || '').trim() || 'No reply.';
+      }
+
+      // Default: local Qwen
+      const llamaBase = process.env.LOCAL_LLM_BASE_URL || 'http://192.168.1.70:8080/v1';
+      const llamaKey = process.env.LOCAL_LLM_API_KEY || 'local';
+      const llamaModel = process.env.LOCAL_LLM_MODEL || 'Qwen_Qwen3.6-27B-Q6_K.gguf';
+
+      const llmResp = await fetch(`${llamaBase}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${llamaKey}`,
+        },
+        body: JSON.stringify({
+          model: llamaModel,
+          messages: [
+            { role: 'system', content: systemText },
+            ...history,
+            { role: 'user', content: promptText },
+          ],
+          temperature: 0.4,
+          max_tokens: 1500,
+        }),
+        signal: AbortSignal.timeout(chatTimeout),
+      });
+
+      if (!llmResp.ok) {
+        const errBody = await llmResp.text().catch(() => '');
+        return `I am connected, but the local chat model returned ${llmResp.status}. ${errBody.slice(0, 120)}`;
+      }
+
+      const llmData = await llmResp.json();
+      const msg = llmData.choices?.[0]?.message || {};
+      let reply = String(msg.content || '').trim();
+      // Qwen can consume all tokens in reasoning_content when max_tokens is tight — fall back to it
+      if (!reply) {
+        reply = String(msg.reasoning_content || '').trim();
+        if (reply) reply = `I was thinking: ${reply.slice(0, 500)}`;
+      }
+      return reply || 'I am here. Send me a normal message, or describe the app change you want.';
+    } catch (err: any) {
+      return `I am here, but the chat model did not answer in time (${err?.name || 'request failed'}). The edit backend is still connected.`;
+    }
+  }
+
+  function selectEditContextFiles(
+    promptText: string,
+    files: Array<{ path: string; fullPath: string; size: number }>,
+  ): Array<{ path: string; fullPath: string; size: number }> {
+    const promptLower = promptText.toLowerCase();
+    const words = new Set(
+      promptLower
+        .split(/[^a-z0-9]+/)
+        .filter(w => w.length >= 3),
+    );
+    const explicitPaths = [...promptText.matchAll(/(?:client\/src\/)?([a-z0-9_\-/.]+\.(?:tsx|ts|css|json|html|md|jsx|js|svg))/gi)]
+      .map(m => normalizeClientEditPath(m[1].toLowerCase()));
+
+    const mustInclude = new Set([
+      'App.tsx',
+      'main.tsx',
+      'index.css',
+      ...explicitPaths,
+    ]);
+
+    const keywordHints: Array<[RegExp, string[]]> = [
+      [/\b(view|preview|editor|nl|natural|command|monaco|device|frame)\b/i, ['pages/view.tsx', 'components/edit-nl-command.tsx', 'components/edit-code-editor.tsx', 'components/edit-file-tree.tsx', 'components/edit-git-bar.tsx']],
+      [/\b(login|auth|sign in|signin|otp|password)\b/i, ['components/system-login-modal.tsx', 'pages/sro-login.tsx', 'pages/create-account.tsx', 'pages/verify-email.tsx']],
+      [/\b(home|landing|hero|banner)\b/i, ['pages/home.tsx', 'pages/landing.tsx']],
+      [/\b(admin|user|ou|license|security|audit)\b/i, ['pages/admin-panel.tsx']],
+      [/\b(staff|dashboard|ticket|valet|car|retrieval|parking)\b/i, ['pages/staff-dashboard.tsx', 'components/valet-ticket-wizard.tsx', 'components/status-tracker.tsx']],
+      [/\b(camera|scan|ocr|photo|plate)\b/i, ['components/camera-scanner.tsx', 'components/car-photo-uploader.tsx', 'hooks/useOCR.ts']],
+      [/\b(faq|help|docs|documentation)\b/i, ['components/faq-modal.tsx', 'pages/docs.tsx']],
+      [/\b(style|css|color|font|layout|mobile|desktop|responsive)\b/i, ['index.css', 'tailwind.config.ts']],
+    ];
+
+    for (const [pattern, hintedPaths] of keywordHints) {
+      if (pattern.test(promptText)) hintedPaths.forEach(p => mustInclude.add(p));
+    }
+
+    const scored = files.map(file => {
+      const pathLower = file.path.toLowerCase();
+      const basename = pathLower.split('/').pop() || pathLower;
+      let score = mustInclude.has(file.path) || mustInclude.has(pathLower) ? 1000 : 0;
+      if (explicitPaths.some(p => pathLower.endsWith(p))) score += 1500;
+      for (const word of words) {
+        if (pathLower.includes(word)) score += 20;
+        if (basename.includes(word)) score += 30;
+      }
+      if (pathLower.includes('/ui/')) score -= 20;
+      return { ...file, score };
+    });
+
+    const selected: Array<{ path: string; fullPath: string; size: number; score: number }> = [];
+    let bytes = 0;
+    for (const file of scored.sort((a, b) => b.score - a.score || a.size - b.size)) {
+      if (file.score <= 0 && selected.length >= 8) continue;
+      if (bytes + file.size > 120_000 && selected.length >= 6) continue;
+      selected.push(file);
+      bytes += file.size;
+      if (selected.length >= 14 || bytes >= 140_000) break;
+    }
+
+    return selected
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .map(({ score, ...file }) => file);
+  }
+
+  // Helper: build text outline of file tree from flat path list
+  function buildFileTreeText(paths: string[]): string {
+    const lines: string[] = [];
+    const pathSet = new Set(paths);
+
+    // Get top-level dirs
+    const dirs = new Set<string>();
+    for (const p of paths) {
+      const firstSlash = p.indexOf('/');
+      if (firstSlash > -1) dirs.add(p.substring(0, firstSlash));
+    }
+
+    for (const dir of [...dirs].sort()) {
+      lines.push(dir + '/');
+      const dirFiles = paths
+        .filter(p => p.startsWith(dir + '/'))
+        .map(p => p.substring(dir.length + 1));
+      for (const f of dirFiles.sort()) {
+        lines.push(`  ${f}`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+  } // end: Edit API local-dev gate
 
   return httpServer;
 }

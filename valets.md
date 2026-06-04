@@ -69,6 +69,28 @@ Oscar edits code locally → npm run build → git commit → git push origin ma
 3. Re-enable/rebuild photo upload routes later; they are currently disabled with `503`
 4. Keep using fresh sessions if `qwen36-local` hits idle timeout or `503 Loading model`
 
+## Checkpoint (2026-06-01 18:55 JST)
+
+- **Local dev server:** `ai.openclaw.valet-dev` LaunchAgent restarted and running on port 5174.
+- **Local `/view` Editor ON → NL Command fix:** Updated `server/routes.ts` so `/api/edit/apply` no longer sends the full `client/src` source tree to Qwen on every prompt. The handler now selects a relevance-ranked subset of source files, caps prompt context around 120-140 KB, normalizes model-returned paths like `client/src/pages/view.tsx` back to `pages/view.tsx`, and gives the local model up to 180 seconds.
+- **Why:** Full-context payload was about 390 KB and hit the old 60-second abort path, causing visible NL command timeouts. Path mismatch could also make otherwise valid model edits fail to apply.
+- **Verification:** `npm run build` passes. Plain unauthenticated POST to `/api/edit/apply` returns expected 401, confirming the patched route is live behind auth. `npm run check` still has unrelated pre-existing TypeScript errors.
+
+## Checkpoint (2026-06-01 19:05 JST)
+
+- **Local NL Command conversational fallback fix:** Ivan tested `Hi Oscar do you copy` and `what can you see at the moment` in Editor ON → NL Command. The endpoint no longer timed out, but Qwen treated both as non-edit prompts and returned `{"edits":[],"summary":"No changes needed"}` after 46-52 seconds.
+- **Fix:** Updated `server/routes.ts` so obvious conversational/status prompts bypass Qwen and return an immediate assistant/status reply. Real edit prompts still go through the relevance-ranked Qwen edit path.
+- **UI polish:** Updated `client/src/components/edit-nl-command.tsx` so longer NL Command replies wrap cleanly instead of overflowing.
+- **Verification:** `npm run build` passes. `ai.openclaw.valet-dev` was restarted and is running on port 5174. Unauthenticated POST still returns expected 401; authenticated browser requests should now show direct replies for greetings/status instead of `No changes needed`.
+
+## Checkpoint (2026-06-01 19:11 JST)
+
+- **Local NL Command chat mode fix:** Ivan reported that casual follow-up messages like `nice that was fast` still returned `No changes needed`.
+- **Cause:** The endpoint still defaulted to edit mode for any prompt not caught by a small greeting/status regex.
+- **Fix:** Updated `server/routes.ts` so `/api/edit/apply` classifies chat vs edit first. Normal messages now use assistant mode with recent panel history; only clear app-edit requests enter the code-edit path. Simple acknowledgement messages return immediately.
+- **UI polish:** Updated `client/src/components/edit-nl-command.tsx` into `Oscar Command`, with history sent to the backend and display text adjusted for normal chat plus app edits.
+- **Verification:** `npm run build` passes. `ai.openclaw.valet-dev` was restarted and is running on port 5174. Unauthenticated POST remains expected 401, so the route is live and auth is still enforced.
+
 ## Checkpoint (2026-05-29 06:55 JST)
 
 - **Branch:** `migration/railway`
