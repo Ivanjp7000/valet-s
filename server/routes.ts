@@ -3058,49 +3058,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Auto-close tickets whose scheduledDepartureAt has passed — runs every minute
-  setInterval(async () => {
-    try {
-      const due = await storage.getDueScheduledDepartures();
-      for (const ticket of due) {
-        const now = new Date();
+  // Background ticket schedulers are opt-in because they query Neon on a timer.
+  // If left enabled while the app is unused, they prevent Neon from auto-idling.
+  const enableValetBackgroundJobs = process.env.ENABLE_VALET_BACKGROUND_JOBS === 'true';
 
-        // Simulate full SLA retrieval process: random 5–8 min total
-        const totalSLASec = Math.floor(Math.random() * (480 - 300 + 1)) + 300; // 300–480 s
-        // Split into 3 stages (retrieving, transit, preparing) with random proportions
-        const r1 = Math.random(), r2 = Math.random(), r3 = Math.random();
-        const sum = r1 + r2 + r3;
-        const retrievingSec = Math.round((r1 / sum) * totalSLASec);
-        const transitSec    = Math.round((r2 / sum) * totalSLASec);
-        const preparingSec  = totalSLASec - retrievingSec - transitSec;
+  if (enableValetBackgroundJobs) {
+    console.log('[Background Jobs] ENABLE_VALET_BACKGROUND_JOBS=true; scheduled ticket pollers enabled');
 
-        const retrievalStartedAt = new Date(now.getTime() - totalSLASec * 1000);
-        const transitAt          = new Date(retrievalStartedAt.getTime() + retrievingSec * 1000);
-        const preparingAt        = new Date(transitAt.getTime() + transitSec * 1000);
-        const retrievalReadyAt   = new Date(preparingAt.getTime() + preparingSec * 1000);
+    // Auto-close tickets whose scheduledDepartureAt has passed.
+    setInterval(async () => {
+      try {
+        const due = await storage.getDueScheduledDepartures();
+        for (const ticket of due) {
+          const now = new Date();
 
-        // Mark completed (sets status, departedAt, totalStaySeconds)
-        let updated = await storage.updateValetTicketStatus(ticket.ticketNumber, 'completed');
-        if (!updated) continue;
+          // Simulate full SLA retrieval process: random 5–8 min total
+          const totalSLASec = Math.floor(Math.random() * (480 - 300 + 1)) + 300; // 300–480 s
+          // Split into 3 stages (retrieving, transit, preparing) with random proportions
+          const r1 = Math.random(), r2 = Math.random(), r3 = Math.random();
+          const sum = r1 + r2 + r3;
+          const retrievingSec = Math.round((r1 / sum) * totalSLASec);
+          const transitSec    = Math.round((r2 / sum) * totalSLASec);
+          const preparingSec  = totalSLASec - retrievingSec - transitSec;
 
-        // Overlay simulated SLA fields
-        const depCategory = (ticket.visitorType === 'restaurant' || ticket.visitorType === 'event' || ticket.visitorType === 'others') ? 'events' : 'departing';
-        updated = await storage.updateValetTicket(ticket.ticketNumber, {
-          rosterCategory: depCategory,
-          inRoster: true,
-          scheduledDepartureAt: null,
-          retrievalStartedAt,
-          retrievalReadyAt,
-          retrievalDurationSeconds: totalSLASec,
-        }) ?? updated;
+          const retrievalStartedAt = new Date(now.getTime() - totalSLASec * 1000);
+          const transitAt          = new Date(retrievalStartedAt.getTime() + retrievingSec * 1000);
+          const preparingAt        = new Date(transitAt.getTime() + transitSec * 1000);
+          const retrievalReadyAt   = new Date(preparingAt.getTime() + preparingSec * 1000);
 
-        broadcastToOU(updated.ouId, { type: 'ticket_status_updated', data: updated });
-        console.log(`[Auto-Close] Ticket ${ticket.ticketNumber} departed — simulated SLA ${Math.round(totalSLASec/60)}m (retrieving ${retrievingSec}s / transit ${transitSec}s / preparing ${preparingSec}s)`);
+          // Mark completed (sets status, departedAt, totalStaySeconds)
+          let updated = await storage.updateValetTicketStatus(ticket.ticketNumber, 'completed');
+          if (!updated) continue;
+
+          // Overlay simulated SLA fields
+          const depCategory = (ticket.visitorType === 'restaurant' || ticket.visitorType === 'event' || ticket.visitorType === 'others') ? 'events' : 'departing';
+          updated = await storage.updateValetTicket(ticket.ticketNumber, {
+            rosterCategory: depCategory,
+            inRoster: true,
+            scheduledDepartureAt: null,
+            retrievalStartedAt,
+            retrievalReadyAt,
+            retrievalDurationSeconds: totalSLASec,
+          }) ?? updated;
+
+          broadcastToOU(updated.ouId, { type: 'ticket_status_updated', data: updated });
+          console.log(`[Auto-Close] Ticket ${ticket.ticketNumber} departed — simulated SLA ${Math.round(totalSLASec/60)}m (retrieving ${retrievingSec}s / transit ${transitSec}s / preparing ${preparingSec}s)`);
+        }
+      } catch (e) {
+        console.error('[Auto-Close] Error processing scheduled departures:', e);
       }
-    } catch (e) {
-      console.error('[Auto-Close] Error processing scheduled departures:', e);
-    }
-  }, 5 * 60 * 1000);
+    }, 5 * 60 * 1000);
+  } else {
+    console.log('[Background Jobs] Scheduled ticket pollers disabled; set ENABLE_VALET_BACKGROUND_JOBS=true to enable');
+  }
 
   // ── 15-minute pre-alert for scheduled retrievals ─────────────────────────────
   // Maps ticketNumber → ISO scheduledAt string at time of last alert.
@@ -3108,41 +3118,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // different time, and prune entries once they leave the upcoming window.
   const scheduleAlertedMap = new Map<string, string>();
 
-  setInterval(async () => {
-    try {
-      const upcoming = await storage.getUpcomingScheduledRetrievals(15);
-      const upcomingNumbers = new Set(upcoming.map(t => t.ticketNumber));
+  if (enableValetBackgroundJobs) {
+    setInterval(async () => {
+      try {
+        const upcoming = await storage.getUpcomingScheduledRetrievals(15);
+        const upcomingNumbers = new Set(upcoming.map(t => t.ticketNumber));
 
-      // Prune entries that are no longer in the upcoming window (ticket retrieved,
-      // schedule cleared, past due, or status changed to non-active).
-      for (const tn of [...scheduleAlertedMap.keys()]) {
-        if (!upcomingNumbers.has(tn)) scheduleAlertedMap.delete(tn);
-      }
+        // Prune entries that are no longer in the upcoming window (ticket retrieved,
+        // schedule cleared, past due, or status changed to non-active).
+        for (const tn of [...scheduleAlertedMap.keys()]) {
+          if (!upcomingNumbers.has(tn)) scheduleAlertedMap.delete(tn);
+        }
 
-      for (const ticket of upcoming) {
-        const isoTime = ticket.scheduledRetrievalAt instanceof Date
-          ? ticket.scheduledRetrievalAt.toISOString()
-          : String(ticket.scheduledRetrievalAt);
-        // Skip if we already fired an alert for this exact scheduled time.
-        // If the time changed (rescheduled), the stored value won't match → re-alert.
-        if (scheduleAlertedMap.get(ticket.ticketNumber) === isoTime) continue;
-        scheduleAlertedMap.set(ticket.ticketNumber, isoTime);
-        broadcastToOU(ticket.ouId, {
-          type: 'schedule_alert',
-          data: {
-            ticketNumber: ticket.ticketNumber,
-            guestName: ticket.guestName,
-            scheduledAt: isoTime,
-            ouId: ticket.ouId,
-            locationId: ticket.locationId,
-          },
-        });
-        console.log(`[Schedule Alert] Fired 15-min pre-alert for ticket ${ticket.ticketNumber}`);
+        for (const ticket of upcoming) {
+          const isoTime = ticket.scheduledRetrievalAt instanceof Date
+            ? ticket.scheduledRetrievalAt.toISOString()
+            : String(ticket.scheduledRetrievalAt);
+          // Skip if we already fired an alert for this exact scheduled time.
+          // If the time changed (rescheduled), the stored value won't match → re-alert.
+          if (scheduleAlertedMap.get(ticket.ticketNumber) === isoTime) continue;
+          scheduleAlertedMap.set(ticket.ticketNumber, isoTime);
+          broadcastToOU(ticket.ouId, {
+            type: 'schedule_alert',
+            data: {
+              ticketNumber: ticket.ticketNumber,
+              guestName: ticket.guestName,
+              scheduledAt: isoTime,
+              ouId: ticket.ouId,
+              locationId: ticket.locationId,
+            },
+          });
+          console.log(`[Schedule Alert] Fired 15-min pre-alert for ticket ${ticket.ticketNumber}`);
+        }
+      } catch (e) {
+        console.error('[Schedule Alert] Error checking upcoming retrievals:', e);
       }
-    } catch (e) {
-      console.error('[Schedule Alert] Error checking upcoming retrievals:', e);
-    }
-  }, 2 * 60 * 1000);
+    }, 2 * 60 * 1000);
+  }
 
   // Event types that carry ticket data and must respect per-location restrictions.
   // Any event whose payload includes `ticketNumber` is also treated as ticket-related

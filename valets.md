@@ -2,6 +2,14 @@
 
 ## Status: Live on Railway ✅
 
+## Checkpoint (2026-06-21 09:36 JST)
+
+- **Neon compute idle fix:** Ivan received a Neon warning that the project had used 93% of its monthly compute allowance even though the migrated app was not actively in use.
+- **Cause:** Server-side scheduled ticket pollers queried Neon every 5 minutes / 2 minutes for scheduled departures and retrieval pre-alerts, preventing Neon from auto-idling.
+- **Fix:** `server/routes.ts` now gates those scheduled pollers behind `ENABLE_VALET_BACKGROUND_JOBS=true`. By default they are disabled, so idle production should stop continuously waking Neon.
+- **Behavior change:** Normal app usage still queries Neon on demand. Scheduled auto-close and 15-minute retrieval pre-alert automation only run when the env var is explicitly enabled.
+- **Verification before deploy:** `npm run build` passed. Local production-mode smoke test on port 5099 returned `/api/health` `{"ok":true}` and logged `Scheduled ticket pollers disabled; set ENABLE_VALET_BACKGROUND_JOBS=true to enable`.
+
 ## Development & Deployment Workflow
 
 ### How Changes Get to Production
