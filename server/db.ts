@@ -19,6 +19,4 @@ export const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-pool.query('SELECT 1').catch(() => {});
-
 export const db = drizzle({ client: pool, schema });
