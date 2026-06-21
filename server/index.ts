@@ -65,13 +65,13 @@ app.use((req, res, next) => {
 
   if (runStartupMigrations) {
     // Keep production startup from waking Neon unless migrations are explicitly requested.
-    const { pool } = await import("./db");
-    await pool.query(`
+    const { sql } = await import("./db");
+    await sql(`
       ALTER TABLE valet_tickets
       ADD COLUMN IF NOT EXISTS scheduled_departure_at TIMESTAMPTZ;
     `).catch((e: any) => console.error('[Migration] scheduled_departure_at:', e.message));
 
-    await pool.query(`
+    await sql(`
       CREATE TABLE IF NOT EXISTS session_audit_log (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         session_id varchar UNIQUE NOT NULL,

@@ -38,7 +38,7 @@ import {
   type CalendarEvent,
   type GuestNameImport,
 } from "@shared/schema";
-import { db, pool } from "./db";
+import { db, sql } from "./db";
 import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull, gt, ilike, lt } from "drizzle-orm";
 import { sql as drizzleSql } from "drizzle-orm";
 
@@ -389,18 +389,18 @@ export class DatabaseStorage implements IStorage {
     const durationSeconds = returnedAt
       ? Math.floor((returnedAt.getTime() - departedAt.getTime()) / 1000)
       : null;
-    const { rows } = await pool.query(
+    const { rows } = await sql(
       `UPDATE ticket_guest_trips
        SET departed_at = $1, returned_at = $2, duration_seconds = $3
        WHERE id = $4
        RETURNING id, ticket_id as "ticketId", departed_at as "departedAt", returned_at as "returnedAt", duration_seconds as "durationSeconds", created_at as "createdAt"`,
       [departedAt, returnedAt, durationSeconds, tripId]
     );
-    return rows[0];
+    return rows[0] as TicketGuestTrip | undefined;
   }
 
   async deleteGuestTrip(tripId: string): Promise<boolean> {
-    const { rowCount } = await pool.query(
+    const { rowCount } = await sql(
       `DELETE FROM ticket_guest_trips WHERE id = $1`,
       [tripId]
     );
@@ -904,13 +904,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAuditArchiveDates(ouId?: string): Promise<string[]> {
-    const rows = await pool.query<{ snapshot_date: string }>(
+    const rows = await sql(
       ouId
         ? `SELECT DISTINCT snapshot_date FROM session_audit_log WHERE ou_id = $1 AND snapshot_date IS NOT NULL ORDER BY snapshot_date DESC LIMIT 90`
         : `SELECT DISTINCT snapshot_date FROM session_audit_log WHERE snapshot_date IS NOT NULL ORDER BY snapshot_date DESC LIMIT 90`,
       ouId ? [ouId] : []
     );
-    return rows.rows.map(r => r.snapshot_date);
+    return rows.rows.map((r) => String(r.snapshot_date));
   }
 
   // ── GS Hub ────────────────────────────────────────────────────────────────
