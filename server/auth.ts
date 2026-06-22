@@ -1,17 +1,29 @@
 import session from "express-session";
 import connectPg from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import type { Express, RequestHandler } from "express";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    pruneSessionInterval: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  const useDbSessionStore =
+    process.env.ENABLE_DB_SESSION_STORE === "true" ||
+    process.env.NODE_ENV !== "production";
+  const sessionStore = useDbSessionStore
+    ? new (connectPg(session))({
+        conString: process.env.DATABASE_URL,
+        createTableIfMissing: false,
+        pruneSessionInterval: false,
+        ttl: sessionTtl,
+        tableName: "sessions",
+      })
+    : new (createMemoryStore(session))({
+        checkPeriod: sessionTtl,
+      });
+
+  if (!useDbSessionStore) {
+    console.log("[Auth] Using in-memory session store; set ENABLE_DB_SESSION_STORE=true to use Postgres sessions");
+  }
+
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
