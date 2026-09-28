@@ -1,6 +1,7 @@
+import { uploadPhoto } from "@/lib/photo-upload";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useOCR } from "@/hooks/useOCR";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -454,6 +455,7 @@ interface ValetTicketWizardProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserType | null | undefined;
+  workingOUId?: string | null;
 }
 
 type VisitorType = keyof typeof VISITOR_TYPES;
@@ -727,9 +729,17 @@ function WheelPicker({
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardProps) {
+export function ValetTicketWizard({ isOpen, onClose, user, workingOUId }: ValetTicketWizardProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const { data: availableLocations = [], isError: locationsError } = useQuery<Array<{ id: string; name: string; ouId: string | null }>>({
+    queryKey: ["/api/locations"],
+    enabled: isOpen && !user?.locationId,
+  });
+  const selectableLocations = availableLocations.filter(location => !workingOUId || location.ouId === workingOUId);
+  const ticketLocationId = user?.locationId || (selectableLocations.some(location => location.id === selectedLocationId) ? selectedLocationId : "");
+
   const [currentStep, setCurrentStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
   const [carMakeSearch, setCarMakeSearch] = useState("");
@@ -885,26 +895,14 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     ).slice(0, 8);
   }, [carMakeSearch]);
 
-  const uploadDataUrlToServer = async (dataUrl: string): Promise<string | null> => {
-    try {
-      const uploadRes = await fetch('/api/car-photos/upload', { method: 'POST', credentials: 'include' });
-      if (!uploadRes.ok) return null;
-      const { uploadURL, issuedPath } = await uploadRes.json();
-      const base64 = dataUrl.split(',')[1];
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: 'image/jpeg' });
-      const putRes = await fetch(uploadURL, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
-      if (!putRes.ok) return null;
-      return issuedPath as string;
-    } catch {
-      return null;
-    }
+  const uploadDataUrlToServer = async (dataUrl: string): Promise<string> => {
+    const response = await fetch(dataUrl);
+    return uploadPhoto(await response.blob());
   };
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!ticketLocationId) throw new Error("Select a ticket location before uploading photos");
       const staffName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
         : user?.username || "Unknown Staff";
@@ -932,7 +930,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
         carPhoto,
         createdByUserId: user?.id,
         createdByName: staffName,
-        locationId: user?.locationId || null,
+        locationId: ticketLocationId,
       });
     },
     onSuccess: () => {
@@ -978,7 +976,7 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
     return letter + digits;
   };
 
-  const canProceedStep1 = formData.visitorType && 
+  const canProceedStep1 = ticketLocationId && formData.visitorType &&
     (formData.visitorType !== "restaurant" || formData.visitorSubType) &&
     formData.carMake && formData.carModel && formData.carColor &&
     formData.guestName.trim().length > 0 &&
@@ -1024,6 +1022,16 @@ export function ValetTicketWizard({ isOpen, onClose, user }: ValetTicketWizardPr
 
   const renderStep1 = () => (
     <div className="space-y-3">
+      {!user?.locationId && (
+        <div>
+          <label htmlFor="ticket-location" className="text-sm font-semibold text-regis-navy">Location *</label>
+          <select id="ticket-location" className="w-full border rounded-md p-2 mt-1" value={selectedLocationId} onChange={event => setSelectedLocationId(event.target.value)}>
+            <option value="">Select a location</option>
+            {selectableLocations.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
+          </select>
+          {locationsError && <p className="text-sm text-red-600">Locations could not be loaded. Please reopen this form to retry.</p>}
+        </div>
+      )}
       {/* Guest Information — top of step 1 */}
       <div>
         <h3 className="text-sm font-semibold text-regis-navy mb-1.5">Guest Information</h3>

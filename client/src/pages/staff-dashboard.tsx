@@ -5631,6 +5631,7 @@ export default function StaffDashboard() {
           isOpen={showTicketWizard}
           onClose={() => setShowTicketWizard(false)}
           user={user as any}
+          workingOUId={workingOUId}
         />
 
         {/* View Ticket Modal */}

@@ -1,3 +1,4 @@
+import { registerPhotoRoutes } from "./photo-routes";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -1415,7 +1416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const normalizedCarPhoto = carPhoto.startsWith('https://storage.googleapis.com/')
           ? carPhoto
           : carPhoto;
-        if (!normalizedCarPhoto.startsWith('/car-photos/') || !isServerIssuedPhotoPath(normalizedCarPhoto)) {
+        if (!normalizedCarPhoto.startsWith('/car-photos/') || !await isServerIssuedPhotoPath(normalizedCarPhoto, currentUser.id)) {
           return res.status(400).json({ message: "Invalid car photo path" });
         }
       }
@@ -1423,7 +1424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const normalizedPlatePhoto = platePhotoUrl.startsWith('https://storage.googleapis.com/')
           ? platePhotoUrl
           : platePhotoUrl;
-        if (!normalizedPlatePhoto.startsWith('/car-photos/') || !isServerIssuedPhotoPath(normalizedPlatePhoto)) {
+        if (!normalizedPlatePhoto.startsWith('/car-photos/') || !await isServerIssuedPhotoPath(normalizedPlatePhoto, currentUser.id)) {
           return res.status(400).json({ message: "Invalid plate photo path" });
         }
       }
@@ -2555,32 +2556,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Car Photo Management Routes
-  // Server-side registry of legitimately issued photo paths.
-  // Paths are added when an upload URL is minted and expire after 30 minutes.
-  // Write endpoints only accept paths present in this registry (or already stored on the ticket).
-  const issuedPhotoPaths = new Map<string, number>(); // path → expiry timestamp ms
-  const PHOTO_PATH_TTL_MS = 30 * 60 * 1000;
-  setInterval(() => {
-    const now = Date.now();
-    issuedPhotoPaths.forEach((exp, path) => { if (now > exp) issuedPhotoPaths.delete(path); });
-  }, 5 * 60 * 1000);
-
-  function isServerIssuedPhotoPath(path: string): boolean {
-    const exp = issuedPhotoPaths.get(path);
-    if (exp === undefined) return false;
-    if (Date.now() > exp) { issuedPhotoPaths.delete(path); return false; }
-    return true;
-  }
-
-  // Photo uploads DISABLED during migration (Replit Object Storage removed)
-  app.post('/api/car-photos/upload', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
-    res.status(503).json({ message: "Photo uploads temporarily disabled" });
-  });
-
-  // Photo access DISABLED during migration (Replit Object Storage removed)
-  app.get('/car-photos/:photoPath(*)', isAuthenticated, requireReadAccess, async (req: any, res) => {
-    res.status(503).json({ message: "Photo access temporarily disabled" });
+  // Private R2 photo uploads and scoped reads; no database schema changes.
+  const isServerIssuedPhotoPath = registerPhotoRoutes(app, {
+    auth: isAuthenticated, write: requireStandardAdmin, read: requireReadAccess,
+    ticketForPhoto: path => storage.getTicketByPhotoPath(path),
+    inScope: isTicketInScope,
   });
 
   // Staff endpoint for editing ticket details (accessible by standard admin)
@@ -2719,7 +2699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Only accept paths that are either already on this ticket, or were server-issued
       if (normalizedPhotoPath && normalizedPhotoPath !== existing.carPhoto) {
-        if (!isServerIssuedPhotoPath(normalizedPhotoPath)) {
+        if (!await isServerIssuedPhotoPath(normalizedPhotoPath, req.currentUser.id)) {
           return res.status(400).json({ message: "Invalid car photo path" });
         }
       }
@@ -2905,11 +2885,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error generating backup:", error);
       res.status(500).json({ message: "Failed to generate backup" });
     }
-  });
-
-    // Photo backup proxy DISABLED during migration (Replit Object Storage removed)
-  app.get('/api/backup/photo', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
-    res.status(503).json({ message: "Photo access temporarily disabled" });
   });
 
   // Immediately close a ticket as departed (guest left without retrieval process)

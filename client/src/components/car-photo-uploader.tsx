@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Camera, Upload, X, Check } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { uploadPhoto } from "@/lib/photo-upload";
 import { useToast } from "@/hooks/use-toast";
 
 interface CarPhotoUploaderProps {
@@ -20,24 +20,7 @@ export function CarPhotoUploader({ onPhotoUploaded, currentPhoto }: CarPhotoUplo
     mutationFn: async (file: File) => {
       setUploading(true);
       
-      // Get upload URL from backend
-      const uploadResult = (await apiRequest("POST", "/api/car-photos/upload")) as any;
-      const uploadURL = uploadResult?.uploadURL;
-      
-      // Upload file directly to object storage
-      const uploadResponse = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type,
-        },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to upload photo");
-      }
-
-      return uploadURL;
+      return uploadPhoto(file);
     },
     onSuccess: (uploadURL) => {
       setUploading(false);
@@ -52,14 +35,14 @@ export function CarPhotoUploader({ onPhotoUploaded, currentPhoto }: CarPhotoUplo
       console.error("Upload error:", error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload car photo. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to upload car photo. Please try again.",
         variant: "destructive",
       });
     },
   });
 
   const handleFileSelect = (file: File) => {
-    if (!file.type.startsWith("image/")) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       toast({
         title: "Invalid File",
         description: "Please select an image file",
@@ -138,7 +121,7 @@ export function CarPhotoUploader({ onPhotoUploaded, currentPhoto }: CarPhotoUplo
           >
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleFileInput}
               className="hidden"
               id="car-photo-input"
