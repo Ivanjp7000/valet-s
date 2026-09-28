@@ -935,6 +935,7 @@ export function ValetTicketWizard({ isOpen, onClose, user, workingOUId }: ValetT
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tickets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
       toast({ title: "Valet ticket created successfully!" });
       handleClose();
