@@ -12,7 +12,7 @@ import {
   Hotel, UtensilsCrossed, Users, X, Ticket, CalendarDays, Plus, Printer, RefreshCw,
   LayoutGrid, List as ListIcon, Search
 } from "lucide-react";
-import qrCodeUrl from "@/assets/qr-valet-s.jpg";
+import { guestQrDataUrl } from "@/lib/guest-qr";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -91,7 +91,7 @@ async function printNameLabel(guestName: string): Promise<void> {
 
   let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
   try {
-    const resp  = await fetch(qrCodeUrl);
+    const resp  = await fetch(await guestQrDataUrl());
     const bytes = new Uint8Array(await resp.arrayBuffer());
     try { qrImage = await doc.embedJpg(bytes); } catch { qrImage = await doc.embedPng(bytes); }
   } catch { /* skip */ }
@@ -107,7 +107,7 @@ async function printNameLabel(guestName: string): Promise<void> {
 
   // "Visit Valet-s.com"
   const visitSize = 6;
-  const visitText = 'Visit  Valet-s.com';
+  const visitText = 'Scan to request your car';
   page.drawText(visitText, {
     x: pad + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
     y: cursor - visitSize, font, size: visitSize, color: rgb(0.4, 0.4, 0.4),
@@ -160,8 +160,7 @@ async function printPinLabel(pin: string): Promise<void> {
 
   let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
   try {
-    const { default: qrUrl } = await import('@/assets/qr-valet-s.jpg');
-    const resp  = await fetch(qrUrl);
+    const resp  = await fetch(await guestQrDataUrl());
     const bytes = new Uint8Array(await resp.arrayBuffer());
     try { qrImage = await doc.embedJpg(bytes); } catch { qrImage = await doc.embedPng(bytes); }
   } catch { /* skip */ }
@@ -177,7 +176,7 @@ async function printPinLabel(pin: string): Promise<void> {
 
   // "Visit Valet-s.com"
   const visitSize = 6;
-  const visitText = 'Visit  Valet-s.com';
+  const visitText = 'Scan to request your car';
   page.drawText(visitText, {
     x: pad + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
     y: cursor - visitSize, font, size: visitSize, color: rgb(0.4, 0.4, 0.4),
@@ -234,8 +233,7 @@ async function printTicketPinLabel(ticketNumber: string, pin: string): Promise<v
 
   let qrImage: Awaited<ReturnType<typeof doc.embedJpg>> | null = null;
   try {
-    const { default: qrUrl } = await import('@/assets/qr-valet-s.jpg');
-    const resp  = await fetch(qrUrl);
+    const resp  = await fetch(await guestQrDataUrl());
     const bytes = new Uint8Array(await resp.arrayBuffer());
     try { qrImage = await doc.embedJpg(bytes); } catch { qrImage = await doc.embedPng(bytes); }
   } catch { /* skip */ }
@@ -251,7 +249,7 @@ async function printTicketPinLabel(ticketNumber: string, pin: string): Promise<v
 
   // "Visit Valet-s.com"
   const visitSize = 5.5;
-  const visitText = 'Visit  Valet-s.com';
+  const visitText = 'Scan to request your car';
   page.drawText(visitText, {
     x: pad + (innerW - font.widthOfTextAtSize(visitText, visitSize)) / 2,
     y: cursor - visitSize, font, size: visitSize, color: rgb(0.4, 0.4, 0.4),

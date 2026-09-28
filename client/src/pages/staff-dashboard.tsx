@@ -1,3 +1,4 @@
+import { guestQrDataUrl } from "@/lib/guest-qr";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,6 +55,7 @@ function formatDuration(seconds: number): string {
 }
 
 async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Promise<void> {
+  const qrDataUrl = await guestQrDataUrl();
   const visitorLabel = ticket.visitorType === 'hotel_guest' ? 'Hotel Staying Guest'
     : ticket.visitorType === 'restaurant'
       ? `Restaurant${ticket.visitorSubType ? `<br>${(RESTAURANT_SUB_TYPES as Record<string,string>)[ticket.visitorSubType] || ticket.visitorSubType}` : ''}`
@@ -132,8 +134,8 @@ async function printFullTicket(ticket: import("@shared/schema").ValetTicket): Pr
     ${ticket.guestPin ? line(ticket.guestPin, 'pin') : ''}
   </div>
   <div class="footer-block">
-    <div class="site">Valet-s.com</div>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://valet-s.com" alt="QR"/>
+    <div class="site">Scan to request your car</div>
+    <img src="${qrDataUrl}" alt="QR"/>
   </div>
   <script>window.onload = function(){ window.print(); }<\/script>
 </body>
