@@ -94,16 +94,14 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
 
   const queryKey = ["/api/tickets", ticketNumber, guestName, guestPin ?? ""];
 
-  const { data: ticket } = useQuery<ValetTicket>({
+  const { data: ticket, isError } = useQuery<ValetTicket>({
     queryKey,
     queryFn: async () => {
       const res = await fetch(buildLookupUrl(), { credentials: "include" });
-      // On 429 (rate-limited) keep previous data — do not throw
-      if (res.status === 429) return undefined as any;
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
-    refetchInterval: 3000,
+    refetchInterval: query => query.state.data?.status === "completed" ? false : 3000,
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: true,
     retry: false,
@@ -445,14 +443,14 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
           <div className="w-16 h-16 bg-regis-gold rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
             <Car className="text-white" size={24} />
           </div>
-          <h2 className="text-xl font-semibold mb-2">Starting Retrieval</h2>
+          <h2 className="text-xl font-semibold mb-2">Scheduled Pickup Due</h2>
           <p className="text-blue-200 text-sm">Ticket #{ticketNumber}</p>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto w-full">
           <div className="w-20 h-20 border-4 border-regis-gold border-t-transparent rounded-full animate-spin mb-6" />
           <h3 className="text-xl font-bold text-regis-navy mb-3">Your scheduled pickup time has arrived</h3>
           <p className="text-gray-500 text-sm leading-relaxed">
-            A valet attendant is starting retrieval of your vehicle. This page will update automatically.
+            Your scheduled pickup is due. Please contact the valet desk if you are ready to collect your vehicle. This page will update when staff start retrieval.
           </p>
         </div>
         <Button variant="ghost" onClick={onBack} className="mx-auto mb-8 text-gray-400 hover:text-gray-600">
@@ -463,12 +461,23 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     );
   }
 
+  if (ticket?.status === "completed") {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center">
+        <Check className="text-green-600 mb-6" size={48} />
+        <h2 className="text-2xl font-bold text-regis-navy mb-3">Vehicle Collected</h2>
+        <p className="text-gray-500">Staff have confirmed departure for ticket #{ticketNumber}. Thank you, and have a safe journey.</p>
+        <Button variant="ghost" onClick={onBack} className="mt-6">Back to Home</Button>
+      </div>
+    );
+  }
+
   // In progress (retrieving, transit, or preparing)
   if (!isActive) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8 text-center">
         <div className="w-16 h-16 border-4 border-regis-gold border-t-transparent rounded-full animate-spin mb-6" />
-        <p className="text-gray-500">Loading status…</p>
+        <p className="text-gray-500">{ticket ? "Your vehicle is parked. Return home to request pickup." : isError ? "Unable to load your ticket. Please return home and try again." : "Loading status…"}</p>
         <Button variant="ghost" onClick={onBack} className="mt-6 text-gray-400">
           <X className="mr-2" size={16} />
           Back

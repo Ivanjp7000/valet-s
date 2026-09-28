@@ -87,6 +87,11 @@ export default function Landing() {
 
       const data = await response.json();
       if (data.ticketNumber) {
+        if (data.status === "completed") {
+          setSubmittedTicket(ticketNumber);
+          setShowStatus(true);
+          return;
+        }
         setTicketPreview(data);
         setShowConfirmation(true);
       }
