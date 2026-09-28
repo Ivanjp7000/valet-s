@@ -50,7 +50,11 @@ function Router() {
       <Route path="/sro" component={SroLogin} />
 
       {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/staff" component={Landing} />
+          <Route path="/admin" component={Landing} />
+        </>
       ) : (
         <>
           <Route path="/" component={Home} />

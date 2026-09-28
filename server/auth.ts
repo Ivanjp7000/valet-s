@@ -16,7 +16,7 @@ export function getSession() {
         conString: process.env.DATABASE_URL,
         createTableIfMissing: false,
         pruneSessionInterval: false,
-        ttl: sessionTtl,
+        ttl: sessionTtl / 1000,
         tableName: "sessions",
       })
     : new (createMemoryStore(session))({

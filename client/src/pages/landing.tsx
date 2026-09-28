@@ -33,7 +33,7 @@ export default function Landing() {
   const [ticketNumber, setTicketNumber] = useState("");
   const [showStatus, setShowStatus] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showSystemLogin, setShowSystemLogin] = useState(() => new URLSearchParams(window.location.search).get("login") === "1");
+  const [showSystemLogin, setShowSystemLogin] = useState(() => new URLSearchParams(window.location.search).get("login") === "1" || ["/staff", "/admin"].includes(window.location.pathname));
   const [showFAQModal, setShowFAQModal] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -144,6 +144,9 @@ export default function Landing() {
         toast({ title: t.errors.scheduleFailed, description: err.message || t.errors.scheduleFailedDesc, variant: "destructive" });
         return;
       }
+      setSubmittedTicket(ticketNumber);
+      setShowSchedule(false);
+      setShowConfirmation(false);
       setScheduleConfirmed(true);
     } catch (err: any) {
       toast({ title: t.errors.connectionError, description: t.errors.connectionErrorDesc, variant: "destructive" });
