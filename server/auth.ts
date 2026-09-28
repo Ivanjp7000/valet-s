@@ -3,7 +3,10 @@ import connectPg from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 import type { Express, RequestHandler } from "express";
 
+let sharedSession: ReturnType<typeof session> | undefined;
+
 export function getSession() {
+  if (sharedSession) return sharedSession;
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const useDbSessionStore =
     process.env.ENABLE_DB_SESSION_STORE === "true" ||
@@ -24,7 +27,7 @@ export function getSession() {
     console.log("[Auth] Using in-memory session store; set ENABLE_DB_SESSION_STORE=true to use Postgres sessions");
   }
 
-  return session({
+  return sharedSession = session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false,

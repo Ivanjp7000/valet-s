@@ -79,7 +79,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     setOverrides((prev) => ({
       ...prev,
       landing: {
-        ...prev.landing,
+        ...mergeContent(defaultContent, prev).landing,
         [section]: {
           ...(prev.landing as any)?.[section],
           [field]: value,

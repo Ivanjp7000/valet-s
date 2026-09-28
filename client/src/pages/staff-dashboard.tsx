@@ -328,7 +328,7 @@ function GuestOutCard({ ticket, onBack, onView, canEdit = true }: { ticket: Vale
 
   useEffect(() => {
     if (!ticket.guestDepartedAt) return;
-    
+
     const departedAt = new Date(ticket.guestDepartedAt).getTime();
     const updateTimer = () => {
       setElapsedSeconds(Math.floor((Date.now() - departedAt) / 1000));
@@ -558,7 +558,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
                 ? 'bg-green-100 text-green-700 border border-green-300'
                 : 'bg-red-100 text-red-700 border border-red-300'
             }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-      
+
               {ticket.parkingLocation || 'Unassigned'}
             </span>
             {isOvernight && (
@@ -623,17 +623,14 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
               {(ticket as any).scheduledDepartureAt && (
                 <div className="mt-0.5 space-y-0.5">
                   <p className="text-[10px] text-purple-700 font-semibold">
-                    ⏰ Auto-close: {fmtScheduled((ticket as any).scheduledDepartureAt)}
+                    Planned departure (staff confirmation required): {fmtScheduled((ticket as any).scheduledDepartureAt)}
                   </p>
                   <div className="flex gap-1">
                     <button
                       className="text-[9px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-1.5 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
                       onClick={onCancelAutoClose}
                     >✕ Cancel</button>
-                    <button
-                      className="text-[9px] text-purple-600 hover:text-purple-800 font-semibold border border-purple-300 hover:border-purple-500 rounded px-1.5 py-0.5 leading-tight bg-purple-100 hover:bg-purple-200"
-                      onClick={onAutoClose}
-                    >✎ Edit</button>
+
                   </div>
                 </div>
               )}
@@ -723,13 +720,7 @@ function CompactInHouseCard({ ticket, onRetrieve, onEdit, onView, onDepart, onAu
             >
               <LogOut size={12} className="mr-1" />Departed
             </Button>
-            <Button
-              size="sm"
-              className="h-7 flex-1 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold"
-              onClick={onAutoClose}
-            >
-              <Timer size={12} className="mr-1" />Auto Close
-            </Button>
+
           </div>
           {/* Print Ticket */}
           <Button
@@ -815,7 +806,7 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
 
   useEffect(() => {
     if (!ticket.guestDepartedAt) return;
-    
+
     const departedAt = new Date(ticket.guestDepartedAt).getTime();
     const updateTimer = () => {
       setElapsedSeconds(Math.floor((Date.now() - departedAt) / 1000));
@@ -854,7 +845,7 @@ function GuestOutCardFull({ ticket, onBack, onView, canEdit = true }: { ticket: 
         <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${
           ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'
         }`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-  
+
           {ticket.parkingLocation || 'Unassigned'}
         </span>
       </div>
@@ -958,7 +949,7 @@ export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   // Standard User has read-only access - cannot create/edit/delete
   const canEdit = user?.role !== 'standard_user';
   const [editingTicket, setEditingTicket] = useState<ValetTicket | null>(null);
@@ -998,11 +989,11 @@ export default function StaffDashboard() {
     lastName: "",
     role: "standard",
   });
-  
+
   // Edit user state
   const [editUserData, setEditUserData] = useState<UserType | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Password change modal state
   const [showPasswordChangeModal, setShowPasswordChangeModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -1010,14 +1001,14 @@ export default function StaffDashboard() {
     newPassword: '',
     confirmPassword: ''
   });
-  
+
   // Reset password state (for Super Admin)
   const [resetPasswordData, setResetPasswordData] = useState({
     newPassword: '',
     confirmPassword: '',
     forceChange: true
   });
-  
+
   // Per-section font size (persisted in localStorage)
   const [sectionFontSize, setSectionFontSize] = useState<Record<string, number>>(() => {
     try { return JSON.parse(localStorage.getItem('sectionFontSize') || '{}'); } catch { return {}; }
@@ -1087,9 +1078,9 @@ export default function StaffDashboard() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfIncludeCarPhoto, setPdfIncludeCarPhoto] = useState(false);
   const [pdfIncludePlatePhoto, setPdfIncludePlatePhoto] = useState(false);
-  
+
   // Compact view toggle for mobile
-  
+
   // ── Panel order & collapse state (persisted to localStorage) ──────────────
   const [desktopPanelOrder, setDesktopPanelOrder] = useState<string[]>(() => {
     try {
@@ -1196,7 +1187,7 @@ export default function StaffDashboard() {
 
   // Retrieval queue notifications
   const [retrievalRequests, setRetrievalRequests] = useState<RetrievalRequest[]>([]);
-  
+
   // WebSocket connection for real-time updates
   const { lastMessage } = useWebSocket();
 
@@ -3124,7 +3115,7 @@ export default function StaffDashboard() {
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <p className="font-bold text-regis-navy" style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>#{ticket.ticketNumber}</p>
                                           <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-                                    
+
                                             {ticket.parkingLocation || 'Unassigned'}
                                           </span>
                                         </div>
@@ -3195,22 +3186,14 @@ export default function StaffDashboard() {
                                     {!inHouseCollapsed && (ticket as any).scheduledDepartureAt && (
                                       <div className="mb-1.5 space-y-1">
                                         <p className="text-xs text-purple-600 font-semibold">
-                                          ⏰ Auto-close: {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
+                                          Planned departure (staff confirmation required): {(() => { const d = new Date((ticket as any).scheduledDepartureAt); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`; })()}
                                         </p>
                                         <div className="flex gap-1.5">
                                           <button
                                             className="text-[10px] text-red-500 hover:text-red-700 font-semibold border border-red-300 hover:border-red-500 rounded px-2 py-0.5 leading-tight bg-red-50 hover:bg-red-100"
                                             onClick={() => cancelSchedDepMutation.mutate(ticket.ticketNumber)}
                                           >✕ Cancel Schedule</button>
-                                          <button
-                                            className="text-[10px] text-purple-600 hover:text-purple-800 font-semibold border border-purple-300 hover:border-purple-500 rounded px-2 py-0.5 leading-tight bg-purple-100 hover:bg-purple-200"
-                                            onClick={() => {
-                                              setAutoCloseTicket(ticket);
-                                              const d = new Date((ticket as any).scheduledDepartureAt);
-                                              setAutoCloseDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                                              setAutoCloseTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
-                                            }}
-                                          >✎ Edit Schedule</button>
+
                                         </div>
                                       </div>
                                     )}
@@ -3281,19 +3264,7 @@ export default function StaffDashboard() {
                                           >
                                             <LogOut size={13} className="mr-1" /> Departed
                                           </Button>
-                                          <Button size="sm"
-                                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs"
-                                            onClick={() => {
-                                              setAutoCloseTicket(ticket);
-                                              const today = new Date();
-                                              const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-                                              const localTime = `${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
-                                              setAutoCloseDate(localDate);
-                                              setAutoCloseTime(localTime);
-                                            }}
-                                          >
-                                            <Timer size={13} className="mr-1" /> Auto Close
-                                          </Button>
+
                                         </div>
                                         {/* Print Ticket */}
                                         <Button size="sm" variant="outline"
@@ -3775,7 +3746,7 @@ export default function StaffDashboard() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="font-medium text-sm sm:text-base">Ticket #{ticket.ticketNumber}</p>
                                   <span className={`inline-flex items-center px-1.5 py-0 rounded-full font-bold ${ticket.parkingLocation ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300'}`} style={{ fontSize: 'var(--panel-card-title-size, 14px)' }}>
-                            
+
                                     {ticket.parkingLocation || 'Unassigned'}
                                   </span>
                                 </div>
@@ -3843,7 +3814,7 @@ export default function StaffDashboard() {
                               )}
                             </div>
                           </div>
-                          
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
                             {ticket.guestName && (
                               <p className="truncate"><strong>Guest:</strong> {fmtGuest(ticket.guestName)}</p>
@@ -3858,7 +3829,7 @@ export default function StaffDashboard() {
                               <p className="truncate"><strong>Parking:</strong> {ticket.parkingLocation}</p>
                             )}
                           </div>
-                          
+
                           {ticket.staffNotes && (
                             <p className="text-xs sm:text-sm text-gray-600 mt-2 line-clamp-2">
                               <strong>Notes:</strong> {ticket.staffNotes}
@@ -5176,7 +5147,7 @@ export default function StaffDashboard() {
                     </p>
                   </div>
                 )}
-                
+
                 {/* Reset Password Section - Super Admin Only */}
                 {user?.role === 'superadmin' && (
                   <div className="border-t pt-4 mt-4">
@@ -5245,7 +5216,7 @@ export default function StaffDashboard() {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="flex justify-end pt-4 border-t">
                   <Button variant="outline" onClick={() => {
                     setEditUserData(null);
@@ -6249,7 +6220,7 @@ export default function StaffDashboard() {
                     This action cannot be undone. All ticket data will be lost.
                   </p>
                 </div>
-                
+
                 <div className="text-sm text-gray-600">
                   <p><strong>Guest:</strong> {deleteTicket.guestName ? fmtGuest(deleteTicket.guestName) : 'N/A'}</p>
                   <p><strong>Vehicle:</strong> {deleteTicket.carMake} {deleteTicket.carModel}</p>
@@ -6298,7 +6269,7 @@ export default function StaffDashboard() {
                     Archived tickets are kept for historical records but won't appear in active lists.
                   </p>
                 </div>
-                
+
                 <div className="text-sm text-gray-600">
                   <p><strong>Guest:</strong> {archiveTicket.guestName ? fmtGuest(archiveTicket.guestName) : 'N/A'}</p>
                   <p><strong>Vehicle:</strong> {archiveTicket.carMake} {archiveTicket.carModel}</p>
@@ -6328,77 +6299,7 @@ export default function StaffDashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Auto Close (Scheduled Departure) Dialog */}
-        <Dialog open={!!autoCloseTicket} onOpenChange={(o) => { if (!o) setAutoCloseTicket(null); }}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Timer size={18} className="text-purple-600" />
-                Auto Close — #{autoCloseTicket?.ticketNumber}
-              </DialogTitle>
-            </DialogHeader>
-            {autoCloseTicket && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Choose the date and time to automatically close this ticket. The system will mark the guest as departed at that exact moment.
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-700 block mb-1">Date</label>
-                    <input
-                      type="date"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                      value={autoCloseDate}
-                      min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
-                      max={(() => { const d = new Date(); d.setDate(d.getDate() + 10); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}
-                      onChange={e => setAutoCloseDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-700 block mb-1">Time</label>
-                    <input
-                      type="time"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                      value={autoCloseTime}
-                      onChange={e => setAutoCloseTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-                {(autoCloseTicket as any).scheduledDepartureAt && (
-                  <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-md px-3 py-2">
-                    <p className="text-xs text-purple-700">
-                      Currently scheduled: {new Date((autoCloseTicket as any).scheduledDepartureAt).toLocaleString()}
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 text-xs text-red-500 hover:text-red-700 px-2"
-                      onClick={() => { cancelSchedDepMutation.mutate(autoCloseTicket.ticketNumber); setAutoCloseTicket(null); }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                    disabled={!autoCloseDate || !autoCloseTime || scheduleDepMutation.isPending}
-                    onClick={() => {
-                      const iso = new Date(`${autoCloseDate}T${autoCloseTime}:00`).toISOString();
-                      scheduleDepMutation.mutate({ ticketNumber: autoCloseTicket.ticketNumber, scheduledDepartureAt: iso });
-                    }}
-                  >
-                    <Timer size={14} className="mr-1" />
-                    {scheduleDepMutation.isPending ? "Scheduling..." : "Confirm Schedule"}
-                  </Button>
-                  <Button variant="outline" onClick={() => setAutoCloseTicket(null)}>
-                    Close
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+
       </div>
     </div>
   );

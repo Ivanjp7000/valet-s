@@ -86,8 +86,8 @@ export default function Landing() {
       }
 
       const data = await response.json();
-      if (data.success) {
-        setTicketPreview(data.ticket);
+      if (data.ticketNumber) {
+        setTicketPreview(data);
         setShowConfirmation(true);
       }
     } catch (err: any) {
@@ -100,7 +100,7 @@ export default function Landing() {
   const handleConfirmRetrieval = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/tickets/${ticketNumber}/queue`, { method: "POST" });
+      const response = await fetch(`/api/tickets/${ticketNumber}/request-retrieval`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ guestName: guestNameInput.trim(), guestPin: guestPinInput.trim().toUpperCase() }) });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         toast({
@@ -134,10 +134,10 @@ export default function Landing() {
     }
     setScheduleLoading(true);
     try {
-      const response = await fetch(`/api/tickets/${ticketNumber}/schedule`, {
+      const response = await fetch(`/api/tickets/${ticketNumber}/schedule-retrieval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: scheduleDate, time: scheduleTime, email: scheduleEmail }),
+        body: JSON.stringify({ scheduledAt: new Date(`${scheduleDate}T${scheduleTime}`).toISOString(), reminderEmail: scheduleEmail, guestName: guestNameInput.trim(), guestPin: guestPinInput.trim().toUpperCase() }),
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -156,7 +156,7 @@ export default function Landing() {
   if (showStatus) {
     return (
       <div className="min-h-screen bg-soft-gray">
-        <StatusTracker ticketNumber={submittedTicket} />
+        <StatusTracker ticketNumber={submittedTicket} guestName={guestNameInput.trim()} guestPin={guestPinInput.trim().toUpperCase()} onBack={() => { setShowStatus(false); handleCancelConfirmation(); }} />
         <Button
           variant="ghost"
           size="icon"

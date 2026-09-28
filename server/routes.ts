@@ -1,3 +1,4 @@
+import { createScheduledReminderPoller } from "./scheduled-reminders";
 import { registerPhotoRoutes } from "./photo-routes";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
@@ -2908,30 +2909,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Schedule auto-close departure for a future time
-  app.post('/api/staff/tickets/:ticketNumber/schedule-departure', isAuthenticated, requireStandardAdmin, async (req: any, res) => {
-    try {
-      const { ticketNumber } = req.params;
-      const { scheduledDepartureAt } = req.body;
-      if (!scheduledDepartureAt) return res.status(400).json({ message: "scheduledDepartureAt is required" });
-      const scheduledTime = new Date(scheduledDepartureAt);
-      if (isNaN(scheduledTime.getTime())) return res.status(400).json({ message: "Invalid date" });
-      const maxDate = new Date();
-      maxDate.setDate(maxDate.getDate() + 10);
-      if (scheduledTime > maxDate) return res.status(400).json({ message: "Cannot schedule more than 10 days in advance" });
-      const existing = await storage.getValetTicket(ticketNumber);
-      if (!existing) return res.status(404).json({ message: "Ticket not found" });
-      if (!await isTicketInScope(existing, req.currentUser)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      const ticket = await storage.updateValetTicket(ticketNumber, { scheduledDepartureAt: scheduledTime });
-      if (!ticket) return res.status(404).json({ message: "Ticket not found" });
-      broadcastToOU(ticket.ouId, { type: 'ticket_status_updated', data: ticket });
-      res.json(ticket);
-    } catch (error) {
-      console.error("Error scheduling departure:", error);
-      res.status(500).json({ message: "Failed to schedule departure" });
-    }
+  // Automatic completion is retired. Staff must confirm actual departures.
+  app.post('/api/staff/tickets/:ticketNumber/schedule-departure', isAuthenticated, requireStandardAdmin, (_req, res) => {
+    res.status(410).json({ message: "Automatic departure is disabled. Schedule a pickup reminder and confirm departure manually." });
   });
 
   // Cancel a scheduled departure
@@ -3033,102 +3013,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Background ticket schedulers are opt-in because they query Neon on a timer.
-  // If left enabled while the app is unused, they prevent Neon from auto-idling.
-  const enableValetBackgroundJobs = process.env.ENABLE_VALET_BACKGROUND_JOBS === 'true';
-
-  if (enableValetBackgroundJobs) {
-    console.log('[Background Jobs] ENABLE_VALET_BACKGROUND_JOBS=true; scheduled ticket pollers enabled');
-
-    // Auto-close tickets whose scheduledDepartureAt has passed.
-    setInterval(async () => {
-      try {
-        const due = await storage.getDueScheduledDepartures();
-        for (const ticket of due) {
-          const now = new Date();
-
-          // Simulate full SLA retrieval process: random 5–8 min total
-          const totalSLASec = Math.floor(Math.random() * (480 - 300 + 1)) + 300; // 300–480 s
-          // Split into 3 stages (retrieving, transit, preparing) with random proportions
-          const r1 = Math.random(), r2 = Math.random(), r3 = Math.random();
-          const sum = r1 + r2 + r3;
-          const retrievingSec = Math.round((r1 / sum) * totalSLASec);
-          const transitSec    = Math.round((r2 / sum) * totalSLASec);
-          const preparingSec  = totalSLASec - retrievingSec - transitSec;
-
-          const retrievalStartedAt = new Date(now.getTime() - totalSLASec * 1000);
-          const transitAt          = new Date(retrievalStartedAt.getTime() + retrievingSec * 1000);
-          const preparingAt        = new Date(transitAt.getTime() + transitSec * 1000);
-          const retrievalReadyAt   = new Date(preparingAt.getTime() + preparingSec * 1000);
-
-          // Mark completed (sets status, departedAt, totalStaySeconds)
-          let updated = await storage.updateValetTicketStatus(ticket.ticketNumber, 'completed');
-          if (!updated) continue;
-
-          // Overlay simulated SLA fields
-          const depCategory = (ticket.visitorType === 'restaurant' || ticket.visitorType === 'event' || ticket.visitorType === 'others') ? 'events' : 'departing';
-          updated = await storage.updateValetTicket(ticket.ticketNumber, {
-            rosterCategory: depCategory,
-            inRoster: true,
-            scheduledDepartureAt: null,
-            retrievalStartedAt,
-            retrievalReadyAt,
-            retrievalDurationSeconds: totalSLASec,
-          }) ?? updated;
-
-          broadcastToOU(updated.ouId, { type: 'ticket_status_updated', data: updated });
-          console.log(`[Auto-Close] Ticket ${ticket.ticketNumber} departed — simulated SLA ${Math.round(totalSLASec/60)}m (retrieving ${retrievingSec}s / transit ${transitSec}s / preparing ${preparingSec}s)`);
-        }
-      } catch (e) {
-        console.error('[Auto-Close] Error processing scheduled departures:', e);
-      }
-    }, 5 * 60 * 1000);
-  } else {
-    console.log('[Background Jobs] Scheduled ticket pollers disabled; set ENABLE_VALET_BACKGROUND_JOBS=true to enable');
-  }
-
-  // ── 15-minute pre-alert for scheduled retrievals ─────────────────────────────
-  // Maps ticketNumber → ISO scheduledAt string at time of last alert.
-  // Using a Map (not a Set) lets us re-alert when a ticket is rescheduled to a
-  // different time, and prune entries once they leave the upcoming window.
-  const scheduleAlertedMap = new Map<string, string>();
-
-  if (enableValetBackgroundJobs) {
-    setInterval(async () => {
-      try {
-        const upcoming = await storage.getUpcomingScheduledRetrievals(15);
-        const upcomingNumbers = new Set(upcoming.map(t => t.ticketNumber));
-
-        // Prune entries that are no longer in the upcoming window (ticket retrieved,
-        // schedule cleared, past due, or status changed to non-active).
-        for (const tn of [...scheduleAlertedMap.keys()]) {
-          if (!upcomingNumbers.has(tn)) scheduleAlertedMap.delete(tn);
-        }
-
-        for (const ticket of upcoming) {
-          const isoTime = ticket.scheduledRetrievalAt instanceof Date
-            ? ticket.scheduledRetrievalAt.toISOString()
-            : String(ticket.scheduledRetrievalAt);
-          // Skip if we already fired an alert for this exact scheduled time.
-          // If the time changed (rescheduled), the stored value won't match → re-alert.
-          if (scheduleAlertedMap.get(ticket.ticketNumber) === isoTime) continue;
-          scheduleAlertedMap.set(ticket.ticketNumber, isoTime);
-          broadcastToOU(ticket.ouId, {
-            type: 'schedule_alert',
-            data: {
-              ticketNumber: ticket.ticketNumber,
-              guestName: ticket.guestName,
-              scheduledAt: isoTime,
-              ouId: ticket.ouId,
-              locationId: ticket.locationId,
-            },
-          });
-          console.log(`[Schedule Alert] Fired 15-min pre-alert for ticket ${ticket.ticketNumber}`);
-        }
-      } catch (e) {
-        console.error('[Schedule Alert] Error checking upcoming retrievals:', e);
-      }
+  // Staff reminders only. Departures remain manual; no simulated SLA metrics.
+  // No database polling when no authenticated staff websocket is connected.
+  const pollScheduledReminders = createScheduledReminderPoller({
+    listeners: () => [...clients.keys()].filter(client => client.readyState === WebSocket.OPEN),
+    mayReceive: (client, ticket) => {
+      const info = clients.get(client);
+      if (!info) return false;
+      if (info.role === 'superadmin') return true;
+      return !!ticket.ouId && info.ouId === ticket.ouId &&
+        (info.scopedLocationIds === undefined ||
+          (!!ticket.locationId && info.scopedLocationIds.includes(ticket.locationId)));
+    },
+    upcoming: () => storage.getUpcomingScheduledRetrievals(15),
+    send: (client, ticket, scheduledAt) => client.send(JSON.stringify({
+      type: 'schedule_alert',
+      data: { ticketNumber: ticket.ticketNumber, guestName: ticket.guestName,
+        scheduledAt, ouId: ticket.ouId, locationId: ticket.locationId },
+    })),
+  });
+  if (process.env.ENABLE_VALET_BACKGROUND_JOBS === 'true') {
+    const reminderTimer = setInterval(() => {
+      void pollScheduledReminders().catch(error => console.error('[Schedule Alert] Reminder check failed:', error));
     }, 2 * 60 * 1000);
+    reminderTimer.unref();
+    httpServer.once('close', () => clearInterval(reminderTimer));
+    console.log('[Background Jobs] Staff reminders enabled; departures require staff confirmation');
+  } else {
+    console.log('[Background Jobs] Staff reminders disabled');
   }
 
   // Event types that carry ticket data and must respect per-location restrictions.
@@ -3351,8 +3263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const level1Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-      const level2Count = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      const level1Count: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+      const level2Count: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
       for (const f of findings) {
         if (f.level === 1) level1Count[f.severity]++;
         else level2Count[f.severity]++;

@@ -98,7 +98,7 @@ export function FileTree({ onSelectFile, selectedPath }: FileTreeProps) {
           value={search}
           onChange={e => {
             setSearch(e.target.value);
-            if (e.target.value) setExpanded(new Set(tree.flatMap(n => n.type === 'directory' ? [n.path, ...(n.children || [])] : [])));
+            if (e.target.value) setExpanded(new Set(tree.flatMap(n => n.type === 'directory' ? [n.path, ...(n.children || []).filter(child => child.type === 'directory').map(child => child.path)] : [])));
           }}
           placeholder="Filter files..."
           className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-blue-600"
