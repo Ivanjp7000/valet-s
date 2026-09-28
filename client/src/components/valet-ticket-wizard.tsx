@@ -1737,7 +1737,7 @@ export function ValetTicketWizard({ isOpen, onClose, user, workingOUId }: ValetT
                             console.error('Plate OCR failed:', err);
                             toast({
                               title: "Plate scan failed",
-                              description: "Could not read the plate — please type it manually.",
+                              description: err instanceof Error ? err.message : "Could not read the plate — please type it manually.",
                               variant: "destructive",
                             });
                           } finally {

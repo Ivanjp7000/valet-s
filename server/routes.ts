@@ -2795,7 +2795,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const base64Data = imageBase64.replace(/^data:[^;]+;base64,/, '');
 
       const visionUrl =
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
+        'https://vision.googleapis.com/v1/images:annotate';
 
       const body = {
         requests: [
@@ -2811,19 +2811,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const response = await fetch(visionUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey },
         body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         const errText = await response.text();
         console.error('[Vision API] error:', errText);
-        return res.status(502).json({ message: 'Vision API request failed', detail: errText });
+        return res.status(502).json({ message: 'Plate-reading service unavailable' });
       }
 
       const json = (await response.json()) as any;
+      if (json.responses?.[0]?.error) {
+        console.error('[Vision API] image error code:', json.responses[0].error.code);
+        return res.status(502).json({ message: 'Plate-reading service could not process this image' });
+      }
       const annotation = json.responses?.[0]?.textAnnotations?.[0];
-      const text: string = annotation?.description ?? '';
+      const text: string = json.responses?.[0]?.fullTextAnnotation?.text ?? annotation?.description ?? '';
 
       return res.json({ text });
     } catch (err: any) {

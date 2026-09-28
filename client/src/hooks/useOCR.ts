@@ -1,3 +1,4 @@
+import { requestPlateRecognition } from '@/lib/plate-ocr';
 import { useCallback } from 'react';
 import Tesseract from 'tesseract.js';
 
@@ -40,31 +41,7 @@ export function useOCR() {
     []
   );
 
-  /**
-   * Plate recognition via Google Cloud Vision (server-side).
-   * Sends the enhanced plate image as a base64 data URL to /api/ocr/plate.
-   * Falls back to an empty string on error so the caller can show a toast.
-   */
-  const recognizePlate = useCallback(
-    async (imageDataUrl: string): Promise<string> => {
-      const response = await fetch('/api/ocr/plate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: imageDataUrl }),
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.message ?? `OCR request failed (${response.status})`);
-      }
-
-      const { text } = (await response.json()) as { text: string };
-      console.log('[Vision OCR] raw text:', JSON.stringify(text));
-      return text;
-    },
-    []
-  );
+  const recognizePlate = useCallback(requestPlateRecognition, []);
 
   return { recognizeText, recognizePlate };
 }
