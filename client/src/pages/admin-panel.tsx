@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { InternalsPanel } from "@/components/internals-panel";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1225,7 +1226,7 @@ export default function AdminPanel() {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
-            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-8' : 'sm:grid-cols-5'}`}>
+            <TabsList className={`inline-flex w-auto min-w-full sm:grid sm:w-full ${isSuperAdmin ? 'sm:grid-cols-9' : 'sm:grid-cols-5'}`}>
               {isSuperAdmin && (
                 <TabsTrigger value="ous" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-ous">
                   <Building size={14} />
@@ -1261,6 +1262,12 @@ export default function AdminPanel() {
                 <BarChart2 size={14} />
                 <span>Reports</span>
               </TabsTrigger>
+              {isSuperAdmin && (
+                <TabsTrigger value="internals" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-internals">
+                  <Settings size={14} />
+                  <span>Internals</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="backup" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap" data-testid="tab-backup">
                 <Database size={14} />
                 <span>Backup</span>
@@ -2078,6 +2085,12 @@ export default function AdminPanel() {
               );
             })()}
           </TabsContent>
+
+          {isSuperAdmin && (
+            <TabsContent value="internals" className="space-y-6">
+              <InternalsPanel />
+            </TabsContent>
+          )}
 
           {/* Backup Tab */}
           <TabsContent value="backup" className="space-y-6">
