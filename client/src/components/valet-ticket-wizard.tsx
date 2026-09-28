@@ -424,7 +424,7 @@ async function processPlateImage(dataUrl: string): Promise<string> {
  */
 function extractJapanesePlate(raw: string): string {
   // Normalise: collapse whitespace, remove newlines
-  const text = raw.replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const text = raw.normalize('NFKC').replace(/(\d)[-‐‑–—−ー](?=\d)/g, '$1').replace(/[\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
   // ── Pattern match ────────────────────────────────────────────────────────
   // CJK kanji (area name) + digits (class) + hiragana + digits (serial)

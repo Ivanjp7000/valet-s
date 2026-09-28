@@ -4,6 +4,7 @@ export async function uploadPhoto(blob: Blob): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contentType: blob.type, size: blob.size }),
   });
+  if (request.status === 401) throw new Error('Your sign-in has expired. Sign in again before saving this ticket.');
   if (!request.ok) {
     const body = await request.json().catch(()=>null);
     throw new Error(body?.message || 'Could not prepare photo upload');
