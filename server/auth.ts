@@ -44,6 +44,8 @@ export function getSession() {
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
+  // Older open browser tabs may still use the former hosted-auth entry point.
+  app.get("/api/login", (_req, res) => res.redirect(302, "/staff"));
 }
 
 export const isAuthenticated: RequestHandler = async (req: any, res, next) => {

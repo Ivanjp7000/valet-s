@@ -913,7 +913,7 @@ export default function AdminPanel() {
   const handleError = (error: any, defaultMsg: string) => {
     if (isUnauthorizedError(error)) {
       toast({ title: "Unauthorized", description: "Session expired. Redirecting...", variant: "destructive" });
-      setTimeout(() => { window.location.href = "/api/login"; }, 500);
+      setTimeout(() => { window.location.href = "/admin"; }, 500);
       return;
     }
     // Try to extract detailed error message from response

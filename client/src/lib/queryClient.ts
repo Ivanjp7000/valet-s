@@ -1,10 +1,15 @@
+import { HttpError } from "./authUtils";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
-  if (res.status === 401) throw new Error('Your sign-in has expired. Sign in again and retry.');
+  if (res.status === 401) {
+    // A failed refetch otherwise leaves the last successful user in React Query.
+    queryClient.setQueryData(["/api/auth/user"], null);
+    throw new HttpError(401, 'Your sign-in has expired. Sign in again and retry.');
+  }
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    throw new HttpError(res.status, `${res.status}: ${text}`);
   }
 }
 

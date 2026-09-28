@@ -1426,7 +1426,7 @@ export default function StaffDashboard() {
           description: "You are logged out. Logging in again...",
           variant: "destructive",
         });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = "/staff"; }, 500);
         return;
       }
       toast({ title: "Error", description: "Failed to add user", variant: "destructive" });
@@ -1534,7 +1534,7 @@ export default function StaffDashboard() {
     onError: (error: any) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = "/staff"; }, 500);
         return;
       }
       let msg = "Failed to update ticket";
@@ -1577,7 +1577,7 @@ export default function StaffDashboard() {
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = "/staff"; }, 500);
         return;
       }
       toast({ title: "Error", description: "Failed to delete ticket", variant: "destructive" });
@@ -1598,7 +1598,7 @@ export default function StaffDashboard() {
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({ title: "Unauthorized", description: "Session expired", variant: "destructive" });
-        setTimeout(() => { window.location.href = "/api/login"; }, 500);
+        setTimeout(() => { window.location.href = "/staff"; }, 500);
         return;
       }
       toast({ title: "Error", description: "Failed to archive ticket", variant: "destructive" });
