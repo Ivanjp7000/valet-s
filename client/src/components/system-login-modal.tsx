@@ -40,6 +40,12 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
     }
   };
 
+  const finishLogin = async () => {
+    const response = await fetch('/api/auth/user', { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) throw new Error('Your browser could not keep the sign-in session. Allow cookies for this app and try again.');
+    window.location.href = '/staff';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -52,7 +58,7 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
         setPendingEmail(data.email || "");
         setOtpStep(true);
       } else {
-        window.location.href = "/";
+        await finishLogin();
       }
     } catch (err: any) {
       setError(err.message || "Invalid credentials. Please check username and password.");
@@ -69,7 +75,7 @@ export function SystemLoginModal({ onClose }: SystemLoginModalProps) {
     setIsLoading(true);
     try {
       await apiRequest("POST", "/api/auth/verify-otp", { userId: pendingUserId, code });
-      window.location.href = "/";
+      await finishLogin();
     } catch (err: any) {
       setError(err.message || "Invalid or expired code. Please try again.");
       setOtp(["", "", "", "", "", ""]);

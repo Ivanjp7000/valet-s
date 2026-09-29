@@ -35,7 +35,8 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      partitioned: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
     },
   });
@@ -43,6 +44,22 @@ export function getSession() {
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
+  app.use((req, res, next) => {
+    if (process.env.NODE_ENV === 'production') {
+      // Only the owner's Studio may embed authenticated production screens.
+      res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://studio-production-cb90.up.railway.app");
+      // SameSite=None requires explicit browser-origin checks on mutations.
+      // Requests made inside the iframe still originate from the Valet app.
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+        const origin = req.get('origin');
+        const ownOrigin = `${req.protocol}://${req.get('host')}`;
+        if ((origin && origin !== ownOrigin) || (!origin && ['cross-site', 'same-site'].includes(req.get('sec-fetch-site') || ''))) {
+          return res.status(403).json({ message: 'Request origin is not allowed' });
+        }
+      }
+    }
+    next();
+  });
   app.use(getSession());
   // Older open browser tabs may still use the former hosted-auth entry point.
   app.get("/api/login", (_req, res) => res.redirect(302, "/staff"));

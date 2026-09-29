@@ -573,6 +573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sameSite: 'lax',
       path: '/',
     });
+    if (process.env.NODE_ENV === 'production') res.clearCookie('connect.sid', {
+      httpOnly: true, secure: true, sameSite: 'none', partitioned: true, path: '/',
+    });
   }
 
   function destroySession(req: any, res: any, done: (error?: Error) => void) {
@@ -2740,6 +2743,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const sessionParser = (await import('./auth')).getSession();
 
   wss.on('connection', (ws, request: any) => {
+    if (process.env.NODE_ENV === 'production' && request.headers.origin &&
+        request.headers.origin !== `https://${request.headers.host}`) {
+      ws.close(1008, 'Request origin is not allowed');
+      return;
+    }
     // Validate session before accepting the WebSocket connection
     sessionParser(request, {} as any, async () => {
       const localUserId = request.session?.user?.claims?.sub;
