@@ -1,0 +1,23 @@
+name: Release checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:photos
+      - run: npm run test:reminders
+      - run: npx --no-install tsx server/login-redirect.test.ts
+      - run: npx --no-install tsx server/session.test.ts
+      - run: npm run build
