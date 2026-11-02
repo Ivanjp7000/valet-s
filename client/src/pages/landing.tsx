@@ -68,10 +68,9 @@ export default function Landing() {
     setIsLoading(true);
     setNameError("");
     try {
-      const params = new URLSearchParams();
-      if (guestNameInput.trim()) params.set("name", guestNameInput.trim());
-      if (pinTrimmed) params.set("pin", pinTrimmed);
-      const response = await fetch(`/api/tickets/${ticketNumber}?${params.toString()}`);
+      const response = await fetch(`/api/tickets/${encodeURIComponent(ticketNumber)}`, {
+        headers: { "X-Ticket-PIN": pinTrimmed },
+      });
       if (!response.ok) {
         if (response.status === 429) {
           toast({
