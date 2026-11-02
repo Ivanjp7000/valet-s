@@ -5,6 +5,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { installWebSocketHeartbeat } from "./websocket-heartbeat.mjs";
 import { clearLogoutSessionCookies, isAllowedWebSocketOrigin } from "./websocket-security.mjs";
+import { refreshUserLocationScopeSockets } from "./websocket-scope-refresh.mjs";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -2239,6 +2240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const scope = await storage.addUserLocationScope({ userId, locationId });
+      refreshUserLocationScopeSockets(clients, userId, WebSocket.OPEN);
       res.json(scope);
     } catch (error) {
       console.error("Error adding user location scope:", error);
@@ -2263,6 +2265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.removeUserLocationScope(userId, locationId);
+      refreshUserLocationScopeSockets(clients, userId, WebSocket.OPEN);
       res.json({ message: "Location scope removed successfully" });
     } catch (error) {
       console.error("Error removing user location scope:", error);
@@ -2734,7 +2737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const stopWebSocketHeartbeat = installWebSocketHeartbeat(wss);
   httpServer.once('close', stopWebSocketHeartbeat);
   // scopedLocationIds: undefined = no location restriction; string[] = restricted to those locations (may be empty)
-  interface ClientInfo { ouId: string | null; role: string; scopedLocationIds?: string[]; }
+  interface ClientInfo { userId: string; ouId: string | null; role: string; scopedLocationIds?: string[]; }
   const clients = new Map<WebSocket, ClientInfo>();
   const sessionParser = (await import('./auth')).getSession();
 
@@ -2763,7 +2766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Load location restrictions so broadcastToOU can filter ticket events
       const scopedLocationIds = await getUserScopedLocationIds(user) ?? undefined;
-      clients.set(ws, { ouId: user.ouId ?? null, role: user.role, scopedLocationIds });
+      clients.set(ws, { userId: String(userId), ouId: user.ouId ?? null, role: user.role, scopedLocationIds });
       console.log('Authenticated client connected to WebSocket');
 
       ws.on('close', () => {
