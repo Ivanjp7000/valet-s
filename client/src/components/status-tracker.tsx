@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles, CalendarClock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ValetTicket } from "@shared/schema";
-import { createPublicTicketEventGeneration, createSingleFlightRefresh, isPublicTicketStreamDisabledResponse, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, publicTicketVisibilityAction, PUBLIC_TICKET_STREAM_RECONCILE_MS } from "@/lib/public-ticket-stream-policy.mjs";
+import { createPublicTicketEventGeneration, createSingleFlightRefresh, isPublicTicketStreamDisabledResponse, publicTicketConnectedAfterVisibilityPause, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, publicTicketVisibilityAction, PUBLIC_TICKET_STREAM_RECONCILE_MS } from "@/lib/public-ticket-stream-policy.mjs";
 import { consumePublicTicketStream } from "@/lib/public-ticket-stream-client.mjs";
 import { buildPublicTicketStreamRequest } from "@/lib/public-ticket-stream-request.mjs";
 
@@ -306,7 +306,7 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
       const action = publicTicketVisibilityAction({ hidden: document.hidden, streamUnavailable: streamUnavailableRef.current });
       if (action === "pause") {
         closeStream();
-        setStreamConnected(true);
+        setConnected(publicTicketConnectedAfterVisibilityPause({ streamUnavailable: streamUnavailableRef.current }));
       } else if (action === "refresh") {
         void refreshTicketRef.current?.();
       } else {

@@ -27,6 +27,10 @@ export function publicTicketVisibilityAction({ hidden, streamUnavailable }) {
   return streamUnavailable ? "refresh" : "connect";
 }
 
+export function publicTicketConnectedAfterVisibilityPause({ streamUnavailable }) {
+  return !streamUnavailable;
+}
+
 export function createSingleFlightRefresh(refresh) {
   let inFlight = null;
   return () => {

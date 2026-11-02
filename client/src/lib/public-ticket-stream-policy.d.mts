@@ -9,6 +9,7 @@ export function publicTicketQueryEnabled(options: {
 export function publicTicketLookupRevokesAccess(status?: number): boolean;
 export function isPublicTicketStreamDisabledResponse(status?: number, headerValue?: string | null): boolean;
 export function publicTicketVisibilityAction(options: { hidden: boolean; streamUnavailable: boolean }): "pause" | "refresh" | "connect";
+export function publicTicketConnectedAfterVisibilityPause(options: { streamUnavailable: boolean }): boolean;
 export function createSingleFlightRefresh(refresh: () => Promise<unknown>): () => Promise<unknown>;
 export function createPublicTicketEventGeneration(): {
   next(): number;
