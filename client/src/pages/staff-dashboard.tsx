@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { shouldRefreshGuestServicesCount, shouldRefreshStaffTicketData } from "@/lib/realtime-event-policy.mjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -951,6 +952,7 @@ export default function StaffDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { lastMessage, isConnected } = useWebSocket();
 
   // Standard User has read-only access - cannot create/edit/delete
   const canEdit = user?.role !== 'standard_user';
@@ -979,7 +981,11 @@ export default function StaffDashboard() {
       const msgs: { status: string }[] = await res.json();
       return msgs.filter(m => m.status === "open").length;
     },
-    refetchInterval: 15000,
+    // Guest Services events invalidate this count as they arrive. Poll only
+    // during socket outages, and never keep a hidden dashboard polling Neon.
+    refetchInterval: isConnected ? false : 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
   const [rosterTab, setRosterTab] = useState<'arriving' | 'departing' | 'events' | 'others'>('arriving');
   const [rosterDate, setRosterDate] = useState<Date>(new Date());
@@ -1190,17 +1196,25 @@ export default function StaffDashboard() {
   // Retrieval queue notifications
   const [retrievalRequests, setRetrievalRequests] = useState<RetrievalRequest[]>([]);
 
-  // WebSocket connection for real-time updates
-  const { lastMessage } = useWebSocket();
-
-  const { data: activeTickets, isLoading: ticketsLoading } = useQuery<ValetTicket[]>({
+  const { data: activeTickets, isLoading: ticketsLoading, isFetching: ticketsRefreshing, dataUpdatedAt: ticketsCheckedAt, refetch: refetchActiveTickets } = useQuery<ValetTicket[]>({
     queryKey: ["/api/staff/tickets"],
-    refetchInterval: 20000,
+    // WebSocket events invalidate this queue immediately. Poll only as a
+    // recovery path while disconnected; reconnection triggers an immediate sync.
+    refetchInterval: isConnected ? false : 30_000,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     staleTime: 10000,
   });
 
-  const { data: stats, isLoading: statsLoading } = useQuery<{
+  useEffect(() => {
+    if (!isConnected) return;
+    // Reconcile once on reconnect so changes made while offline are not missed.
+    void queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/gs/messages/open-count"] });
+  }, [isConnected, queryClient]);
+
+  const { data: stats, isLoading: statsLoading, refetch: refetchStaffStats } = useQuery<{
     pending: number;
     transit: number;
     ready: number;
@@ -1208,7 +1222,9 @@ export default function StaffDashboard() {
     avgTime: string;
   }>({
     queryKey: ["/api/staff/stats"],
-    refetchInterval: 30000,
+    refetchInterval: isConnected ? false : 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
     staleTime: 0,
   });
 
@@ -1618,9 +1634,11 @@ export default function StaffDashboard() {
     if (lastMessage) {
       try {
         const data = JSON.parse(lastMessage);
-        if (data.type === 'ticket_created' || data.type === 'ticket_status_updated' || data.type === 'status_updated' || data.type === 'retrieval_accepted') {
+        if (shouldRefreshStaffTicketData(data.type)) {
           queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
           queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+        }
+        if (data.type === 'ticket_created' || data.type === 'ticket_status_updated' || data.type === 'status_updated' || data.type === 'retrieval_accepted') {
           // Dismiss schedule alerts globally when the ticket is no longer active
           if (data.type === 'ticket_status_updated' || data.type === 'status_updated') {
             const updatedTicket = data.data;
@@ -1697,10 +1715,13 @@ export default function StaffDashboard() {
           queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
           queryClient.invalidateQueries({ queryKey: ['/api/admin/new-stregis-accounts'] });
         }
-        if (['gs_message', 'gs_reply', 'gs_event_created', 'gs_event_updated', 'gs_event_deleted', 'gs_acknowledged', 'gs_member_added', 'gs_member_removed'].includes(data.type)) {
+        if (['gs_message', 'gs_message_updated', 'gs_message_deleted', 'gs_reply', 'gs_event_created', 'gs_event_updated', 'gs_event_deleted', 'gs_acknowledged', 'gs_member_added', 'gs_member_removed'].includes(data.type)) {
           queryClient.invalidateQueries({ queryKey: ["/api/gs/messages"] });
           queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
           queryClient.invalidateQueries({ queryKey: ["/api/gs/members/me"] });
+        }
+        if (shouldRefreshGuestServicesCount(data.type)) {
+          queryClient.invalidateQueries({ queryKey: ["/api/gs/messages/open-count"] });
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
@@ -2141,7 +2162,13 @@ export default function StaffDashboard() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
-            {/* ── Persistent Retrieval Requests Banner (poll-based, never missed) ── */}
+            <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+              <span>{ticketsCheckedAt ? `Last checked ${new Date(ticketsCheckedAt).toLocaleTimeString()}` : "Waiting for first check"}</span>
+              <Button size="sm" variant="outline" onClick={() => { void refetchActiveTickets(); void refetchStaffStats(); }} disabled={ticketsRefreshing}>
+                {ticketsRefreshing ? "Checking…" : "Check now"}
+              </Button>
+            </div>
+            {/* WebSocket updates are immediate; the timed refresh is a recovery fallback. */}
             {(() => {
               const pendingRetrievals = activeTickets?.filter(t => t.status === 'retrieval_requested') ?? [];
               if (pendingRetrievals.length === 0) return null;
