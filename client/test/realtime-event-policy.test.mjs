@@ -57,6 +57,7 @@ test("ticket mutations and retrieval queue events refresh staff list and counts"
     "ticket_created", "ticket_updated", "ticket_deleted", "ticket_archived",
     "ticket_details_updated", "ticket_status_updated", "ticket_scheduled",
     "retrieval_requested", "retrieval_cancelled", "retrieval_accepted", "status_updated",
+    "location_scope_changed",
   ]) assert.equal(shouldRefreshStaffTicketData(type), true, type);
   assert.equal(shouldRefreshStaffTicketData("gs_message"), false);
 });
