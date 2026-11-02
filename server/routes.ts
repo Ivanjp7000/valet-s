@@ -3,6 +3,7 @@ import { registerPhotoRoutes } from "./photo-routes";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { installWebSocketHeartbeat } from "./websocket-heartbeat.mjs";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -572,9 +573,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-    });
-    if (process.env.NODE_ENV === 'production') res.clearCookie('connect.sid', {
-      httpOnly: true, secure: true, sameSite: 'none', partitioned: true, path: '/',
     });
   }
 
@@ -2737,17 +2735,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const stopWebSocketHeartbeat = installWebSocketHeartbeat(wss);
+  httpServer.once('close', stopWebSocketHeartbeat);
   // scopedLocationIds: undefined = no location restriction; string[] = restricted to those locations (may be empty)
   interface ClientInfo { ouId: string | null; role: string; scopedLocationIds?: string[]; }
   const clients = new Map<WebSocket, ClientInfo>();
   const sessionParser = (await import('./auth')).getSession();
 
   wss.on('connection', (ws, request: any) => {
-    if (process.env.NODE_ENV === 'production' && request.headers.origin &&
-        request.headers.origin !== `https://${request.headers.host}`) {
-      ws.close(1008, 'Request origin is not allowed');
-      return;
-    }
     // Validate session before accepting the WebSocket connection
     sessionParser(request, {} as any, async () => {
       const localUserId = request.session?.user?.claims?.sub;

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { shouldRefreshStatusTicket } from "@/lib/realtime-event-policy.mjs";
 import { Button } from "@/components/ui/button";
 import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles, CalendarClock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -37,7 +35,6 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editSaving, setEditSaving] = useState(false);
-  const { lastMessage, isConnected } = useWebSocket();
   const queryClient = useQueryClient();
 
   const handleCancelSchedule = async () => {
@@ -102,34 +99,18 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
-    refetchInterval: query => query.state.data?.status === "completed" || isConnected ? false : 30_000,
-    // WebSocket status events are immediate. Poll only as a recovery path when
-    // disconnected, and pause in hidden tabs so Neon can scale to zero.
+    refetchInterval: query => query.state.data?.status === "completed" ? false : 30_000,
+    // Public status pages are not authorized for the staff WebSocket. Poll as
+    // a visible-page fallback and pause while hidden to reduce idle database reads.
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     retry: false,
     placeholderData: (prev) => prev, // always show last known status while refetching
   });
 
-  useEffect(() => {
-    if (!isConnected) return;
-    void queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticketNumber, guestName, guestPin ?? ""] });
-  }, [isConnected, queryClient, ticketNumber, guestName, guestPin]);
-
   const currentStage = ticket ? getStageFromStatus(ticket.status) : -1;
   const isReady = ticket?.status === "ready";
   const isActive = currentStage >= 0;
-
-  // Immediately refetch when a WebSocket update arrives for this ticket
-  useEffect(() => {
-    if (!lastMessage) return;
-    try {
-      const message = JSON.parse(lastMessage);
-      if (shouldRefreshStatusTicket(message.type, message.data, ticketNumber)) {
-        queryClient.invalidateQueries({ queryKey });
-      }
-    } catch {}
-  }, [lastMessage, ticketNumber, queryClient]);
 
   // Sync timer with DB stageStartedAt when status changes
   useEffect(() => {
@@ -601,7 +582,7 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
           })()}
 
           <div className="flex items-center justify-center gap-3 text-xs text-gray-400 mt-4">
-            <span>{dataUpdatedAt ? `Checked ${new Date(dataUpdatedAt).toLocaleTimeString()}` : "Waiting for first check"} · Updates automatically</span>
+            <span>{dataUpdatedAt ? `Checked ${new Date(dataUpdatedAt).toLocaleTimeString()}` : "Waiting for first check"} · Checks every 30 seconds while visible</span>
             <Button variant="ghost" size="sm" onClick={() => void refetch()} disabled={isFetching} className="h-7 px-2 text-xs">
               {isFetching ? "Checking…" : "Check now"}
             </Button>

@@ -1,9 +1,9 @@
 import { guestQrDataUrl } from "@/lib/guest-qr";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { shouldRefreshGuestServicesCount, shouldRefreshStaffTicketData } from "@/lib/realtime-event-policy.mjs";
+import { createRealtimeInvalidationQueue, shouldFetchRealtimeUpdate, shouldRefreshGuestServicesCount, shouldRefreshStaffTicketData } from "@/lib/realtime-event-policy.mjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -953,6 +953,8 @@ export default function StaffDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { lastMessage, isConnected } = useWebSocket();
+  const realtimeInvalidator = useMemo(() => createRealtimeInvalidationQueue(queryClient, () => document.visibilityState), [queryClient]);
+  const invalidateRealtimeQuery = useCallback((queryKey: unknown[]) => realtimeInvalidator.invalidate(queryKey), [realtimeInvalidator]);
 
   // Standard User has read-only access - cannot create/edit/delete
   const canEdit = user?.role !== 'standard_user';
@@ -1209,10 +1211,23 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (!isConnected) return;
     // Reconcile once on reconnect so changes made while offline are not missed.
-    void queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/gs/messages/open-count"] });
-  }, [isConnected, queryClient]);
+    invalidateRealtimeQuery(["/api/staff/tickets"]);
+    invalidateRealtimeQuery(["/api/staff/stats"]);
+    invalidateRealtimeQuery(["/api/gs/messages/open-count"]);
+  }, [isConnected, invalidateRealtimeQuery]);
+
+  useEffect(() => {
+    const reconcileWhenVisible = () => {
+      if (!shouldFetchRealtimeUpdate(document.visibilityState)) return;
+      invalidateRealtimeQuery(["/api/staff/tickets"]);
+      invalidateRealtimeQuery(["/api/staff/stats"]);
+      invalidateRealtimeQuery(["/api/gs/messages/open-count"]);
+    };
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
+    return () => document.removeEventListener("visibilitychange", reconcileWhenVisible);
+  }, [invalidateRealtimeQuery]);
+
+  useEffect(() => () => realtimeInvalidator.dispose(), [realtimeInvalidator]);
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStaffStats } = useQuery<{
     pending: number;
@@ -1635,8 +1650,8 @@ export default function StaffDashboard() {
       try {
         const data = JSON.parse(lastMessage);
         if (shouldRefreshStaffTicketData(data.type)) {
-          queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+          invalidateRealtimeQuery(["/api/staff/tickets"]);
+          invalidateRealtimeQuery(["/api/staff/stats"]);
         }
         if (data.type === 'ticket_created' || data.type === 'ticket_status_updated' || data.type === 'status_updated' || data.type === 'retrieval_accepted') {
           // Dismiss schedule alerts globally when the ticket is no longer active
@@ -1665,11 +1680,11 @@ export default function StaffDashboard() {
         if (data.type === 'retrieval_cancelled') {
           const cancelled = data.data;
           setRetrievalRequests(prev => prev.filter(r => r.ticketNumber !== cancelled?.ticketNumber));
-          queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
+          invalidateRealtimeQuery(["/api/staff/tickets"]);
         }
         if (data.type === 'ticket_scheduled') {
-          queryClient.invalidateQueries({ queryKey: ["/api/staff/tickets"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/staff/stats"] });
+          invalidateRealtimeQuery(["/api/staff/tickets"]);
+          invalidateRealtimeQuery(["/api/staff/stats"]);
           const d = data.data;
           if (d?.scheduledAt) {
             toast({
@@ -1712,22 +1727,22 @@ export default function StaffDashboard() {
             duration: 8000,
           });
           // Refresh admin panel lists for Super Admins
-          queryClient.invalidateQueries({ queryKey: ['/api/admin/pending-registrations'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/admin/new-stregis-accounts'] });
+          invalidateRealtimeQuery(['/api/admin/pending-registrations']);
+          invalidateRealtimeQuery(['/api/admin/new-stregis-accounts']);
         }
         if (['gs_message', 'gs_message_updated', 'gs_message_deleted', 'gs_reply', 'gs_event_created', 'gs_event_updated', 'gs_event_deleted', 'gs_acknowledged', 'gs_member_added', 'gs_member_removed'].includes(data.type)) {
-          queryClient.invalidateQueries({ queryKey: ["/api/gs/messages"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/calendar/events"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/gs/members/me"] });
+          invalidateRealtimeQuery(["/api/gs/messages"]);
+          invalidateRealtimeQuery(["/api/calendar/events"]);
+          invalidateRealtimeQuery(["/api/gs/members/me"]);
         }
         if (shouldRefreshGuestServicesCount(data.type)) {
-          queryClient.invalidateQueries({ queryKey: ["/api/gs/messages/open-count"] });
+          invalidateRealtimeQuery(["/api/gs/messages/open-count"]);
         }
       } catch (error) {
         console.error("Error parsing WebSocket message:", error);
       }
     }
-  }, [lastMessage, queryClient, user]);
+  }, [lastMessage, invalidateRealtimeQuery, queryClient, user]);
 
   // Reconcile popup with polled data — shows popup for any retrieval_requested ticket
   // even if the WS event was missed (e.g. page was loading when request arrived)
