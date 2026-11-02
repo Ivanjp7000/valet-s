@@ -1,6 +1,6 @@
 export function shouldRefreshStaffTicketData(type) {
   return typeof type === "string" &&
-    (type.startsWith("ticket_") || type.startsWith("retrieval_") || type === "status_updated");
+    (type.startsWith("ticket_") || type.startsWith("retrieval_") || type === "status_updated" || type === "location_scope_changed");
 }
 
 export function shouldFetchRealtimeUpdate(visibilityState) {
