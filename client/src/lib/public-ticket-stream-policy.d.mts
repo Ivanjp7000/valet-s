@@ -8,6 +8,8 @@ export function publicTicketQueryEnabled(options: {
 }): boolean;
 export function publicTicketLookupRevokesAccess(status?: number): boolean;
 export function isPublicTicketStreamDisabledResponse(status?: number, headerValue?: string | null): boolean;
+export function publicTicketVisibilityAction(options: { hidden: boolean; streamUnavailable: boolean }): "pause" | "refresh" | "connect";
+export function createSingleFlightRefresh(refresh: () => Promise<unknown>): () => Promise<unknown>;
 export function createPublicTicketEventGeneration(): {
   next(): number;
   invalidate(): number;

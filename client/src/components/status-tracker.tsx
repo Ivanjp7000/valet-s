@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles, CalendarClock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ValetTicket } from "@shared/schema";
-import { createPublicTicketEventGeneration, isPublicTicketStreamDisabledResponse, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, PUBLIC_TICKET_STREAM_RECONCILE_MS } from "@/lib/public-ticket-stream-policy.mjs";
+import { createPublicTicketEventGeneration, createSingleFlightRefresh, isPublicTicketStreamDisabledResponse, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, publicTicketVisibilityAction, PUBLIC_TICKET_STREAM_RECONCILE_MS } from "@/lib/public-ticket-stream-policy.mjs";
 import { consumePublicTicketStream } from "@/lib/public-ticket-stream-client.mjs";
 import { buildPublicTicketStreamRequest } from "@/lib/public-ticket-stream-request.mjs";
 
@@ -139,6 +139,13 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     retry: false,
     placeholderData: (prev) => prev, // always show last known status while refetching
   });
+  const refreshTicketRef = useRef<(() => Promise<unknown>) | null>(null);
+  if (refreshTicketRef.current === null) {
+    refreshTicketRef.current = createSingleFlightRefresh(() => {
+      if (queryClient.isFetching({ queryKey, exact: true }) > 0) return Promise.resolve();
+      return refetch();
+    });
+  }
 
   useEffect(() => {
     const status = (error as (Error & { status?: number }) | null)?.status;
@@ -296,9 +303,12 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     };
     const onVisibilityChange = () => {
       setDocumentHidden(document.hidden);
-      if (document.hidden) {
+      const action = publicTicketVisibilityAction({ hidden: document.hidden, streamUnavailable: streamUnavailableRef.current });
+      if (action === "pause") {
         closeStream();
         setStreamConnected(true);
+      } else if (action === "refresh") {
+        void refreshTicketRef.current?.();
       } else {
         openStream();
       }
@@ -306,9 +316,9 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     const onWindowFocus = () => {
       if (document.hidden) return;
       if (streamRef.current) {
-        if (!streamConnectingRef.current) void refetch();
+        if (!streamConnectingRef.current) void refreshTicketRef.current?.();
       }
-      else if (streamUnavailableRef.current) void refetch();
+      else if (streamUnavailableRef.current) void refreshTicketRef.current?.();
       else openStream();
     };
 
@@ -810,7 +820,7 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
               {dataUpdatedAt ? `Checked ${new Date(dataUpdatedAt).toLocaleTimeString()}` : "Waiting for first check"}
               {streamConnected ? " · Live updates with periodic safety checks" : " · Rechecking every 30 seconds while reconnecting"}
             </span>
-            <Button variant="ghost" size="sm" onClick={() => void refetch()} disabled={isFetching} className="h-7 px-2 text-xs">
+            <Button variant="ghost" size="sm" onClick={() => void refreshTicketRef.current?.()} disabled={isFetching} className="h-7 px-2 text-xs">
               {isFetching ? "Checking…" : "Check now"}
             </Button>
           </div>

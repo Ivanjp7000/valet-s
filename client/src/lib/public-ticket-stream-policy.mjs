@@ -22,6 +22,24 @@ export function isPublicTicketStreamDisabledResponse(status, headerValue) {
   return status === 503 && headerValue === "true";
 }
 
+export function publicTicketVisibilityAction({ hidden, streamUnavailable }) {
+  if (hidden) return "pause";
+  return streamUnavailable ? "refresh" : "connect";
+}
+
+export function createSingleFlightRefresh(refresh) {
+  let inFlight = null;
+  return () => {
+    if (inFlight) return inFlight;
+    const current = Promise.resolve().then(refresh);
+    inFlight = current;
+    void current.finally(() => {
+      if (inFlight === current) inFlight = null;
+    }).catch(() => {});
+    return current;
+  };
+}
+
 export function createPublicTicketEventGeneration() {
   let generation = 0;
   return {

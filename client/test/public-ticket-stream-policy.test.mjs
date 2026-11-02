@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createPublicTicketEventGeneration, isPublicTicketStreamDisabledResponse, PUBLIC_TICKET_STREAM_FALLBACK_POLL_MS, PUBLIC_TICKET_STREAM_RECONCILE_MS, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, resolvePublicTicketReconcileMs } from "../src/lib/public-ticket-stream-policy.mjs";
+import { createPublicTicketEventGeneration, createSingleFlightRefresh, isPublicTicketStreamDisabledResponse, PUBLIC_TICKET_STREAM_FALLBACK_POLL_MS, PUBLIC_TICKET_STREAM_RECONCILE_MS, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, publicTicketVisibilityAction, resolvePublicTicketReconcileMs } from "../src/lib/public-ticket-stream-policy.mjs";
 
 test("public tracker reconciles slowly when connected and pauses polling while hidden or terminal", () => {
   assert.equal(publicTicketFallbackPollInterval({ connected: true, hidden: false, status: "active" }), PUBLIC_TICKET_STREAM_RECONCILE_MS);
@@ -48,6 +48,27 @@ test("unknown or multi-replica stream response selects the polling fallback", ()
   assert.equal(isPublicTicketStreamDisabledResponse(503, null), false);
   assert.equal(isPublicTicketStreamDisabledResponse(404, "true"), false);
   assert.equal(publicTicketFallbackPollInterval({ connected: false, hidden: false, status: "active" }), 30_000);
+});
+
+test("hidden return with disabled stream performs one immediate fallback lookup without focus", async () => {
+  let calls = 0;
+  let finish;
+  const refresh = createSingleFlightRefresh(() => {
+    calls += 1;
+    return new Promise(resolve => { finish = resolve; });
+  });
+
+  assert.equal(publicTicketVisibilityAction({ hidden: true, streamUnavailable: true }), "pause");
+  assert.equal(publicTicketVisibilityAction({ hidden: false, streamUnavailable: true }), "refresh");
+  const visibleRefresh = refresh();
+  const simultaneousFocusAndManualRefresh = refresh();
+  assert.strictEqual(simultaneousFocusAndManualRefresh, visibleRefresh);
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  finish();
+  await visibleRefresh;
+
+  assert.equal(publicTicketVisibilityAction({ hidden: false, streamUnavailable: false }), "connect");
 });
 
 test("ticket events queued before credential revocation cannot repopulate removed cache", () => {
