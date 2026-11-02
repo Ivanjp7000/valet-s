@@ -15,6 +15,7 @@ export function installWebSocketHeartbeat(wss, intervalMs = 25_000, schedule = s
         continue;
       }
       alive.delete(socket);
+      socket.send(JSON.stringify({ type: "heartbeat" }));
       socket.ping();
     }
   }, intervalMs);

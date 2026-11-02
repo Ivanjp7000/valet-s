@@ -4,12 +4,24 @@ import {
   shouldRefreshGuestServicesCount,
   shouldRefreshStaffTicketData,
   shouldFetchRealtimeUpdate,
+  closeIfWebSocketHeartbeatStale,
   createRealtimeInvalidationQueue,
 } from "../src/lib/realtime-event-policy.mjs";
 
 test("hidden tabs mark realtime data stale without fetching until visible", () => {
   assert.equal(shouldFetchRealtimeUpdate("hidden"), false);
   assert.equal(shouldFetchRealtimeUpdate("visible"), true);
+});
+
+test("client marks half-open sockets disconnected after the bounded heartbeat timeout", () => {
+  let closes = 0;
+  const check = (now, isOpen = true) => closeIfWebSocketHeartbeatStale({
+    isOpen, lastHeartbeatAt: 1_000, now, onStale: () => { closes += 1; },
+  });
+  assert.equal(check(56_000), false);
+  assert.equal(check(56_001), true);
+  assert.equal(check(56_002, false), false);
+  assert.equal(closes, 1);
 });
 
 test("hidden bursts defer reads and foreground bursts reconcile each query once", () => {
@@ -32,6 +44,11 @@ test("hidden bursts defer reads and foreground bursts reconcile each query once"
   assert.equal(calls.length, 3);
   timerCallback();
   assert.deepEqual(calls.slice(3).map((call) => call.queryKey), [["tickets"], ["stats"]]);
+
+  queue.invalidate(["events"]);
+  visibility = "hidden";
+  timerCallback();
+  assert.deepEqual(calls[5], { queryKey: ["events"], refetchType: "none" });
   queue.dispose();
 });
 

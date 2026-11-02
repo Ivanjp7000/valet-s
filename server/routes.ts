@@ -4,6 +4,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { installWebSocketHeartbeat } from "./websocket-heartbeat.mjs";
+import { clearLogoutSessionCookies, isAllowedWebSocketOrigin } from "./websocket-security.mjs";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -568,12 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   function clearSessionCookie(res: any) {
-    res.clearCookie('connect.sid', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+    clearLogoutSessionCookies(res, process.env.NODE_ENV === 'production');
   }
 
   function destroySession(req: any, res: any, done: (error?: Error) => void) {
@@ -2743,6 +2739,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const sessionParser = (await import('./auth')).getSession();
 
   wss.on('connection', (ws, request: any) => {
+    if (!isAllowedWebSocketOrigin(request.headers.origin, request.headers.host, process.env.NODE_ENV === 'production')) {
+      ws.close(1008, 'Request origin is not allowed');
+      return;
+    }
     // Validate session before accepting the WebSocket connection
     sessionParser(request, {} as any, async () => {
       const localUserId = request.session?.user?.claims?.sub;

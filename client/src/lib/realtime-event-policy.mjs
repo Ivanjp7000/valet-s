@@ -7,6 +7,16 @@ export function shouldFetchRealtimeUpdate(visibilityState) {
   return visibilityState === "visible";
 }
 
+export function isWebSocketHeartbeatStale(lastHeartbeatAt, now, timeoutMs = 55_000) {
+  return !Number.isFinite(lastHeartbeatAt) || now - lastHeartbeatAt > timeoutMs;
+}
+
+export function closeIfWebSocketHeartbeatStale({ isOpen, lastHeartbeatAt, now, timeoutMs = 55_000, onStale }) {
+  if (!isOpen || !isWebSocketHeartbeatStale(lastHeartbeatAt, now, timeoutMs)) return false;
+  onStale();
+  return true;
+}
+
 export function createRealtimeInvalidationQueue(queryClient, getVisibilityState, schedule = setTimeout, cancel = clearTimeout) {
   const pending = new Map();
   let timer = null;
@@ -14,7 +24,8 @@ export function createRealtimeInvalidationQueue(queryClient, getVisibilityState,
     timer = null;
     const keys = [...pending.values()];
     pending.clear();
-    for (const queryKey of keys) void queryClient.invalidateQueries({ queryKey });
+    const refetchType = shouldFetchRealtimeUpdate(getVisibilityState()) ? "active" : "none";
+    for (const queryKey of keys) void queryClient.invalidateQueries({ queryKey, refetchType });
   };
 
   return {
