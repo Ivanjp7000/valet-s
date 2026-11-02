@@ -5,6 +5,12 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { installWebSocketHeartbeat } from "./websocket-heartbeat.mjs";
 import { clearLogoutSessionCookies, isAllowedWebSocketOrigin } from "./websocket-security.mjs";
+import { LOCATION_SCOPE_CHANGED_CLOSE_CODE, getUserLocationScopeGeneration, isUserLocationScopeSnapshotCurrent, refreshUserLocationScopeSockets } from "./websocket-scope-refresh.mjs";
+import { subscribeToPublicTicketChanges } from "./public-ticket-events.mjs";
+import { isPublicTicketAuthorized, toPublicTicketStatus } from "./public-ticket-status.mjs";
+import { publicTicketStreamLimiter } from "./public-ticket-stream-limits.mjs";
+import { isSingleReplicaTicketStreamEnabled } from "./public-ticket-stream-topology.mjs";
+import { servePublicTicketStatusStream } from "./public-ticket-stream.mjs";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -808,19 +814,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public routes (Customer facing)
+  app.get('/api/tickets/:ticketNumber/stream', async (req: any, res) => {
+    if (!isSingleReplicaTicketStreamEnabled(process.env.PUBLIC_TICKET_STREAM_TOPOLOGY)) {
+      res.setHeader('X-Ticket-Stream-Disabled', 'true');
+      return res.status(503).json({ message: "Live ticket stream requires an explicitly confirmed single-replica runtime" });
+    }
+    const { ticketNumber } = req.params;
+    const headerPin = typeof req.headers?.['x-ticket-pin'] === 'string' ? req.headers['x-ticket-pin'] : '';
+    const pinParam = headerPin.trim().toUpperCase();
+    const socketIp = req.socket?.remoteAddress || 'unknown';
+    const connectionIp = req.ip || socketIp;
+    const identityPresent = Boolean(pinParam);
+    const rateLimitAllowed = !identityPresent || (
+      checkRateLimit(`ticket-lookup:${ticketNumber}`, 600, 15 * 60 * 1000) &&
+      checkRateLimit(`ticket-lookup-ip:${socketIp}`, 300, 60 * 1000)
+    );
+    return servePublicTicketStatusStream({
+      ticketNumber,
+      pin: pinParam,
+      identityPresent,
+      req,
+      res,
+      readTicket: (number) => storage.getValetTicket(number),
+      subscribe: subscribeToPublicTicketChanges,
+      rateLimitAllowed,
+      acquireStreamSlot: () => publicTicketStreamLimiter.acquire(ticketNumber, connectionIp),
+    });
+  });
+
   app.get('/api/tickets/:ticketNumber', async (req: any, res) => {
     try {
       const { ticketNumber } = req.params;
       const nameParam = typeof req.query.name === 'string' ? req.query.name.trim() : '';
-      const pinParam = typeof req.query.pin === 'string' ? req.query.pin.trim().toUpperCase() : '';
+      const headerPin = typeof req.headers?.['x-ticket-pin'] === 'string' ? req.headers['x-ticket-pin'] : '';
+      const queryPin = typeof req.query.pin === 'string' ? req.query.pin : '';
+      const pinParam = (headerPin || queryPin).trim().toUpperCase();
 
       // Require name OR pin as a second factor — eliminates validity oracle
       if (!nameParam && !pinParam) {
         return res.status(400).json({ message: "Name or PIN is required" });
       }
 
-      // Rate limit per-ticket — generous limit to allow continuous status polling
-      // (3-second polling = 20/min = 300/15min; 600 gives 30min of headroom)
+      // Rate limit per-ticket. The public tracker normally uses the SSE stream;
+      // this endpoint serves manual checks and the disconnected-stream fallback.
       const socketIp = req.socket?.remoteAddress || 'unknown';
       if (!checkRateLimit(`ticket-lookup:${ticketNumber}`, 600, 15 * 60 * 1000)) {
         return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
@@ -833,13 +869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticket = await storage.getValetTicket(ticketNumber);
 
       // Verify identity: PIN is required for all public ticket access.
-      // Tickets without a stored PIN are inaccessible via public endpoints.
-      let verified = false;
-      if (!ticket || !ticket.guestPin) {
-        verified = false;
-      } else {
-        verified = !!pinParam && pinParam === ticket.guestPin.toUpperCase();
-      }
+      const verified = isPublicTicketAuthorized(ticket, pinParam);
 
       // Return the same 404 whether the ticket doesn't exist or verification fails
       // — prevents enumeration oracle
@@ -847,19 +877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Ticket not found" });
       }
 
-      res.json({
-        ticketNumber: ticket.ticketNumber,
-        status: ticket.status,
-        visitorType: ticket.visitorType,
-        visitorSubType: ticket.visitorSubType,
-        createdAt: ticket.createdAt,
-        stageStartedAt: ticket.stageStartedAt,
-        guestName: ticket.guestName,
-        carMake: ticket.carMake,
-        carModel: ticket.carModel,
-        carColor: ticket.carColor,
-        scheduledRetrievalAt: ticket.scheduledRetrievalAt,
-      });
+      res.json(toPublicTicketStatus(ticket));
     } catch (error) {
       console.error("Error fetching ticket:", error);
       res.status(500).json({ message: "Failed to fetch ticket" });
@@ -2239,6 +2257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const scope = await storage.addUserLocationScope({ userId, locationId });
+      refreshUserLocationScopeSockets(clients, userId, WebSocket.OPEN);
       res.json(scope);
     } catch (error) {
       console.error("Error adding user location scope:", error);
@@ -2263,6 +2282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.removeUserLocationScope(userId, locationId);
+      refreshUserLocationScopeSockets(clients, userId, WebSocket.OPEN);
       res.json({ message: "Location scope removed successfully" });
     } catch (error) {
       console.error("Error removing user location scope:", error);
@@ -2734,7 +2754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const stopWebSocketHeartbeat = installWebSocketHeartbeat(wss);
   httpServer.once('close', stopWebSocketHeartbeat);
   // scopedLocationIds: undefined = no location restriction; string[] = restricted to those locations (may be empty)
-  interface ClientInfo { ouId: string | null; role: string; scopedLocationIds?: string[]; }
+  interface ClientInfo { userId: string; ouId: string | null; role: string; scopedLocationIds?: string[]; }
   const clients = new Map<WebSocket, ClientInfo>();
   const sessionParser = (await import('./auth')).getSession();
 
@@ -2762,8 +2782,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Load location restrictions so broadcastToOU can filter ticket events
+      const scopeGeneration = getUserLocationScopeGeneration(String(userId));
       const scopedLocationIds = await getUserScopedLocationIds(user) ?? undefined;
-      clients.set(ws, { ouId: user.ouId ?? null, role: user.role, scopedLocationIds });
+      // A concurrent scope mutation may have invalidated a snapshot while this
+      // asynchronous DB lookup was in flight. Reconnect so the next handshake
+      // loads the current scope instead of registering a stale authorization.
+      if (!isUserLocationScopeSnapshotCurrent(String(userId), scopeGeneration)) {
+        ws.close(LOCATION_SCOPE_CHANGED_CLOSE_CODE, 'Location scopes changed during authentication');
+        return;
+      }
+      clients.set(ws, { userId: String(userId), ouId: user.ouId ?? null, role: user.role, scopedLocationIds });
       console.log('Authenticated client connected to WebSocket');
 
       ws.on('close', () => {

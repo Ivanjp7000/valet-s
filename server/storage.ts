@@ -39,6 +39,7 @@ import {
   type GuestNameImport,
 } from "@shared/schema";
 import { db, sql } from "./db";
+import { publishPublicTicketChange } from "./public-ticket-events.mjs";
 import { eq, desc, asc, and, or, inArray, isNull, lte, isNotNull, gt, ilike, lt } from "drizzle-orm";
 import { sql as drizzleSql } from "drizzle-orm";
 
@@ -225,6 +226,7 @@ export class DatabaseStorage implements IStorage {
   // Valet ticket operations
   async createValetTicket(ticket: InsertValetTicket): Promise<ValetTicket> {
     const [newTicket] = await db.insert(valetTickets).values(ticket).returning();
+    publishPublicTicketChange(newTicket.ticketNumber, newTicket);
     return newTicket;
   }
 
@@ -291,6 +293,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
 
+    // Publish the committed ticket state before ancillary trip logging. A trip
+    // log failure must not suppress a status change from an active public stream.
+    if (ticket) publishPublicTicketChange(ticketNumber, ticket);
+
     // If transitioning to out_with_guest, log a new trip entry
     if (status === 'out_with_guest' && ticket) {
       await db.insert(ticketGuestTrips).values({
@@ -308,6 +314,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...details, updatedAt: new Date() })
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
+    if (ticket) publishPublicTicketChange(ticketNumber, ticket);
     return ticket;
   }
 
@@ -317,6 +324,7 @@ export class DatabaseStorage implements IStorage {
       .set({ ...(fields as any), updatedAt: new Date() })
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
+    if (ticket) publishPublicTicketChange(ticketNumber, ticket);
     return ticket;
   }
 
@@ -343,6 +351,8 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
+
+    if (updatedTicket) publishPublicTicketChange(ticketNumber, updatedTicket);
 
     // Close the open trip entry for this ticket
     if (updatedTicket) {
@@ -442,6 +452,7 @@ export class DatabaseStorage implements IStorage {
       .delete(valetTickets)
       .where(eq(valetTickets.ticketNumber, ticketNumber))
       .returning();
+    if (result.length > 0) publishPublicTicketChange(ticketNumber, null);
     return result.length > 0;
   }
 

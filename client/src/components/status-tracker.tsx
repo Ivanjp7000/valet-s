@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Car, Search, Construction, Check, X, Clock, Bell, Sparkles, CalendarClock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ValetTicket } from "@shared/schema";
+import { createPublicTicketEventGeneration, createSingleFlightRefresh, isPublicTicketStreamDisabledResponse, publicTicketConnectedAfterVisibilityPause, publicTicketFallbackPollInterval, publicTicketLookupRevokesAccess, publicTicketQueryEnabled, publicTicketVisibilityAction, PUBLIC_TICKET_STREAM_RECONCILE_MS } from "@/lib/public-ticket-stream-policy.mjs";
+import { consumePublicTicketStream } from "@/lib/public-ticket-stream-client.mjs";
+import { buildPublicTicketStreamRequest } from "@/lib/public-ticket-stream-request.mjs";
 
 interface StatusTrackerProps {
   ticketNumber: string;
@@ -35,7 +38,23 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [streamConnected, setStreamConnected] = useState(true);
+  const [streamConnecting, setStreamConnectingState] = useState(true);
+  const [documentHidden, setDocumentHidden] = useState(document.hidden);
+  const [streamAccessRevoked, setStreamAccessRevoked] = useState(false);
+  const streamRef = useRef<AbortController | null>(null);
+  const streamConnectingRef = useRef(true);
+  const streamUnavailableRef = useRef(false);
+  const streamConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamReconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastStreamHeartbeatRef = useRef(0);
+  const streamTicketEventGenerationRef = useRef(createPublicTicketEventGeneration());
   const queryClient = useQueryClient();
+  const setStreamConnecting = (connecting: boolean) => {
+    streamConnectingRef.current = connecting;
+    setStreamConnectingState(connecting);
+  };
 
   const handleCancelSchedule = async () => {
     setCancellingSchedule(true);
@@ -68,12 +87,10 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     setEditSaving(false);
   };
 
-  // Build the polling URL — prefer PIN when provided; fall back to name
+  // Keep the PIN in a request header instead of the URL so access logs and
+  // guest identity details do not appear in URLs, access logs, or referrers.
   const buildLookupUrl = () => {
-    const params = new URLSearchParams();
-    if (guestPin) params.set("pin", guestPin);
-    else if (guestName) params.set("name", guestName);
-    return `/api/tickets/${encodeURIComponent(ticketNumber)}?${params.toString()}`;
+    return `/api/tickets/${encodeURIComponent(ticketNumber)}`;
   };
 
   // Calls the server to cancel the retrieval request, then navigates back
@@ -92,21 +109,230 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
 
   const queryKey = ["/api/tickets", ticketNumber, guestName, guestPin ?? ""];
 
-  const { data: ticket, isError, isFetching, dataUpdatedAt, refetch } = useQuery<ValetTicket>({
+  const { data: ticket, error, isError, isFetching, dataUpdatedAt, refetch } = useQuery<ValetTicket>({
     queryKey,
-    queryFn: async () => {
-      const res = await fetch(buildLookupUrl(), { credentials: "include" });
-      if (!res.ok) throw new Error(`${res.status}`);
+    queryFn: async ({ signal }) => {
+      const res = await fetch(buildLookupUrl(), {
+        credentials: "include",
+        headers: guestPin ? { "X-Ticket-PIN": guestPin } : {},
+        signal,
+      });
+      if (!res.ok) {
+        const error = new Error(`${res.status}`) as Error & { status: number };
+        error.status = res.status;
+        throw error;
+      }
       return res.json();
     },
-    refetchInterval: query => query.state.data?.status === "completed" ? false : 30_000,
-    // Public status pages are not authorized for the staff WebSocket. Poll as
-    // a visible-page fallback and pause while hidden to reduce idle database reads.
+    enabled: publicTicketQueryEnabled({ hidden: documentHidden, connecting: streamConnecting, revoked: streamAccessRevoked }),
+    staleTime: PUBLIC_TICKET_STREAM_RECONCILE_MS,
+    refetchInterval: query => publicTicketFallbackPollInterval({
+      connected: streamConnected,
+      hidden: document.hidden,
+      status: query.state.data?.status,
+    }),
+    // Ticket events are pushed immediately. Reconcile after the Neon idle window while
+    // connected to recover changes made by another runtime process or writer;
+    // poll faster after disconnect and always allow manual/foreground checks.
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     retry: false,
     placeholderData: (prev) => prev, // always show last known status while refetching
   });
+  const refreshTicketRef = useRef<(() => Promise<unknown>) | null>(null);
+  if (refreshTicketRef.current === null) {
+    refreshTicketRef.current = createSingleFlightRefresh(() => {
+      if (queryClient.isFetching({ queryKey, exact: true }) > 0) return Promise.resolve();
+      return refetch();
+    });
+  }
+
+  useEffect(() => {
+    const status = (error as (Error & { status?: number }) | null)?.status;
+    if (!isError || !publicTicketLookupRevokesAccess(status)) return;
+    streamTicketEventGenerationRef.current.invalidate();
+    streamRef.current?.abort();
+    streamRef.current = null;
+    if (streamConnectTimeoutRef.current) clearTimeout(streamConnectTimeoutRef.current);
+    streamConnectTimeoutRef.current = null;
+    if (streamWatchdogRef.current) clearInterval(streamWatchdogRef.current);
+    streamWatchdogRef.current = null;
+    if (streamReconnectRef.current) clearTimeout(streamReconnectRef.current);
+    streamReconnectRef.current = null;
+    queryClient.removeQueries({ queryKey, exact: true });
+    setStreamAccessRevoked(true);
+    setStreamConnected(true);
+    setStreamConnecting(false);
+  }, [error, isError, queryClient, queryKey]);
+
+  useEffect(() => {
+    let disposed = false;
+    let retryDelay = 60_000;
+    const setConnected = (connected: boolean) => setStreamConnected(connected);
+    const closeStream = () => {
+      streamRef.current?.abort();
+      streamRef.current = null;
+      if (streamConnectTimeoutRef.current) clearTimeout(streamConnectTimeoutRef.current);
+      streamConnectTimeoutRef.current = null;
+      if (streamWatchdogRef.current) clearInterval(streamWatchdogRef.current);
+      streamWatchdogRef.current = null;
+      if (streamReconnectRef.current) clearTimeout(streamReconnectRef.current);
+      streamReconnectRef.current = null;
+    };
+    const scheduleReconnect = () => {
+      if (disposed || document.hidden || streamReconnectRef.current !== null) return;
+      streamReconnectRef.current = setTimeout(() => {
+        streamReconnectRef.current = null;
+        openStream();
+      }, retryDelay);
+      retryDelay = Math.min(5 * 60_000, retryDelay * 2);
+    };
+    const openStream = () => {
+      if (disposed || document.hidden || streamRef.current || streamUnavailableRef.current) return;
+      if (streamReconnectRef.current) clearTimeout(streamReconnectRef.current);
+      streamReconnectRef.current = null;
+      setStreamAccessRevoked(false);
+      const request = buildPublicTicketStreamRequest(ticketNumber, guestPin, window.location.origin);
+      const controller = new AbortController();
+      setStreamConnecting(true);
+      setConnected(true);
+      void queryClient.cancelQueries({ queryKey, exact: true });
+      streamRef.current = controller;
+      streamConnectTimeoutRef.current = setTimeout(() => {
+        if (streamRef.current !== controller) return;
+        streamRef.current = null;
+        controller.abort();
+        streamConnectTimeoutRef.current = null;
+        setStreamConnecting(false);
+        setConnected(false);
+        scheduleReconnect();
+      }, 15_000);
+      const handleStreamFailure = () => {
+        if (disposed || controller.signal.aborted) return;
+        if (streamRef.current === controller) streamRef.current = null;
+        if (streamConnectTimeoutRef.current) clearTimeout(streamConnectTimeoutRef.current);
+        streamConnectTimeoutRef.current = null;
+        if (streamWatchdogRef.current) clearInterval(streamWatchdogRef.current);
+        streamWatchdogRef.current = null;
+        setStreamConnecting(false);
+        setConnected(false);
+        scheduleReconnect();
+        controller.abort();
+      };
+
+      void (async () => {
+        try {
+          const response = await fetch(request.url, {
+            ...request.init,
+            signal: controller.signal,
+          });
+          if (isPublicTicketStreamDisabledResponse(response.status, response.headers.get("x-ticket-stream-disabled"))) {
+            await response.body?.cancel().catch(() => {});
+            if (streamRef.current === controller) streamRef.current = null;
+            if (streamConnectTimeoutRef.current) clearTimeout(streamConnectTimeoutRef.current);
+            streamConnectTimeoutRef.current = null;
+            controller.abort();
+            streamUnavailableRef.current = true;
+            setStreamConnecting(false);
+            setConnected(false);
+            return;
+          }
+          if (response.status === 400 || response.status === 404) {
+            await response.body?.cancel().catch(() => {});
+            streamTicketEventGenerationRef.current.invalidate();
+            if (streamRef.current === controller) streamRef.current = null;
+            if (streamConnectTimeoutRef.current) clearTimeout(streamConnectTimeoutRef.current);
+            streamConnectTimeoutRef.current = null;
+            controller.abort();
+            setStreamConnecting(false);
+            queryClient.removeQueries({ queryKey, exact: true });
+            setStreamAccessRevoked(true);
+            setConnected(true);
+            return;
+          }
+          if (!response.ok || !response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
+            await response.body?.cancel().catch(() => {});
+            handleStreamFailure();
+            return;
+          }
+
+          if (streamConnectTimeoutRef.current) clearTimeout(streamConnectTimeoutRef.current);
+          streamConnectTimeoutRef.current = null;
+          retryDelay = 60_000;
+          lastStreamHeartbeatRef.current = Date.now();
+          setConnected(true);
+          streamWatchdogRef.current = setInterval(() => {
+            if (Date.now() - lastStreamHeartbeatRef.current <= 60_000) return;
+            if (streamRef.current === controller) streamRef.current = null;
+            controller.abort();
+            if (streamWatchdogRef.current) clearInterval(streamWatchdogRef.current);
+            streamWatchdogRef.current = null;
+            setStreamConnecting(false);
+            setConnected(false);
+            scheduleReconnect();
+          }, 10_000);
+
+          await consumePublicTicketStream(response.body, {
+            onHeartbeat: () => { lastStreamHeartbeatRef.current = Date.now(); },
+            onTicket: (data) => {
+              lastStreamHeartbeatRef.current = Date.now();
+              const next = JSON.parse(data) as ValetTicket;
+              const eventGeneration = streamTicketEventGenerationRef.current.next();
+              void queryClient.cancelQueries({ queryKey, exact: true }).finally(() => {
+                if (streamTicketEventGenerationRef.current.isCurrent(eventGeneration)) {
+                  queryClient.setQueryData(queryKey, next);
+                  setStreamConnecting(false);
+                }
+              });
+              if (next.status === "completed") closeStream();
+            },
+            onAccessRevoked: () => {
+              closeStream();
+              streamTicketEventGenerationRef.current.invalidate();
+              setStreamConnecting(false);
+              queryClient.removeQueries({ queryKey, exact: true });
+              setStreamAccessRevoked(true);
+              setConnected(true);
+            },
+          }, controller.signal);
+          if (!controller.signal.aborted) handleStreamFailure();
+        } catch {
+          handleStreamFailure();
+        }
+      })();
+    };
+    const onVisibilityChange = () => {
+      setDocumentHidden(document.hidden);
+      const action = publicTicketVisibilityAction({ hidden: document.hidden, streamUnavailable: streamUnavailableRef.current });
+      if (action === "pause") {
+        closeStream();
+        setConnected(publicTicketConnectedAfterVisibilityPause({ streamUnavailable: streamUnavailableRef.current }));
+      } else if (action === "refresh") {
+        void refreshTicketRef.current?.();
+      } else {
+        openStream();
+      }
+    };
+    const onWindowFocus = () => {
+      if (document.hidden) return;
+      if (streamRef.current) {
+        if (!streamConnectingRef.current) void refreshTicketRef.current?.();
+      }
+      else if (streamUnavailableRef.current) void refreshTicketRef.current?.();
+      else openStream();
+    };
+
+    openStream();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onWindowFocus);
+    return () => {
+      disposed = true;
+      streamTicketEventGenerationRef.current.invalidate();
+      closeStream();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onWindowFocus);
+    };
+  }, [ticketNumber, guestName, guestPin, queryClient, refetch]);
 
   const currentStage = ticket ? getStageFromStatus(ticket.status) : -1;
   const isReady = ticket?.status === "ready";
@@ -138,6 +364,14 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
     }, 1000);
     return () => clearInterval(interval);
   }, [ticket?.status]);
+
+  if (streamAccessRevoked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8 text-center">
+        <p className="text-sm text-gray-600">This ticket is no longer available. Please contact the valet desk.</p>
+      </div>
+    );
+  }
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -582,8 +816,11 @@ export function StatusTracker({ ticketNumber, guestName, guestPin, onBack }: Sta
           })()}
 
           <div className="flex items-center justify-center gap-3 text-xs text-gray-400 mt-4">
-            <span>{dataUpdatedAt ? `Checked ${new Date(dataUpdatedAt).toLocaleTimeString()}` : "Waiting for first check"} · Checks every 30 seconds while visible</span>
-            <Button variant="ghost" size="sm" onClick={() => void refetch()} disabled={isFetching} className="h-7 px-2 text-xs">
+            <span>
+              {dataUpdatedAt ? `Checked ${new Date(dataUpdatedAt).toLocaleTimeString()}` : "Waiting for first check"}
+              {streamConnected ? " · Live updates with periodic safety checks" : " · Rechecking every 30 seconds while reconnecting"}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => void refreshTicketRef.current?.()} disabled={isFetching} className="h-7 px-2 text-xs">
               {isFetching ? "Checking…" : "Check now"}
             </Button>
           </div>
